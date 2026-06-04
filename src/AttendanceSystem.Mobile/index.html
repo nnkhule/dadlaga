@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="mn">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Цаг Бүртгэл</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="top-label">
+        <div class="small">Сайн байна уу 👋</div>
+        <h2 id="emp-name">Б.Батаа</h2>
+      </div>
+      <button class="btn btn-ghost" onclick="doLogout()">Гарах</button>
+    </header>
+
+    <main class="content">
+      <section class="screen active" id="home-screen">
+        <div class="hero-card">
+          <div class="hero-date" id="today-date">...</div>
+          <div class="hero-time" id="live-clock">00:00:00</div>
+          <p class="hero-subtitle">Таны цалин, ажилласан цаг, чөлөөний хүсэлт болон тасралтгүй ирцийн мэдээг нэг платформд.</p>
+          <div class="status-chip" id="attendance-status">Төлөв</div>
+        </div>
+
+        <div class="glass-card attendance-card">
+          <div class="info-block">
+            <div class="label">Ирсэн цаг</div>
+            <div class="value accent" id="checkin-time">--:--</div>
+            <div class="muted">Өнөөдрийн анхны бүртгэл</div>
+          </div>
+          <div class="info-block">
+            <div class="label">Гарсан цаг</div>
+            <div class="value" id="checkout-time">--:--</div>
+            <div class="muted">Өнөөдрийн төгсгөл</div>
+          </div>
+          <div class="info-block full-width">
+            <div class="label">Төлөв</div>
+            <div class="value" id="attendance-message">Өнөөдрийн бүртгэлийг шалгаж байна...</div>
+          </div>
+        </div>
+
+        <button id="checkin-btn" class="action-btn state-in" type="button" onclick="handleAttendanceAction()">
+          <span id="btn-label">ИРСЭН</span>
+          <small id="btn-hint">Дарж ажилд ирсэн бүртгэлээ хийнэ үү</small>
+        </button>
+
+        <div class="card">
+          <div class="timer-head">
+            <span>Ажилласан цаг</span>
+            <span id="work-timer">0ц 00мин</span>
+          </div>
+          <div class="progress">
+            <div class="fill" id="work-bar"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen" id="stats-screen">
+        <div class="screen-title">Энэ сарын статистик <span id="stats-month" class="muted"></span></div>
+        <div class="stats-grid">
+          <div class="mini-card" id="presentDays"><strong>0/0</strong><span>Ирсэн / ажлын өдөр</span></div>
+          <div class="mini-card" id="lateCount"><strong>0</strong><span>Хоцролт</span></div>
+          <div class="mini-card" id="absentDays"><strong>0</strong><span>Гүйцэтгээгүй</span></div>
+          <div class="mini-card" id="overtimeHours"><strong>0ц</strong><span>Илүү цаг</span></div>
+        </div>
+
+        <div class="card">
+          <div class="section-title">Сүүлийн бүртгэл</div>
+          <div id="history-list" class="history">
+            <!-- recent records injected by JS -->
+          </div>
+        </div>
+      </section>
+
+      <section class="screen" id="schedule-screen">
+        <div class="screen-title">Хуваарь & Чөлөө</div>
+
+        <div class="card">
+          <div class="kv"><span>Ажлын цаг</span><b>09:00 — 18:00</b></div>
+          <div class="divider"></div>
+          <div class="kv"><span>Цайны цаг</span><b>13:00 — 14:00</b></div>
+          <div class="divider"></div>
+          <div class="kv"><span>Хэлтэс ID</span><b id="department-id">---</b></div>
+        </div>
+
+        <div class="card">
+          <div class="section-title">Чөлөө хүсэлт</div>
+          <p class="muted">Чөлөө авах хүсэлт илгээхийн тулд доорх товчийг дарна уу.</p>
+          <div class="action-row">
+            <button class="btn btn-primary" onclick="openLeaveForm()">Чөлөө хүсэлт илгээх</button>
+            <button class="btn btn-ghost" onclick="navTo('home')">Буцах</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="section-title">Ирэх баярын өдрүүд</div>
+          <div class="holiday-list">
+            <div class="holiday-item">🎉 Наадам — 2026/07/11</div>
+            <div class="holiday-item">🇲🇳 Бүгд Найрамдах өдөр — 2026/11/26</div>
+            <div class="holiday-item">🗽 Тусгаар тогтнолын өдөр — 2026/12/29</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen" id="profile-screen">
+        <div class="screen-title">Профайл</div>
+
+        <div class="profile-card">
+          <div class="avatar">ББ</div>
+          <h3>Б.Батаа</h3>
+          <p>EMP001 · Хүний нөөцийн мэргэжилтэн</p>
+        </div>
+
+        <div class="card">
+          <div class="setting">🔔 Мэдэгдлийн тохиргоо</div>
+          <div class="setting">📍 Байршлын зөвшөөрөл</div>
+          <div class="setting">🔒 Нууц үг солих</div>
+          <div class="setting">🌙 Dark mode</div>
+        </div>
+      </section>
+    </main>
+
+    <nav class="bottom-nav">
+      <button class="nav-btn active" id="nav-home" onclick="navTo('home')">Нүүр</button>
+      <button class="nav-btn" id="nav-stats" onclick="navTo('stats')">Статистик</button>
+      <button class="nav-btn" id="nav-schedule" onclick="navTo('schedule')">Хуваарь</button>
+      <button class="nav-btn" id="nav-profile" onclick="navTo('profile')">Профайл</button>
+    </nav>
+  </div>
+
+  <div id="scan-overlay" class="overlay">
+    <div class="overlay-card scan-card">
+      <div class="overlay-title" id="scan-title">Нүүр таниж байна...</div>
+      <div class="overlay-text" id="scan-text">Камерыг нүүр рүүгээ чиглүүлнэ үү</div>
+      <div class="camera-frame">
+        <video id="camera-video" autoplay muted playsinline></video>
+        <div class="camera-ring"></div>
+      </div>
+      <div class="scan-status" id="scan-status">Скан хийж байна...</div>
+    </div>
+  </div>
+
+  <div id="gps-overlay" class="overlay">
+    <div class="overlay-card">
+      <div class="overlay-title">GPS-ийг шалгаж байна...</div>
+      <div class="overlay-text" id="gps-target">Оффис: 100 м хүртэл</div>
+      <div class="gps-badge"><span id="gps-distance">0 м</span></div>
+    </div>
+  </div>
+
+  <div id="distance-overlay" class="overlay">
+    <div class="overlay-card danger-card">
+      <div class="overlay-title">Таны байршил баталгаажаагүй</div>
+      <div class="overlay-text" id="distance-message">Оффисоос хол байна.</div>
+      <div class="action-row action-row-end">
+        <button class="btn btn-primary" onclick="closeDistanceOverlay()">Буцах</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="success-overlay" class="overlay">
+    <div class="overlay-card success-card">
+      <div class="overlay-title" id="success-title">Амжилттай бүртгэгдлээ!</div>
+      <div class="overlay-time" id="success-time">09:24</div>
+      <div class="overlay-text" id="success-text">Ажилд ирсэн цаг бүртгэгдлээ</div>
+    </div>
+  </div>
+
+  <div id="leave-overlay" class="overlay">
+    <div class="overlay-card leave-card">
+      <div class="overlay-title">Чөлөө хүсэлт илгээх</div>
+      <form id="leave-form" class="form" onsubmit="return submitLeaveRequest(event)">
+        <label>Эхлэх огноо
+          <input type="date" id="leave-start" required />
+        </label>
+        <label>Дуусах огноо
+          <input type="date" id="leave-end" required />
+        </label>
+        <label>Чөлөөний төрөл
+          <select id="leave-type">
+            <option value="annual">Ажлын чөлөө</option>
+            <option value="sick">Эмнэлгийн</option>
+            <option value="unpaid">Цалингүй</option>
+          </select>
+        </label>
+        <label>Шалтгаан
+          <textarea id="leave-reason" rows="3" placeholder="Товч шалтгаан"></textarea>
+        </label>
+        <div class="action-row action-row-end">
+          <button type="button" class="btn btn-ghost" onclick="closeLeaveForm()">Цуцлах</button>
+          <button type="submit" id="leave-submit" class="btn btn-primary">Илгээх</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/attendance.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

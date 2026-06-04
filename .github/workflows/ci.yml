@@ -1,0 +1,19 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - run: dotnet restore AttendanceSystem.sln
+      - run: dotnet build AttendanceSystem.sln --no-restore -c Release
+      - run: dotnet test AttendanceSystem.sln --no-build -c Release --verbosity normal

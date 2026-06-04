@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="mn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Цаг Бүртгэл</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:        #0A0A0F;
+  --surface:   #12121A;
+  --surface2:  #1A1A26;
+  --border:    #2A2A3A;
+  --green:     #00E5A0;
+  --green-dim: rgba(0,229,160,0.12);
+  --red:       #FF4757;
+  --red-dim:   rgba(255,71,87,0.12);
+  --blue:      #4A9EFF;
+  --blue-dim:  rgba(74,158,255,0.12);
+  --amber:     #FFB830;
+  --amber-dim: rgba(255,184,48,0.12);
+  --text:      #F0F0FF;
+  --text2:     #8888AA;
+  --text3:     #44445A;
+  --font-d:    'Syne', sans-serif;
+  --font-b:    'DM Sans', sans-serif;
+  --font-m:    'JetBrains Mono', monospace;
+  --r:         16px;
+  --r-sm:      10px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#000;display:flex;justify-content:center;align-items:center;font-family:var(--font-b)}
+.phone{
+    width:100%;
+    max-width:1200px;
+    height:100vh;
+    border-radius:0;
+}@media(min-width:500px){.phone{border-radius:40px;box-shadow:0 40px 120px rgba(0,0,0,.9),0 0 0 1px rgba(255,255,255,.06)}}
+
+/* STATUS BAR */
+.statusbar{display:flex;justify-content:space-between;align-items:center;padding:12px 24px 4px;flex-shrink:0}
+.statusbar .time{font-family:var(--font-m);font-size:13px;font-weight:500;color:var(--text)}
+.statusbar .icons{display:flex;gap:6px;align-items:center}
+.statusbar .icons svg{width:16px;height:16px;fill:var(--text)}
+
+/* SCREENS */
+.screen{position:absolute;inset:0;padding-top:44px;padding-bottom:80px;overflow-y:auto;opacity:0;pointer-events:none;transform:translateY(16px);transition:all .3s cubic-bezier(.4,0,.2,1)}
+.screen.active{opacity:1;pointer-events:all;transform:translateY(0)}
+.screen-inner{padding:0 20px;display:flex;flex-direction:column;gap:16px;padding-bottom:20px}
+
+/* BOTTOM NAV */
+.bottom-nav{position:absolute;bottom:0;left:0;right:0;height:80px;background:var(--surface);border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-around;padding:0 8px 16px;flex-shrink:0;z-index:100}
+.nav-btn{display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 16px;border-radius:12px;border:none;background:none;cursor:pointer;transition:all .2s;min-width:60px}
+.nav-btn svg{width:22px;height:22px;stroke:var(--text3);fill:none;stroke-width:1.8;stroke-linecap:round;transition:all .2s}
+.nav-btn span{font-size:10px;color:var(--text3);font-family:var(--font-b);font-weight:500;transition:all .2s}
+.nav-btn.active svg{stroke:var(--green)}
+.nav-btn.active span{color:var(--green)}
+.nav-btn.active{background:var(--green-dim)}
+
+/* LOGIN SCREEN */
+#login-screen{z-index:200;background:var(--bg);padding-top:0;padding-bottom:0}
+#login-screen.active{display:flex;flex-direction:column;justify-content:center}
+.login-wrap{padding:40px 28px;display:flex;flex-direction:column;gap:24px}
+.login-logo{text-align:center;margin-bottom:8px}
+.login-logo .logo-icon{width:72px;height:72px;background:var(--green-dim);border:1.5px solid rgba(0,229,160,.3);border-radius:24px;display:inline-flex;align-items:center;justify-content:center;margin-bottom:16px}
+.login-logo .logo-icon svg{width:36px;height:36px;stroke:var(--green);fill:none;stroke-width:1.8;stroke-linecap:round}
+.login-logo h1{font-family:var(--font-d);font-size:26px;font-weight:800;color:var(--text);letter-spacing:-0.5px}
+.login-logo p{font-size:13px;color:var(--text2);margin-top:4px}
+.field{display:flex;flex-direction:column;gap:8px}
+.field label{font-size:12px;font-weight:600;color:var(--text2);letter-spacing:.04em;text-transform:uppercase}
+.field input{background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--r-sm);padding:14px 16px;color:var(--text);font-family:var(--font-b);font-size:15px;outline:none;transition:border-color .2s}
+.field input:focus{border-color:var(--green)}
+.field input.error{border-color:var(--red);animation:shake .3s}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+.login-btn{background:var(--green);border:none;border-radius:var(--r-sm);padding:16px;color:#000;font-family:var(--font-d);font-size:16px;font-weight:700;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:8px}
+.login-btn:active{transform:scale(.98)}
+.login-btn.loading{background:rgba(0,229,160,.5);pointer-events:none}
+.login-hint{text-align:center;font-size:12px;color:var(--text3)}
+.login-hint span{color:var(--green)}
+
+/* GREETING */
+.greeting h2{font-family:var(--font-d);font-size:22px;font-weight:700;color:var(--text);letter-spacing:-0.3px}
+.greeting p{font-size:13px;color:var(--text2);margin-top:2px}
+
+/* CLOCK CARD */
+.clock-card{background:linear-gradient(135deg,#0D1F2D 0%,#0A1628 100%);border:1px solid rgba(74,158,255,.2);border-radius:var(--r);padding:20px;text-align:center;position:relative;overflow:hidden}
+.clock-card::before{content:'';position:absolute;top:-40px;right:-40px;width:120px;height:120px;background:radial-gradient(circle,rgba(74,158,255,.15) 0%,transparent 70%);border-radius:50%}
+.clock-card .date{font-size:13px;color:var(--blue);font-weight:500;letter-spacing:.04em;text-transform:uppercase;margin-bottom:4px}
+.clock-card .time{font-family:var(--font-m);font-size:42px;font-weight:500;color:var(--text);letter-spacing:-1px;line-height:1}
+.clock-card .seconds{color:var(--blue);opacity:.7}
+
+/* GPS CARD */
+.gps-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px 16px;display:flex;align-items:center;gap:12px}
+.gps-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;animation:blink 2s infinite}
+.gps-dot.green{background:var(--green);box-shadow:0 0 8px var(--green)}
+.gps-dot.amber{background:var(--amber);box-shadow:0 0 8px var(--amber)}
+.gps-dot.red{background:var(--red);box-shadow:0 0 8px var(--red)}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.4}}
+.gps-info{flex:1}
+.gps-info .loc{font-size:13px;font-weight:500;color:var(--text)}
+.gps-info .dist{font-size:12px;color:var(--text2)}
+.gps-icon{stroke:var(--text3);fill:none;stroke-width:1.8;width:18px;height:18px}
+
+/* CHECK IN BUTTON */
+.checkin-wrap{display:flex;flex-direction:column;align-items:center;gap:12px;padding:8px 0}
+.checkin-btn{width:200px;height:200px;border-radius:50%;border:none;cursor:pointer;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;transition:all .3s;outline:none}
+.checkin-btn.state-in{background:radial-gradient(circle at 40% 35%,#00FFB2,#00B87A);box-shadow:0 0 40px rgba(0,229,160,.4),0 0 80px rgba(0,229,160,.15),inset 0 1px 0 rgba(255,255,255,.2);animation:pulse-green 2.5s ease-in-out infinite}
+.checkin-btn.state-out{background:radial-gradient(circle at 40% 35%,#FF6B7A,#CC1F30);box-shadow:0 0 40px rgba(255,71,87,.4),0 0 80px rgba(255,71,87,.15),inset 0 1px 0 rgba(255,255,255,.2);animation:pulse-red 2.5s ease-in-out infinite}
+.checkin-btn.state-done{background:var(--surface2);border:2px solid var(--border);box-shadow:none;animation:none;cursor:default}
+.checkin-btn.loading-state{animation:none !important;opacity:.7;pointer-events:none}
+@keyframes pulse-green{0%,100%{box-shadow:0 0 40px rgba(0,229,160,.4),0 0 80px rgba(0,229,160,.15)}50%{box-shadow:0 0 60px rgba(0,229,160,.6),0 0 120px rgba(0,229,160,.25)}}
+@keyframes pulse-red{0%,100%{box-shadow:0 0 40px rgba(255,71,87,.4),0 0 80px rgba(255,71,87,.15)}50%{box-shadow:0 0 60px rgba(255,71,87,.6),0 0 120px rgba(255,71,87,.25)}}
+.checkin-btn svg.btn-icon{width:48px;height:48px;stroke:#000;fill:none;stroke-width:2;stroke-linecap:round}
+.checkin-btn.state-done svg.btn-icon{stroke:var(--text3)}
+.checkin-btn .btn-label{font-family:var(--font-d);font-size:14px;font-weight:700;color:#000;letter-spacing:.04em}
+.checkin-btn.state-done .btn-label{color:var(--text3)}
+.checkin-ring{position:absolute;inset:-8px;border-radius:50%;border:2px solid rgba(0,229,160,.2);animation:ring-spin 4s linear infinite}
+.checkin-btn.state-out .checkin-ring{border-color:rgba(255,71,87,.2)}
+.checkin-btn.state-done .checkin-ring{display:none}
+@keyframes ring-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+
+/* STATUS ROW */
+.status-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.status-chip{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px 14px}
+.status-chip .label{font-size:11px;color:var(--text2);font-weight:500;letter-spacing:.04em;text-transform:uppercase;margin-bottom:4px}
+.status-chip .value{font-family:var(--font-m);font-size:18px;font-weight:500;color:var(--text)}
+.status-chip.has-value{border-color:rgba(0,229,160,.25)}
+.status-chip.has-value .value{color:var(--green)}
+
+/* WORK PROGRESS */
+.work-progress{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:14px 16px}
+.work-progress .wp-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.work-progress .wp-title{font-size:12px;color:var(--text2);font-weight:500}
+.work-progress .wp-time{font-family:var(--font-m);font-size:14px;color:var(--text);font-weight:500}
+.progress-track{height:6px;background:var(--border);border-radius:3px;overflow:hidden}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--green),#00B87A);border-radius:3px;transition:width 1s linear}
+.progress-fill.overtime{background:linear-gradient(90deg,var(--amber),#E09000)}
+
+/* SECTION HEADER */
+.section-hdr{display:flex;justify-content:space-between;align-items:center}
+.section-hdr h3{font-family:var(--font-d);font-size:16px;font-weight:700;color:var(--text)}
+.section-hdr a{font-size:12px;color:var(--green);text-decoration:none}
+
+/* STAT CARDS */
+.stat-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px 10px;text-align:center}
+.stat-card .sv{font-family:var(--font-d);font-size:22px;font-weight:800;color:var(--text);line-height:1}
+.stat-card .sl{font-size:10px;color:var(--text2);margin-top:4px;font-weight:500}
+.stat-card.green .sv{color:var(--green)}
+.stat-card.amber .sv{color:var(--amber)}
+.stat-card.blue .sv{color:var(--blue)}
+
+/* CALENDAR */
+.cal-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px}
+.cal-days-hdr{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:8px}
+.cal-days-hdr span{text-align:center;font-size:11px;color:var(--text3);font-weight:600}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.cal-day{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:8px;font-size:12px;font-weight:500;position:relative}
+.cal-day.present{background:var(--green-dim);color:var(--green)}
+.cal-day.absent{background:var(--red-dim);color:var(--red)}
+.cal-day.late{background:var(--amber-dim);color:var(--amber)}
+.cal-day.weekend{color:var(--text3)}
+.cal-day.today{border:1.5px solid var(--green);color:var(--green);font-weight:700}
+.cal-day.empty{opacity:0}
+
+/* ATTENDANCE LIST */
+.att-list{display:flex;flex-direction:column;gap:8px}
+.att-item{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px 14px;display:flex;align-items:center;gap:12px}
+.att-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.att-dot.p{background:var(--green)}
+.att-dot.l{background:var(--amber)}
+.att-dot.a{background:var(--red)}
+.att-info{flex:1}
+.att-info .day{font-size:13px;font-weight:500;color:var(--text)}
+.att-info .times{font-family:var(--font-m);font-size:12px;color:var(--text2)}
+.att-badge{font-size:10px;padding:3px 8px;border-radius:20px;font-weight:600}
+.att-badge.ok{background:var(--green-dim);color:var(--green)}
+.att-badge.late{background:var(--amber-dim);color:var(--amber)}
+.att-badge.abs{background:var(--red-dim);color:var(--red)}
+
+/* SCHEDULE CARDS */
+.schedule-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:10px}
+.sch-row{display:flex;justify-content:space-between;align-items:center}
+.sch-row .sk{font-size:13px;color:var(--text2)}
+.sch-row .sv{font-family:var(--font-m);font-size:13px;color:var(--text);font-weight:500}
+.holiday-list{display:flex;flex-direction:column;gap:8px}
+.holiday-item{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px 14px;display:flex;align-items:center;gap:10px}
+.holiday-item .hi-icon{font-size:18px}
+.holiday-item .hi-name{font-size:13px;font-weight:500;color:var(--text)}
+.holiday-item .hi-date{font-size:12px;color:var(--text2)}
+.leave-btn{background:var(--blue-dim);border:1.5px solid rgba(74,158,255,.3);border-radius:var(--r-sm);padding:14px;color:var(--blue);font-family:var(--font-d);font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .2s}
+.leave-btn:active{transform:scale(.98)}
+
+/* PROFILE */
+.profile-header{display:flex;flex-direction:column;align-items:center;gap:8px;padding:8px 0}
+.avatar{width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,#00E5A0,#4A9EFF);display:flex;align-items:center;justify-content:center;font-family:var(--font-d);font-size:28px;font-weight:800;color:#000}
+.profile-header .pname{font-family:var(--font-d);font-size:20px;font-weight:700;color:var(--text)}
+.profile-header .pmeta{font-size:13px;color:var(--text2)}
+.birthday-card{background:linear-gradient(135deg,rgba(255,184,48,.12),rgba(255,71,87,.08));border:1px solid rgba(255,184,48,.25);border-radius:var(--r-sm);padding:12px 14px}
+.birthday-card .bc-title{font-size:13px;font-weight:600;color:var(--amber);margin-bottom:2px}
+.birthday-card .bc-sub{font-size:12px;color:var(--text2)}
+.settings-list{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.setting-item{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s}
+.setting-item:last-child{border-bottom:none}
+.setting-item:active{background:var(--surface2)}
+.setting-item .si-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+.setting-item .si-label{flex:1;font-size:14px;color:var(--text)}
+.setting-item .si-arrow{stroke:var(--text3);fill:none;stroke-width:2;width:16px;height:16px;stroke-linecap:round}
+.toggle{width:44px;height:26px;background:var(--green);border-radius:13px;position:relative;flex-shrink:0}
+.toggle::after{content:'';position:absolute;right:3px;top:3px;width:20px;height:20px;background:#000;border-radius:50%;transition:transform .2s}
+.logout-btn{background:var(--red-dim);border:1.5px solid rgba(255,71,87,.3);border-radius:var(--r-sm);padding:14px;color:var(--red);font-family:var(--font-d);font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .2s}
+.logout-btn:active{transform:scale(.98)}
+
+/* FACE SCAN OVERLAY */
+.face-overlay{position:absolute;inset:0;background:rgba(0,0,0,.95);z-index:300;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;opacity:0;pointer-events:none;transition:opacity .3s}
+.face-overlay.visible{opacity:1;pointer-events:all}
+.face-frame{width:220px;height:220px;border-radius:50%;border:2px solid var(--green);position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.face-frame::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,var(--green),transparent);animation:scan-line 1.5s ease-in-out infinite}
+@keyframes scan-line{0%{top:0;opacity:1}100%{top:100%;opacity:0}}
+.face-frame .face-icon{font-size:80px;opacity:.3}
+.face-corner{position:absolute;width:20px;height:20px;border-color:var(--green);border-style:solid}
+.face-corner.tl{top:-2px;left:-2px;border-width:3px 0 0 3px;border-radius:4px 0 0 0}
+.face-corner.tr{top:-2px;right:-2px;border-width:3px 3px 0 0;border-radius:0 4px 0 0}
+.face-corner.bl{bottom:-2px;left:-2px;border-width:0 0 3px 3px;border-radius:0 0 0 4px}
+.face-corner.br{bottom:-2px;right:-2px;border-width:0 3px 3px 0;border-radius:0 0 4px 0}
+.face-label{font-family:var(--font-d);font-size:16px;color:var(--text);font-weight:600}
+.face-sub{font-size:13px;color:var(--text2)}
+.face-cancel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px 24px;color:var(--text2);font-family:var(--font-b);cursor:pointer;font-size:13px}
+
+/* SUCCESS OVERLAY */
+.success-overlay{position:absolute;inset:0;background:rgba(0,0,0,.95);z-index:300;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;opacity:0;pointer-events:none;transition:opacity .3s}
+.success-overlay.visible{opacity:1;pointer-events:all}
+.success-circle{width:100px;height:100px;border-radius:50%;display:flex;align-items:center;justify-content:center;animation:success-pop .4s cubic-bezier(.34,1.56,.64,1)}
+.success-circle.green-c{background:var(--green-dim);border:2px solid var(--green)}
+.success-circle.red-c{background:var(--red-dim);border:2px solid var(--red)}
+@keyframes success-pop{0%{transform:scale(0);opacity:0}100%{transform:scale(1);opacity:1}}
+.success-circle svg{width:48px;height:48px;stroke-width:2.5;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.success-title{font-family:var(--font-d);font-size:22px;font-weight:700;color:var(--text)}
+.success-sub{font-size:13px;color:var(--text2)}
+.success-time{font-family:var(--font-m);font-size:32px;color:var(--green);font-weight:500}
+.success-time.red{color:var(--red)}
+
+/* HEADER */
+.screen-header{display:flex;align-items:center;justify-content:space-between;padding:0 20px;margin-bottom:4px;flex-shrink:0;margin-top:8px}
+.screen-header h2{font-family:var(--font-d);font-size:20px;font-weight:700;color:var(--text)}
+.notif-btn{position:relative;width:36px;height:36px;background:var(--surface);border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.notif-btn svg{width:18px;height:18px;stroke:var(--text2);fill:none;stroke-width:1.8;stroke-linecap:round}
+.notif-badge{position:absolute;top:-4px;right:-4px;width:16px;height:16px;background:var(--red);border-radius:50%;font-size:9px;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;border:2px solid var(--bg)}
+
+/* SCROLLBAR */
+.screen::-webkit-scrollbar{width:0}
+</style>
+</head>
+<body>
+<div class="phone">
+
+  <!-- STATUS BAR -->
+  <div class="statusbar">
+    <span class="time" id="sb-time">09:24</span>
+    <div class="icons">
+      <svg viewBox="0 0 24 24"><path d="M1 6l5.5 5.5L12 6l5.5 5.5L23 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+      <svg viewBox="0 0 24 24"><path d="M2 20h.01M7 20v-4M12 20v-8M17 20V8M22 4v16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+      <svg viewBox="0 0 24 24"><rect x="2" y="7" width="18" height="11" rx="2" stroke="currentColor" stroke-width="2" fill="none"/><path d="M22 11v3" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/><rect x="4" y="9" width="10" height="7" rx="1" fill="currentColor"/></svg>
+    </div>
+  </div>
+
+  <!-- LOGIN SCREEN -->
+  <div class="screen active" id="login-screen">
+    <div class="login-wrap">
+      <div class="login-logo">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/><path d="M16 11l2 2 4-4"/></svg>
+        </div>
+        <h1>Цаг Бүртгэл</h1>
+        <p>Attendance System v1.0</p>
+      </div>
+      <div class="field">
+        <label>Имэйл хаяг</label>
+        <input type="email" id="login-email" placeholder="admin@attendance.local" autocomplete="email">
+      </div>
+      <div class="field">
+        <label>Нууц үг</label>
+        <input type="password" id="login-pass" placeholder="••••••••">
+      </div>
+      <button class="login-btn" id="login-btn" onclick="doLogin()">
+        <span id="login-btn-text">Нэвтрэх</span>
+      </button>
+      <div class="login-hint">Туршилтын бүртгэл: <span>admin@attendance.local</span> / <span>Admin@12345!</span></div>
+    </div>
+  </div>
+
+  <!-- HOME SCREEN -->
+  <div class="screen" id="home-screen">
+    <div class="screen-header">
+      <div>
+        <div style="font-size:12px;color:var(--text2);font-weight:500">Сайн байна уу 👋</div>
+        <h2 id="emp-name">Б.Батаа</h2>
+      </div>
+      <div class="notif-btn">
+        <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <div class="notif-badge">2</div>
+      </div>
+    </div>
+    <div class="screen-inner">
+      <div class="clock-card">
+        <div class="date" id="today-date">МЯГМАР, 6-Р САР 3</div>
+        <div class="time" id="live-clock">09:<span id="min">24</span>:<span class="seconds" id="sec">33</span></div>
+      </div>
+      <div class="gps-card">
+        <div class="gps-dot green" id="gps-dot"></div>
+        <div class="gps-info">
+          <div class="loc">📍 Толгойт оффис</div>
+          <div class="dist" id="gps-dist">47м зайд байна — бүртгэх боломжтой</div>
+        </div>
+        <svg class="gps-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+      </div>
+      <div class="checkin-wrap">
+        <button class="checkin-btn state-in" id="checkin-btn" onclick="handleCheckin()">
+          <div class="checkin-ring"></div>
+          <svg class="btn-icon" viewBox="0 0 24 24" id="btn-icon"><path d="M12 2v10M12 12l4-4M12 12l-4-4"/><path d="M5 18a9 9 0 1 0 14 0"/></svg>
+          <span class="btn-label" id="btn-label">ИРСЭН</span>
+        </button>
+        <div style="font-size:12px;color:var(--text2);text-align:center" id="btn-hint">Дарж ажилд ирсэн бүртгэлээ хийнэ үү</div>
+      </div>
+      <div class="status-row">
+        <div class="status-chip" id="chip-in">
+          <div class="label">Ирсэн цаг</div>
+          <div class="value" id="checkin-time">--:--</div>
+        </div>
+        <div class="status-chip" id="chip-out">
+          <div class="label">Гарсан цаг</div>
+          <div class="value" id="checkout-time">--:--</div>
+        </div>
+      </div>
+      <div class="work-progress">
+        <div class="wp-header">
+          <span class="wp-title">⏱ Ажилласан цаг</span>
+          <span class="wp-time" id="work-timer">0ц 00мин</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" id="work-bar" style="width:0%"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STATS SCREEN -->
+  <div class="screen" id="stats-screen">
+    <div class="screen-header"><h2>Энэ сарын статистик</h2></div>
+    <div class="screen-inner">
+      <div class="stat-cards">
+        <div class="stat-card green"><div class="sv">22/23</div><div class="sl">Ирц</div></div>
+        <div class="stat-card amber"><div class="sv">2</div><div class="sl">Хоцролт</div></div>
+        <div class="stat-card blue"><div class="sv">4.5ц</div><div class="sl">Илүү цаг</div></div>
+      </div>
+      <div class="section-hdr"><h3>Ирцийн хуанли</h3></div>
+      <div class="cal-wrap">
+        <div class="cal-days-hdr">
+          <span>Да</span><span>Мя</span><span>Лх</span><span>Пү</span><span>Ба</span><span style="color:var(--red-dim)">Бя</span><span style="color:var(--red-dim)">Ня</span>
+        </div>
+        <div class="cal-grid" id="cal-grid"></div>
+      </div>
+      <div class="section-hdr"><h3>Сүүлийн бүртгэл</h3><a href="#">Бүгдийг харах</a></div>
+      <div class="att-list">
+        <div class="att-item"><div class="att-dot p"></div><div class="att-info"><div class="day">Мягмар, 6/3</div><div class="times">09:02 → 18:05</div></div><span class="att-badge ok">Цагтаа</span></div>
+        <div class="att-item"><div class="att-dot l"></div><div class="att-info"><div class="day">Даваа, 6/2</div><div class="times">09:15 → 18:00</div></div><span class="att-badge late">+15мин</span></div>
+        <div class="att-item"><div class="att-dot p"></div><div class="att-info"><div class="day">Баасан, 5/30</div><div class="times">08:58 → 17:55</div></div><span class="att-badge ok">Цагтаа</span></div>
+        <div class="att-item"><div class="att-dot p"></div><div class="att-info"><div class="day">Пүрэв, 5/29</div><div class="times">09:00 → 19:30</div></div><span class="att-badge blue" style="background:var(--blue-dim);color:var(--blue)">+1.5ц</span></div>
+        <div class="att-item"><div class="att-dot a"></div><div class="att-info"><div class="day">Лхагва, 5/28</div><div class="times">Тасалсан</div></div><span class="att-badge abs">Тасалсан</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCHEDULE SCREEN -->
+  <div class="screen" id="schedule-screen">
+    <div class="screen-header"><h2>Хуваарь & Чөлөө</h2></div>
+    <div class="screen-inner">
+      <div class="schedule-card">
+        <div class="sch-row"><span class="sk">Ажлын цаг</span><span class="sv">09:00 — 18:00</span></div>
+        <div style="height:1px;background:var(--border)"></div>
+        <div class="sch-row"><span class="sk">Цайны цаг</span><span class="sv">13:00 — 14:00</span></div>
+        <div style="height:1px;background:var(--border)"></div>
+        <div class="sch-row"><span class="sk">Хэлтэс</span><span class="sv">Хүний нөөц</span></div>
+        <div style="height:1px;background:var(--border)"></div>
+        <div class="sch-row"><span class="sk">Хуваарийн төрөл</span><span class="sv">Стандарт</span></div>
+      </div>
+      <div class="section-hdr"><h3>Ирэх баярын өдрүүд</h3></div>
+      <div class="holiday-list">
+        <div class="holiday-item"><div class="hi-icon">🎉</div><div><div class="hi-name">Наадам</div><div class="hi-date">2026 оны 7-р сарын 11</div></div></div>
+        <div class="holiday-item"><div class="hi-icon">🇲🇳</div><div><div class="hi-name">Бүгд Найрамдах өдөр</div><div class="hi-date">2026 оны 11-р сарын 26</div></div></div>
+        <div class="holiday-item"><div class="hi-icon">🗽</div><div><div class="hi-name">Тусгаар тогтнолын өдөр</div><div class="hi-date">2026 оны 12-р сарын 29</div></div></div>
+      </div>
+      <button class="leave-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Чөлөө хүсэх
+      </button>
+      <div class="section-hdr"><h3>Хүлээгдэж буй</h3></div>
+      <div class="att-item">
+        <div class="att-dot" style="background:var(--amber)"></div>
+        <div class="att-info"><div class="day">Чөлөө — 6/10</div><div class="times">1 өдөр · Хувийн</div></div>
+        <span class="att-badge" style="background:var(--amber-dim);color:var(--amber)">Хүлээгдэж байна</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROFILE SCREEN -->
+  <div class="screen" id="profile-screen">
+    <div class="screen-header"><h2>Профайл</h2></div>
+    <div class="screen-inner">
+      <div class="profile-header">
+        <div class="avatar">ББ</div>
+        <div class="pname">Б.Батаа</div>
+        <div class="pmeta">EMP001 · Хүний нөөцийн мэргэжилтэн</div>
+      </div>
+      <div class="birthday-card">
+        <div class="bc-title">🎂 Төрсөн өдрийн бэлэг</div>
+        <div class="bc-sub">5-р сарын 15 — Цалинтай 1 өдрийн чөлөө баталгаажсан ✓</div>
+      </div>
+      <div class="settings-list">
+        <div class="setting-item">
+          <div class="si-icon" style="background:var(--blue-dim)">🔔</div>
+          <span class="si-label">Мэдэгдлийн тохиргоо</span>
+          <svg class="si-arrow" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+        <div class="setting-item">
+          <div class="si-icon" style="background:var(--green-dim)">📍</div>
+          <span class="si-label">Байршлын зөвшөөрөл</span>
+          <div class="toggle"></div>
+        </div>
+        <div class="setting-item">
+          <div class="si-icon" style="background:var(--amber-dim)">🔒</div>
+          <span class="si-label">Нууц үг солих</span>
+          <svg class="si-arrow" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+        <div class="setting-item">
+          <div class="si-icon" style="background:rgba(255,255,255,.05)">🌙</div>
+          <span class="si-label">Dark mode</span>
+          <div class="toggle"></div>
+        </div>
+      </div>
+      <button class="logout-btn" onclick="doLogout()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Гарах
+      </button>
+    </div>
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <div class="bottom-nav" id="bottom-nav">
+    <button class="nav-btn active" onclick="navTo('home')" id="nav-home">
+      <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <span>Нүүр</span>
+    </button>
+    <button class="nav-btn" onclick="navTo('stats')" id="nav-stats">
+      <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      <span>Статистик</span>
+    </button>
+    <button class="nav-btn" onclick="navTo('schedule')" id="nav-schedule">
+      <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      <span>Хуваарь</span>
+    </button>
+    <button class="nav-btn" onclick="navTo('profile')" id="nav-profile">
+      <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <span>Профайл</span>
+    </button>
+  </div>
+
+  <!-- FACE SCAN OVERLAY -->
+  <div class="face-overlay" id="face-overlay">
+    <div class="face-frame">
+      <div class="face-icon">😐</div>
+      <div class="face-corner tl"></div>
+      <div class="face-corner tr"></div>
+      <div class="face-corner bl"></div>
+      <div class="face-corner br"></div>
+    </div>
+    <div class="face-label" id="face-label">Нүүр таниж байна...</div>
+    <div class="face-sub" id="face-sub">Камерыг нүүр рүүгээ чиглүүлнэ үү</div>
+    <button class="face-cancel" onclick="cancelFace()">Цуцлах</button>
+  </div>
+
+  <!-- SUCCESS OVERLAY -->
+  <div class="success-overlay" id="success-overlay">
+    <div class="success-circle green-c" id="success-circle">
+      <svg viewBox="0 0 24 24" id="success-icon"><polyline points="20 6 9 17 4 12" stroke="var(--green)"/></svg>
+    </div>
+    <div class="success-title" id="success-title">Амжилттай бүртгэгдлээ!</div>
+    <div class="success-time" id="success-time">09:24</div>
+    <div class="success-sub" id="success-sub">Ажилд ирсэн цаг бүртгэгдлээ</div>
+  </div>
+
+</div>
+
+<script>
+const API = 'https://localhost:7000';
+let token = null;
+let checkedIn = false;
+let checkedOut = false;
+let checkInTime = null;
+let checkOutTime = null;
+let workInterval = null;
+
+// ── CLOCK ──
+function updateClock() {
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2,'0');
+  const m = String(now.getMinutes()).padStart(2,'0');
+  const s = String(now.getSeconds()).padStart(2,'0');
+  const el = document.getElementById('live-clock');
+  if(el) el.innerHTML = `${h}:<span id="min">${m}</span>:<span class="seconds" id="sec">${s}</span>`;
+  document.getElementById('sb-time').textContent = `${h}:${m}`;
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+
+let refreshToken = localStorage.getItem('refreshToken');
+token = localStorage.getItem('accessToken');
+
+// Date
+const days = ['Ням','Даваа','Мягмар','Лхагва','Пүрэв','Баасан','Бямба'];
+const months = ['1-р','2-р','3-р','4-р','5-р','6-р','7-р','8-р','9-р','10-р','11-р','12-р'];
+const now = new Date();
+document.getElementById('today-date').textContent =
+  `${days[now.getDay()]}, ${months[now.getMonth()]} сар ${now.getDate()}`;
+
+// ── CALENDAR ──
+function buildCalendar() {
+  const grid = document.getElementById('cal-grid');
+  if(!grid) return;
+  const year = 2026, month = 5; // June 2026
+  const first = new Date(year, month, 1).getDay();
+  const days_in = new Date(year, month+1, 0).getDate();
+  const start = first === 0 ? 6 : first-1;
+  const statuses = {1:'present',2:'present',3:'present',4:'late',5:'present',9:'present',10:'present',11:'present',12:'absent',16:'present',17:'present',18:'present',19:'present',23:'present',24:'present',25:'present',26:'present'};
+  let html = '';
+  for(let i=0;i<start;i++) html+=`<div class="cal-day empty"></div>`;
+  for(let d=1;d<=days_in;d++){
+    const dow=(start+d-1)%7;
+    const isWeekend=dow===5||dow===6;
+    const isToday=d===3;
+    const st=statuses[d];
+    let cls='cal-day';
+    if(isToday) cls+=' today';
+    else if(st) cls+=` ${st}`;
+    else if(isWeekend) cls+=' weekend';
+    html+=`<div class="${cls}">${d}</div>`;
+  }
+  grid.innerHTML=html;
+}
+buildCalendar();
+
+// ── NAVIGATION ──
+function navTo(name){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById(name+'-screen').classList.add('active');
+  document.getElementById('nav-'+name).classList.add('active');
+}
+
+// ── LOGIN ──
+async function doLogin() {
+    const email = document.getElementById('login-email').value;
+    const password = document.getElementById('login-pass').value;
+
+    const res = await fetch(`${API}/api/auth/login`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            email,
+            password
+        })
+    });
+
+    if (!res.ok) {
+        alert("Нэвтрэх нэр эсвэл нууц үг буруу");
+        return;
+    }
+
+    const data = await res.json();
+
+    token = data.accessToken;
+    refreshToken = data.refreshToken;
+
+    localStorage.setItem("accessToken", token);
+    localStorage.setItem("refreshToken", refreshToken);
+
+    document.getElementById("login-screen")
+        .classList.remove("active");
+
+    document.getElementById("bottom-nav")
+        .style.display = "flex";
+
+    navTo("home");
+
+    await loadTodayAttendance();
+}
+
+
+async function refreshAccessToken() {
+
+    const res = await fetch(`${API}/api/auth/refresh`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            refreshToken: refreshToken
+        })
+    });
+
+    if (!res.ok)
+        return false;
+
+    const data = await res.json();
+
+    token = data.accessToken;
+    refreshToken = data.refreshToken;
+
+    localStorage.setItem("accessToken", token);
+    localStorage.setItem("refreshToken", refreshToken);
+
+    return true;
+}
+
+
+
+async function getLocation() {
+
+    return new Promise((resolve, reject) => {
+
+        navigator.geolocation.getCurrentPosition(
+            position => {
+
+                resolve({
+                    latitude: position.coords.latitude,
+                    longitude: position.coords.longitude
+                });
+
+            },
+            err => reject(err)
+        );
+
+    });
+
+}
+async function sendCheckIn() {
+
+    const loc = await getLocation();
+
+    const res = await fetch(`${API}/api/attendance/checkin`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+            latitude: loc.latitude,
+            longitude: loc.longitude,
+            locationPermissionGranted: true,
+            photoBase64: "",
+            verificationMethod: "FaceRecognition"
+        })
+    });
+
+    console.log("STATUS:", res.status);
+    console.log(`${API}/api/attendance/checkin`);
+
+    const text = await res.text();
+    console.log("RESPONSE:", text);
+
+    return res.ok;
+}
+
+async function sendCheckOut() {
+
+    const loc = await getLocation();
+
+    const res = await fetch(`${API}/api/attendance/checkout`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+            latitude: loc.latitude,
+            longitude: loc.longitude,
+            verificationMethod: "FaceRecognition"
+        })
+    });
+
+    return res.ok;
+}
+
+
+
+async function loadTodayAttendance() {
+
+    const res = await fetch(
+        `${API}/api/attendance/today`,
+        {
+            headers: {
+                "Authorization": `Bearer ${token}`
+            }
+        });
+
+    if (!res.ok)
+        return;
+
+    const data = await res.json();
+
+    console.log(data);
+
+    if (data.checkInTime) {
+        document.getElementById("checkin-time")
+            .textContent =
+            new Date(data.checkInTime)
+                .toLocaleTimeString("en-GB",
+                {hour:'2-digit', minute:'2-digit'});
+    }
+
+    if (data.checkOutTime) {
+        document.getElementById("checkout-time")
+            .textContent =
+            new Date(data.checkOutTime)
+                .toLocaleTimeString("en-GB",
+                {hour:'2-digit', minute:'2-digit'});
+    }
+}
+
+
+
+
+function shakeInputs(){
+  ['login-email','login-pass'].forEach(id=>{
+    const el=document.getElementById(id);
+    el.classList.add('error');
+    setTimeout(()=>el.classList.remove('error'),400);
+  });
+}
+
+// ── CHECKIN / CHECKOUT ──
+function handleCheckin(){
+  if(checkedOut) return;
+  showFaceScan();
+}
+
+function showFaceScan(){
+  document.getElementById('face-overlay').classList.add('visible');
+  let pct=0;
+  const messages=[
+    ['Нүүр таниж байна...','Камерыг нүүр рүүгээ чиглүүлнэ үү'],
+    ['Шалгаж байна...','Хөдлөлгүй байна уу'],
+    ['Баталгаажуулж байна...','Бараг боллоо']
+  ];
+  let step=0;
+  const iv=setInterval(()=>{
+    step++;
+    if(step<messages.length){
+      document.getElementById('face-label').textContent=messages[step][0];
+      document.getElementById('face-sub').textContent=messages[step][1];
+    }
+    if(step>=2){
+      clearInterval(iv);
+      setTimeout(()=>{
+        document.getElementById('face-overlay').classList.remove('visible');
+        completeScan();
+      },600);
+    }
+  },700);
+}
+
+function cancelFace(){
+  document.getElementById('face-overlay').classList.remove('visible');
+}
+async function completeScan(){
+
+  const now = new Date();
+  const timeStr =
+    `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+
+  if(!checkedIn){
+
+    const success = await sendCheckIn();
+
+    if(!success){
+      alert("Check In амжилтгүй");
+      return;
+    }
+
+    checkedIn = true;
+    checkInTime = now;
+
+    document.getElementById('checkin-time').textContent = timeStr;
+    document.getElementById('chip-in').classList.add('has-value');
+
+    const btn = document.getElementById('checkin-btn');
+
+    btn.className = 'checkin-btn state-out';
+
+    document.getElementById('btn-icon').innerHTML =
+      '<path d="M12 22V12M12 12l4 4M12 12l-4 4"/><path d="M5 6a9 9 0 1 0 14 0"/>';
+
+    document.getElementById('btn-label').textContent = 'ГАРСАН';
+    document.getElementById('btn-hint').textContent =
+      'Дарж ажлаас гарсан бүртгэлээ хийнэ үү';
+
+    startWorkTimer();
+    showSuccess(false,timeStr);
+
+  } else {
+
+    const success = await sendCheckOut();
+
+    if(!success){
+      alert("Check Out амжилтгүй");
+      return;
+    }
+
+    checkedOut = true;
+    checkOutTime = now;
+
+    document.getElementById('checkout-time').textContent = timeStr;
+    document.getElementById('chip-out').classList.add('has-value');
+
+    const btn = document.getElementById('checkin-btn');
+
+    btn.className = 'checkin-btn state-done';
+
+    document.getElementById('btn-icon').innerHTML =
+      '<polyline points="20 6 9 17 4 12" stroke="var(--green)"/>';
+
+    document.getElementById('btn-label').textContent = 'ДУУСЛАА';
+    document.getElementById('btn-hint').textContent =
+      'Өнөөдрийн бүртгэл дууслаа';
+
+    stopWorkTimer();
+    showSuccess(true,timeStr);
+  }
+}
+
+function showSuccess(isOut,timeStr){
+  const ov=document.getElementById('success-overlay');
+  const circle=document.getElementById('success-circle');
+  const icon=document.getElementById('success-icon');
+  const title=document.getElementById('success-title');
+  const sub=document.getElementById('success-sub');
+  const time=document.getElementById('success-time');
+  if(isOut){
+    circle.className='success-circle red-c';
+    icon.innerHTML='<polyline points="20 6 9 17 4 12" stroke="var(--red)"/>';
+    title.textContent='Гарсан цаг бүртгэгдлээ!';
+    sub.textContent='Маргааш дахин уулзана 👋';
+    time.className='success-time red';
+  } else {
+    circle.className='success-circle green-c';
+    icon.innerHTML='<polyline points="20 6 9 17 4 12" stroke="var(--green)"/>';
+    title.textContent='Амжилттай бүртгэгдлээ!';
+    sub.textContent='Ажилд ирсэн цаг бүртгэгдлээ';
+    time.className='success-time';
+  }
+  time.textContent=timeStr;
+  ov.classList.add('visible');
+  setTimeout(()=>ov.classList.remove('visible'),2200);
+}
+
+// ── WORK TIMER ──
+function startWorkTimer(){
+  workInterval=setInterval(()=>{
+    if(!checkInTime) return;
+    const diff=Date.now()-checkInTime.getTime();
+    const h=Math.floor(diff/3600000);
+    const m=Math.floor((diff%3600000)/60000);
+    document.getElementById('work-timer').textContent=`${h}ц ${String(m).padStart(2,'0')}мин`;
+    const pct=Math.min((diff/3600000)/8*100,100);
+    const bar=document.getElementById('work-bar');
+    bar.style.width=pct+'%';
+    if(pct>=100) bar.classList.add('overtime');
+  },1000);
+}
+function stopWorkTimer(){ if(workInterval) clearInterval(workInterval); }
+
+// ── LOGOUT ──
+function doLogout(){
+  token=null;checkedIn=false;checkedOut=false;checkInTime=null;checkOutTime=null;
+  stopWorkTimer();
+  document.getElementById('checkin-time').textContent='--:--';
+  document.getElementById('checkout-time').textContent='--:--';
+  document.getElementById('chip-in').classList.remove('has-value');
+  document.getElementById('chip-out').classList.remove('has-value');
+  document.getElementById('work-timer').textContent='0ц 00мин';
+  document.getElementById('work-bar').style.width='0%';
+  const btn=document.getElementById('checkin-btn');
+  btn.className='checkin-btn state-in';
+  document.getElementById('btn-label').textContent='ИРСЭН';
+  document.getElementById('btn-hint').textContent='Дарж ажилд ирсэн бүртгэлээ хийнэ үү';
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('login-screen').classList.add('active');
+  document.getElementById('bottom-nav').style.display='none';
+}
+
+// Init: hide bottom nav, show login
+document.getElementById('bottom-nav').style.display='none';
+
+// Enter key login
+document.getElementById('login-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
+</script>
+</body>
+</html>

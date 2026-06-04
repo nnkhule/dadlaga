@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="mn">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Цаг Бүртгэл - Нэвтрэх</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body class="auth-body">
+  <main class="auth-shell">
+    <section class="auth-card">
+      <div class="auth-badge">Attendance System</div>
+      <h1>Цаг Бүртгэл</h1>
+      <p class="muted">Enterprise зэрэглэлийн dark glass интерфэйсээр нэвтгэлээ эхлүүлнэ үү</p>
+
+      <form id="login-form" class="form">
+        <label>
+          <span>Имэйл хаяг</span>
+          <input id="login-email" type="email" value="bat@attendance.local" autocomplete="email" />
+        </label>
+
+        <label>
+          <span>Нууц үг</span>
+          <input id="login-pass" type="password" value="Employee@12345!" autocomplete="current-password" />
+        </label>
+
+        <button type="submit" class="btn btn-primary">Нэвтрэх</button>
+      </form>
+
+      <div class="hint">
+        Demo: <b>bat@attendance.local</b> / <b>Employee@12345!</b>
+      </div>
+
+      <div id="login-error" class="error-text"></div>
+    </section>
+  </main>
+
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      if (localStorage.getItem("accessToken")) {
+        window.location.href = "index.html";
+      }
+    });
+
+    document.getElementById("login-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const errorEl = document.getElementById("login-error");
+      errorEl.textContent = "";
+
+      try {
+        await doLogin();
+        window.location.href = "index.html";
+      } catch (err) {
+        errorEl.textContent = err?.message || "Нэвтрэх амжилтгүй";
+      }
+    });
+  </script>
+</body>
+</html>

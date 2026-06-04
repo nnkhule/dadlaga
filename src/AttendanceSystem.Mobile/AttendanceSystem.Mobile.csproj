@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>AttendanceSystem.Mobile</RootNamespace>
+    <!-- MAUI requires separate workload; placeholder class library for Phase 1 -->
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\AttendanceSystem.Application\AttendanceSystem.Application.csproj" />
+  </ItemGroup>
+</Project>
