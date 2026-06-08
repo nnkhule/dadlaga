@@ -21,7 +21,7 @@ public class HealthCheckTests : IClassFixture<WebApplicationFactory<Program>>
     [Fact(Skip = "Requires SQL Server; enable with Testcontainers in Phase 2")]
     public async Task Swagger_IsAvailable()
     {
-        var response = await _client.GetAsync("/swagger/index.html");
+        var response = await _client.GetAsync("http://localhost:5000/swagger/index.html");
         response.IsSuccessStatusCode.Should().BeTrue();
     }
 }
