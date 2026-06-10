@@ -1,0 +1,56 @@
+@page "/departments/{Id:guid}"
+@inject ApiClient Api
+@inject NavigationManager Navigation
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3 class="mb-0">Department Details</h3>
+    <button class="btn btn-primary" @onclick="EditDepartment">Edit</button>
+</div>
+
+@if (isLoading)
+{
+    <LoadingSpinner />
+}
+else if (!string.IsNullOrWhiteSpace(error))
+{
+    <div class="alert alert-danger">@error</div>
+}
+else if (department is null)
+{
+    <div class="empty-state">Department data is unavailable.</div>
+}
+else
+{
+    <section class="panel">
+        <SettingsRow Label="Name" Value="@department.Name" />
+        <SettingsRow Label="Description" Value="@department.Description" />
+        <SettingsRow Label="Head Employee" Value="@department.HeadEmployeeName" />
+        <SettingsRow Label="Employee Count" Value="@department.EmployeeCount.ToString()" />
+        <SettingsRow Label="Status" Value="@(department.IsActive ? "Active" : "Inactive")" />
+    </section>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private DepartmentDto? department;
+    private bool isLoading = true;
+    private string? error;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            department = await Api.GetAsync<DepartmentDto>($"api/departments/{Id}");
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void EditDepartment() => Navigation.NavigateTo($"/departments/{Id}/edit");
+}

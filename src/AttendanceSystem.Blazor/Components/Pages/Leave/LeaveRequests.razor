@@ -1,0 +1,132 @@
+@page "/leave"
+@inject ApiClient Api
+
+<h3 class="mb-4">Leave Requests</h3>
+
+<section class="panel mb-3">
+    <EditForm Model="@newLeave" OnValidSubmit="CreateAsync">
+        <DataAnnotationsValidator />
+        <div class="row g-2">
+            <div class="col-md-2"><InputDate class="form-control" @bind-Value="newLeave.StartDate" /></div>
+            <div class="col-md-2"><InputDate class="form-control" @bind-Value="newLeave.EndDate" /></div>
+            <div class="col-md-2"><InputText class="form-control" placeholder="Leave type" @bind-Value="newLeave.LeaveType" /></div>
+            <div class="col-md-4"><InputText class="form-control" placeholder="Reason" @bind-Value="newLeave.Reason" /></div>
+            <div class="col-md-2"><button class="btn btn-primary w-100" disabled="@isSaving">Create</button></div>
+        </div>
+    </EditForm>
+</section>
+
+<section class="panel">
+    @if (isLoading)
+    {
+        <LoadingSpinner />
+    }
+    else if (!string.IsNullOrWhiteSpace(error))
+    {
+        <div class="alert alert-danger">@error</div>
+    }
+    else if (leaves.Count == 0)
+    {
+        <div class="empty-state">No leave requests were found.</div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th>Start Date</th>
+                        <th>End Date</th>
+                        <th>Leave Type</th>
+                        <th>Reason</th>
+                        <th>Approval Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var leave in leaves)
+                    {
+                        <tr>
+                            <td>@leave.StartDate</td>
+                            <td>@leave.EndDate</td>
+                            <td>@leave.LeaveType</td>
+                            <td>@Display(leave.Reason)</td>
+                            <td>@Display(leave.ApprovalStatus ?? leave.Status)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <Pagination PageNumber="@pageNumber" PageSize="@pageSize" TotalCount="@totalCount" PageChanged="ChangePageAsync" />
+    }
+</section>
+
+@code {
+    private IReadOnlyList<LeaveDto> leaves = [];
+    private LeaveForm newLeave = new();
+    private bool isLoading = true;
+    private bool isSaving;
+    private string? error;
+    private int pageNumber = 1;
+    private int pageSize = 10;
+    private int totalCount;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task ChangePageAsync(int page)
+    {
+        pageNumber = page;
+        await LoadAsync();
+    }
+
+    private async Task CreateAsync()
+    {
+        try
+        {
+            isSaving = true;
+            error = null;
+            var response = await Api.PostAsync("api/leaves", new CreateLeaveDto(newLeave.StartDate, newLeave.EndDate, newLeave.LeaveType, newLeave.Reason));
+            if (!response.IsSuccessStatusCode)
+            {
+                error = await response.Content.ReadAsStringAsync();
+                return;
+            }
+
+            newLeave = new();
+            await LoadAsync();
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            isLoading = true;
+            error = null;
+            var result = await Api.GetAsync<PagedResponse<LeaveDto>>($"api/leaves?pageNumber={pageNumber}&pageSize={pageSize}");
+            leaves = result?.Items ?? [];
+            totalCount = result?.TotalCount ?? 0;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value;
+
+    private sealed class LeaveForm
+    {
+        public DateOnly StartDate { get; set; } = DateOnly.FromDateTime(DateTime.Today);
+        public DateOnly EndDate { get; set; } = DateOnly.FromDateTime(DateTime.Today);
+        public string LeaveType { get; set; } = string.Empty;
+        public string Reason { get; set; } = string.Empty;
+    }
+}

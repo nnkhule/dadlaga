@@ -1,20 +1,176 @@
-<div class="topbar">
+@inject ApiClient Api
+@inject AuthService Auth
+@inject NavigationManager Navigation
 
+<div class="topbar">
     <div>
         <h5>Attendance Management System</h5>
     </div>
 
     <div class="user-section">
-
-        <button class="btn btn-light">
-            <i class="fas fa-bell"></i>
+        <a class="btn btn-light" href="/notifications" aria-label="Notifications">
+            <span class="navbar-icon">!</span>
+        </a>
+        <button class="avatar-button" data-bs-toggle="offcanvas" data-bs-target="#profileDrawer" aria-label="Open profile" @onclick="LoadProfileAsync">
+            @if (!string.IsNullOrWhiteSpace(profile?.ProfilePhotoUrl))
+            {
+                <img src="@profile.ProfilePhotoUrl" width="40" height="40" class="rounded-circle" alt="" />
+            }
+            else
+            {
+                <span>@Initials</span>
+            }
         </button>
-
-        <img src="https://ui-avatars.com/api/?name=Admin"
-             width="40"
-             height="40"
-             class="rounded-circle">
-
     </div>
-
 </div>
+
+<div class="offcanvas offcanvas-end" tabindex="-1" id="profileDrawer">
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title">Profile</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body">
+        @if (isLoading)
+        {
+            <LoadingSpinner />
+        }
+        else if (!string.IsNullOrWhiteSpace(error))
+        {
+            <div class="alert alert-danger">@error</div>
+        }
+        else if (profile is null)
+        {
+            <div class="empty-state">Profile data is unavailable.</div>
+        }
+        else if (isEditing)
+        {
+            <div class="mb-3">
+                <label class="form-label">Full Name</label>
+                <input class="form-control" @bind="edit.FullName" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Email</label>
+                <input class="form-control" @bind="edit.Email" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Phone</label>
+                <input class="form-control" @bind="edit.Phone" />
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Date Of Birth</label>
+                <InputDate class="form-control" @bind-Value="edit.DateOfBirth" />
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary" @onclick="SaveProfileAsync">Save</button>
+                <button class="btn btn-outline-secondary" @onclick="() => isEditing = false">Cancel</button>
+            </div>
+        }
+        else
+        {
+            <div class="text-center mb-3">
+                @if (!string.IsNullOrWhiteSpace(profile.ProfilePhotoUrl))
+                {
+                    <img src="@profile.ProfilePhotoUrl" width="96" height="96" class="rounded-circle" alt="" />
+                }
+                else
+                {
+                    <div class="profile-initials">@Initials</div>
+                }
+            </div>
+            <SettingsRow Label="Employee Code" Value="@profile.EmployeeCode" />
+            <SettingsRow Label="Full Name" Value="@profile.FullName" />
+            <SettingsRow Label="Email" Value="@profile.Email" />
+            <SettingsRow Label="Phone" Value="@profile.Phone" />
+            <SettingsRow Label="Date Of Birth" Value="@profile.DateOfBirth?.ToString()" />
+            <SettingsRow Label="Department" Value="@(profile.Department ?? profile.DepartmentName)" />
+            <SettingsRow Label="Position" Value="@profile.Position" />
+            <SettingsRow Label="Hire Date" Value="@profile.HireDate.ToString()" />
+            <SettingsRow Label="Employment Status" Value="@(profile.EmploymentStatus ?? profile.Status ?? (profile.IsActive ? "Active" : "Inactive"))" />
+            <div class="d-grid gap-2 mt-3">
+                <button class="btn btn-primary" @onclick="BeginEdit">Edit Profile</button>
+                <a class="btn btn-outline-secondary" href="/change-password">Change Password</a>
+                <button class="btn btn-outline-danger" @onclick="LogoutAsync">Logout</button>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private EmployeeProfileDto? profile;
+    private ProfileEditModel edit = new();
+    private bool isLoading;
+    private bool isEditing;
+    private string? error;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+            await LoadProfileAsync();
+    }
+
+    private string Initials => string.Join("", (profile?.FullName ?? string.Empty)
+        .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+        .Take(2)
+        .Select(x => x[0]))
+        .ToUpperInvariant();
+
+    private async Task LoadProfileAsync()
+    {
+        try
+        {
+            isLoading = true;
+            error = null;
+            profile = await Api.GetAsync<EmployeeProfileDto>("api/employees/me");
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void BeginEdit()
+    {
+        if (profile is null)
+            return;
+
+        edit = new ProfileEditModel
+        {
+            FullName = profile.FullName,
+            Email = profile.Email,
+            Phone = profile.Phone,
+            DateOfBirth = profile.DateOfBirth
+        };
+        isEditing = true;
+    }
+
+    private async Task SaveProfileAsync()
+    {
+        var response = await Api.PutAsync("api/employees/me", new UpdateProfileDto(edit.FullName, edit.Email, edit.Phone, edit.DateOfBirth));
+        if (!response.IsSuccessStatusCode)
+        {
+            error = await response.Content.ReadAsStringAsync();
+            return;
+        }
+
+        profile = await response.Content.ReadFromJsonAsync<EmployeeProfileDto>();
+        isEditing = false;
+    }
+
+    private async Task LogoutAsync()
+    {
+        await Auth.LogoutAsync();
+        Navigation.NavigateTo("/login");
+    }
+
+    private sealed class ProfileEditModel
+    {
+        public string FullName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string? Phone { get; set; }
+        public DateOnly? DateOfBirth { get; set; }
+    }
+}

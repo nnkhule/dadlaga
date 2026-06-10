@@ -1,0 +1,63 @@
+@page "/departments/create"
+@page "/departments/{Id:guid}/edit"
+@inject ApiClient Api
+@inject NavigationManager Navigation
+
+<h3 class="mb-4">@(Id.HasValue ? "Edit Department" : "Create Department")</h3>
+
+<section class="panel form-narrow">
+    @if (!string.IsNullOrWhiteSpace(error)) { <div class="alert alert-danger">@error</div> }
+    <input class="form-control mb-3" placeholder="Name" @bind="model.Name" />
+    <input class="form-control mb-3" placeholder="Description" @bind="model.Description" />
+    <button class="btn btn-primary" @onclick="SaveAsync" disabled="@isSaving">Save</button>
+</section>
+
+@code {
+    [Parameter] public Guid? Id { get; set; }
+    private DepartmentForm model = new();
+    private string? error;
+    private bool isSaving;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Id is null)
+            return;
+
+        var department = await Api.GetAsync<DepartmentDto>($"api/departments/{Id}");
+        if (department is null)
+            return;
+
+        model.Name = department.Name;
+        model.Description = department.Description;
+    }
+
+    private async Task SaveAsync()
+    {
+        try
+        {
+            isSaving = true;
+            error = null;
+            var response = Id.HasValue
+                ? await Api.PutAsync($"api/departments/{Id}", model)
+                : await Api.PostAsync("api/departments", model);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                error = await response.Content.ReadAsStringAsync();
+                return;
+            }
+
+            Navigation.NavigateTo("/departments");
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private sealed class DepartmentForm
+    {
+        public string Name { get; set; } = string.Empty;
+        public string? Description { get; set; }
+    }
+}

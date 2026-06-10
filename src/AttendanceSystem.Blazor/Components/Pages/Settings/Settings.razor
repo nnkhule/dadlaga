@@ -1,0 +1,124 @@
+@page "/settings"
+@inject ApiClient Api
+
+<h3 class="mb-4">Settings</h3>
+
+@if (isLoading)
+{
+    <LoadingSpinner />
+}
+else if (!string.IsNullOrWhiteSpace(error))
+{
+    <div class="alert alert-danger">@error</div>
+}
+else
+{
+    <div class="row g-3">
+        <div class="col-lg-6">
+            <section class="panel">
+                <h5>Company Settings</h5>
+                <SettingsRow Label="Company Name" Value="@company?.CompanyName" />
+                <SettingsRow Label="Time Zone" Value="@company?.TimeZone" />
+                <SettingsRow Label="Date Format" Value="@company?.DateFormat" />
+                <SettingsRow Label="Time Format" Value="@company?.TimeFormat" />
+            </section>
+        </div>
+        <div class="col-lg-6">
+            <section class="panel">
+                <h5>Attendance Rules</h5>
+                <SettingsRow Label="Grace Minutes" Value="@rules?.GraceMinutes.ToString()" />
+                <SettingsRow Label="Require GPS Check In" Value="@rules?.RequireGpsForCheckIn.ToString()" />
+                <SettingsRow Label="Require GPS Check Out" Value="@rules?.RequireGpsForCheckOut.ToString()" />
+                <SettingsRow Label="Allow Remote Check In" Value="@rules?.AllowRemoteCheckIn.ToString()" />
+                <SettingsRow Label="Overtime Enabled" Value="@rules?.OvertimeEnabled.ToString()" />
+            </section>
+        </div>
+        <div class="col-lg-6">
+            <section class="panel">
+                <h5>Work Schedule Settings</h5>
+                <SettingsRow Label="Name" Value="@schedule?.Name" />
+                <SettingsRow Label="Shift Start" Value="@schedule?.ShiftStart?.ToString()" />
+                <SettingsRow Label="Shift End" Value="@schedule?.ShiftEnd?.ToString()" />
+                <SettingsRow Label="Break Duration Minutes" Value="@schedule?.BreakDurationMinutes.ToString()" />
+                <SettingsRow Label="Standard Hours Per Day" Value="@schedule?.StandardHoursPerDay.ToString()" />
+            </section>
+        </div>
+        <div class="col-lg-6">
+            <section class="panel">
+                <h5>GPS Settings</h5>
+                <SettingsRow Label="Enabled" Value="@gps?.Enabled.ToString()" />
+                <SettingsRow Label="Office Latitude" Value="@gps?.OfficeLatitude.ToString()" />
+                <SettingsRow Label="Office Longitude" Value="@gps?.OfficeLongitude.ToString()" />
+                <SettingsRow Label="Allowed Radius Meters" Value="@gps?.AllowedRadiusMeters.ToString()" />
+                <SettingsRow Label="Block Outside Radius" Value="@gps?.BlockOutsideRadius.ToString()" />
+            </section>
+        </div>
+        <div class="col-12">
+            <section class="panel">
+                <h5>Office Location Settings</h5>
+                @if (offices.Count == 0)
+                {
+                    <div class="empty-state">No office locations are configured.</div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Latitude</th>
+                                    <th>Longitude</th>
+                                    <th>Radius</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var office in offices)
+                                {
+                                    <tr>
+                                        <td>@office.Name</td>
+                                        <td>@office.Latitude</td>
+                                        <td>@office.Longitude</td>
+                                        <td>@office.RadiusMeters</td>
+                                        <td>@(office.IsActive ? "Active" : "Inactive")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </section>
+        </div>
+    </div>
+}
+
+@code {
+    private CompanySettingsDto? company;
+    private AttendanceRulesDto? rules;
+    private WorkScheduleSettingsDto? schedule;
+    private GpsSettingsDto? gps;
+    private IReadOnlyList<OfficeLocationSettingsDto> offices = [];
+    private bool isLoading = true;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            company = await Api.GetAsync<CompanySettingsDto>("api/settings/company");
+            rules = await Api.GetAsync<AttendanceRulesDto>("api/settings/attendance-rules");
+            schedule = await Api.GetAsync<WorkScheduleSettingsDto>("api/settings/work-schedule");
+            gps = await Api.GetAsync<GpsSettingsDto>("api/settings/gps");
+            offices = await Api.GetAsync<IReadOnlyList<OfficeLocationSettingsDto>>("api/settings/office-locations") ?? [];
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

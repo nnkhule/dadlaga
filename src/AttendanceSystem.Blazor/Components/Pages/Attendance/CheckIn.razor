@@ -1,0 +1,112 @@
+@page "/attendance/checkin"
+@inject ApiClient Api
+@inject IJSRuntime Js
+
+<h3 class="mb-4">GPS Attendance</h3>
+
+<section class="panel">
+    <div class="d-flex gap-2 mb-3">
+        <button class="btn btn-outline-primary" @onclick="ValidateLocationAsync" disabled="@isLoading">Validate Location</button>
+        <button class="btn btn-success" @onclick="CheckInAsync" disabled="@isLoading">Check In</button>
+        <button class="btn btn-warning" @onclick="CheckOutAsync" disabled="@isLoading">Check Out</button>
+    </div>
+
+    @if (isLoading)
+    {
+        <LoadingSpinner />
+    }
+    else if (!string.IsNullOrWhiteSpace(error))
+    {
+        <div class="alert alert-danger">@error</div>
+    }
+    else if (validation is null)
+    {
+        <div class="empty-state">Validate your current location to see GPS attendance status.</div>
+    }
+    else
+    {
+        <dl class="row mb-0">
+            <dt class="col-sm-3">Current Location</dt>
+            <dd class="col-sm-9">@Display(validation.CurrentLocation ?? currentLocationText)</dd>
+            <dt class="col-sm-3">Office Location</dt>
+            <dd class="col-sm-9">@Display(validation.OfficeLocation)</dd>
+            <dt class="col-sm-3">Distance</dt>
+            <dd class="col-sm-9">@((validation.Distance != 0 ? validation.Distance : validation.DistanceMeters).ToString("0.##"))</dd>
+            <dt class="col-sm-3">Validation Status</dt>
+            <dd class="col-sm-9">@Display(validation.ValidationStatus ?? validation.Message ?? (validation.IsValid || validation.IsWithinAllowedRadius ? "Valid" : "Invalid"))</dd>
+        </dl>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(success))
+    {
+        <div class="alert alert-success mt-3">@success</div>
+    }
+</section>
+
+@code {
+    private LocationValidationDto? validation;
+    private double? latitude;
+    private double? longitude;
+    private string? currentLocationText;
+    private string? error;
+    private string? success;
+    private bool isLoading;
+
+    private async Task ValidateLocationAsync()
+    {
+        await WithLocationAsync(async () =>
+        {
+            validation = await Api.GetAsync<LocationValidationDto>($"api/attendance/validate-location?latitude={latitude}&longitude={longitude}");
+            if (validation is null)
+            {
+                var response = await Api.PostAsync("api/attendance/validate-location", new LocationValidationRequest(latitude!.Value, longitude!.Value));
+                validation = await response.Content.ReadFromJsonAsync<LocationValidationDto>();
+            }
+        });
+    }
+
+    private async Task CheckInAsync()
+    {
+        await WithLocationAsync(async () =>
+        {
+            var response = await Api.PostAsync("api/attendance/checkin", new AttendanceActionRequest(latitude, longitude));
+            success = response.IsSuccessStatusCode ? "Check in recorded." : await response.Content.ReadAsStringAsync();
+        });
+    }
+
+    private async Task CheckOutAsync()
+    {
+        await WithLocationAsync(async () =>
+        {
+            var response = await Api.PostAsync("api/attendance/checkout", new AttendanceActionRequest(latitude, longitude));
+            success = response.IsSuccessStatusCode ? "Check out recorded." : await response.Content.ReadAsStringAsync();
+        });
+    }
+
+    private async Task WithLocationAsync(Func<Task> action)
+    {
+        try
+        {
+            isLoading = true;
+            error = null;
+            success = null;
+            var location = await Js.InvokeAsync<BrowserLocation>("getLocation");
+            latitude = location.Latitude;
+            longitude = location.Longitude;
+            currentLocationText = $"{latitude:0.######}, {longitude:0.######}";
+            await action();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value;
+
+    private sealed record BrowserLocation(double Latitude, double Longitude);
+}

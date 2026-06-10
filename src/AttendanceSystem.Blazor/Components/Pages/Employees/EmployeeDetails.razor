@@ -1,0 +1,59 @@
+@page "/employees/{Id:guid}"
+@inject ApiClient Api
+@inject NavigationManager Navigation
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3 class="mb-0">Employee Details</h3>
+    <button class="btn btn-primary" @onclick="EditEmployee">Edit</button>
+</div>
+
+@if (isLoading)
+{
+    <LoadingSpinner />
+}
+else if (!string.IsNullOrWhiteSpace(error))
+{
+    <div class="alert alert-danger">@error</div>
+}
+else if (employee is null)
+{
+    <div class="empty-state">Employee data is unavailable.</div>
+}
+else
+{
+    <section class="panel">
+        <SettingsRow Label="Employee Code" Value="@employee.EmployeeCode" />
+        <SettingsRow Label="Full Name" Value="@employee.FullName" />
+        <SettingsRow Label="Email" Value="@employee.Email" />
+        <SettingsRow Label="Phone" Value="@employee.Phone" />
+        <SettingsRow Label="Department" Value="@(employee.Department ?? employee.DepartmentName)" />
+        <SettingsRow Label="Position" Value="@employee.Position" />
+        <SettingsRow Label="Hire Date" Value="@employee.HireDate.ToString()" />
+        <SettingsRow Label="Status" Value="@(employee.Status ?? (employee.IsActive ? "Active" : "Inactive"))" />
+    </section>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private EmployeeDto? employee;
+    private bool isLoading = true;
+    private string? error;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            employee = await Api.GetAsync<EmployeeDto>($"api/employees/{Id}");
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void EditEmployee() => Navigation.NavigateTo($"/employees/{Id}/edit");
+}

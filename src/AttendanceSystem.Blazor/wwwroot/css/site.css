@@ -2,6 +2,7 @@ body {
     margin:0;
     background:#f5f6fa;
     font-family:Segoe UI;
+    color:#172033;
 }
 
 .app-layout{
@@ -46,7 +47,14 @@ body {
     padding:15px 25px;
     display:flex;
     justify-content:space-between;
+    align-items:center;
     box-shadow:0 2px 10px rgba(0,0,0,.08);
+}
+
+.user-section{
+    display:flex;
+    align-items:center;
+    gap:12px;
 }
 
 .page-content{
@@ -91,7 +99,98 @@ body {
 .stat-card{
     background:white;
     padding:25px;
-    border-radius:15px;
+    border-radius:8px;
     text-align:center;
     box-shadow:0 2px 10px rgba(0,0,0,.08);
+}
+
+.panel{
+    background:white;
+    border:1px solid #e5e7eb;
+    border-radius:8px;
+    padding:20px;
+    box-shadow:0 2px 10px rgba(0,0,0,.05);
+}
+
+.empty-state{
+    border:1px dashed #cbd5e1;
+    border-radius:8px;
+    color:#64748b;
+    padding:24px;
+    text-align:center;
+    background:#f8fafc;
+}
+
+.avatar-button{
+    width:40px;
+    height:40px;
+    border:0;
+    border-radius:50%;
+    background:#e0f2fe;
+    color:#075985;
+    font-weight:700;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    overflow:hidden;
+}
+
+.profile-initials{
+    width:96px;
+    height:96px;
+    border-radius:50%;
+    background:#e0f2fe;
+    color:#075985;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    font-size:32px;
+    font-weight:700;
+}
+
+.navbar-icon{
+    display:inline-flex;
+    width:20px;
+    height:20px;
+    align-items:center;
+    justify-content:center;
+    font-weight:700;
+}
+
+.form-narrow{
+    max-width:720px;
+}
+
+@media (max-width: 768px){
+    .sidebar{
+        position:static;
+        width:100%;
+        height:auto;
+    }
+
+    .app-layout{
+        display:block;
+    }
+
+    .main-content{
+        margin-left:0;
+    }
+
+    .login-container{
+        display:block;
+        height:auto;
+        min-height:100vh;
+    }
+
+    .login-left{
+        min-height:220px;
+    }
+
+    .login-right{
+        padding:24px;
+    }
+
+    .login-card{
+        width:100%;
+    }
 }

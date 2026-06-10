@@ -1,0 +1,90 @@
+@page "/employees/create"
+@page "/employees/{Id:guid}/edit"
+@inject ApiClient Api
+@inject NavigationManager Navigation
+
+<h3 class="mb-4">@(Id.HasValue ? "Edit Employee" : "Create Employee")</h3>
+
+<section class="panel form-narrow">
+    @if (!string.IsNullOrWhiteSpace(error)) { <div class="alert alert-danger">@error</div> }
+    <input class="form-control mb-3" placeholder="Employee Code" @bind="model.EmployeeCode" />
+    <input class="form-control mb-3" placeholder="Full Name" @bind="model.FullName" />
+    <input class="form-control mb-3" placeholder="Email" @bind="model.Email" />
+    <input class="form-control mb-3" placeholder="Phone" @bind="model.Phone" />
+    <select class="form-select mb-3" @bind="model.DepartmentId">
+        <option value="">Select department</option>
+        @foreach (var department in departments)
+        {
+            <option value="@department.Id">@department.Name</option>
+        }
+    </select>
+    <input class="form-control mb-3" placeholder="Position" @bind="model.Position" />
+    <InputDate class="form-control mb-3" @bind-Value="model.HireDate" />
+    <button class="btn btn-primary" @onclick="SaveAsync" disabled="@isSaving">Save</button>
+</section>
+
+@code {
+    [Parameter] public Guid? Id { get; set; }
+    private EmployeeForm model = new();
+    private IReadOnlyList<DepartmentDto> departments = [];
+    private string? error;
+    private bool isSaving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var departmentResult = await Api.GetAsync<PagedResponse<DepartmentDto>>("api/departments?pageNumber=1&pageSize=1000");
+        departments = departmentResult?.Items ?? [];
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Id is null)
+            return;
+
+        var employee = await Api.GetAsync<EmployeeDto>($"api/employees/{Id}");
+        if (employee is null)
+            return;
+
+        model.EmployeeCode = employee.EmployeeCode;
+        model.FullName = employee.FullName;
+        model.Email = employee.Email;
+        model.Phone = employee.Phone;
+        model.Position = employee.Position;
+        model.HireDate = employee.HireDate;
+    }
+
+    private async Task SaveAsync()
+    {
+        try
+        {
+            isSaving = true;
+            error = null;
+            var response = Id.HasValue
+                ? await Api.PutAsync($"api/employees/{Id}", model)
+                : await Api.PostAsync("api/employees", model);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                error = await response.Content.ReadAsStringAsync();
+                return;
+            }
+
+            Navigation.NavigateTo("/employees");
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private sealed class EmployeeForm
+    {
+        public string EmployeeCode { get; set; } = string.Empty;
+        public string FullName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string? Phone { get; set; }
+        public Guid? DepartmentId { get; set; }
+        public string? Position { get; set; }
+        public DateOnly HireDate { get; set; } = DateOnly.FromDateTime(DateTime.Today);
+    }
+}

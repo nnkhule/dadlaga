@@ -1,0 +1,11 @@
+<div class="col-sm-6 col-xl-3">
+    <div class="stat-card">
+        <h3>@Value</h3>
+        <span>@Title</span>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public string Value { get; set; } = string.Empty;
+}

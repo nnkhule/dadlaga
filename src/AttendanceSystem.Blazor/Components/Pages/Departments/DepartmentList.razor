@@ -1,0 +1,110 @@
+@page "/departments"
+@inject ApiClient Api
+@inject NavigationManager Navigation
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3 class="mb-0">Departments</h3>
+    <button class="btn btn-primary" @onclick="CreateDepartment">Add Department</button>
+</div>
+
+<section class="panel">
+    <div class="row g-2 mb-3">
+        <div class="col-md-5">
+            <input class="form-control" placeholder="Search departments" @bind="search" @bind:event="oninput" />
+        </div>
+        <div class="col-md-auto">
+            <button class="btn btn-outline-primary" @onclick="LoadFirstPageAsync">Search</button>
+        </div>
+    </div>
+    @if (isLoading)
+    {
+        <LoadingSpinner />
+    }
+    else if (!string.IsNullOrWhiteSpace(error))
+    {
+        <div class="alert alert-danger">@error</div>
+    }
+    else if (departments.Count == 0)
+    {
+        <div class="empty-state">No departments were found.</div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Head</th>
+                        <th>Employees</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var department in departments)
+                    {
+                        <tr role="button" @onclick="() => OpenDepartment(department.Id)">
+                            <td>@department.Name</td>
+                            <td>@Display(department.HeadEmployeeName)</td>
+                            <td>@department.EmployeeCount</td>
+                            <td><span class="@StatusClass(department.IsActive)">@(department.IsActive ? "Active" : "Inactive")</span></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <Pagination PageNumber="@pageNumber" PageSize="@pageSize" TotalCount="@totalCount" PageChanged="ChangePageAsync" />
+    }
+</section>
+
+@code {
+    private IReadOnlyList<DepartmentDto> departments = [];
+    private string? search;
+    private string? error;
+    private bool isLoading = true;
+    private int pageNumber = 1;
+    private int pageSize = 10;
+    private int totalCount;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadFirstPageAsync()
+    {
+        pageNumber = 1;
+        await LoadAsync();
+    }
+
+    private void CreateDepartment() => Navigation.NavigateTo("/departments/create");
+
+    private void OpenDepartment(Guid id) => Navigation.NavigateTo($"/departments/{id}");
+
+    private async Task ChangePageAsync(int page)
+    {
+        pageNumber = page;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            isLoading = true;
+            error = null;
+            var url = $"api/departments?pageNumber={pageNumber}&pageSize={pageSize}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+            var result = await Api.GetAsync<PagedResponse<DepartmentDto>>(url);
+            departments = result?.Items ?? [];
+            totalCount = result?.TotalCount ?? 0;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value;
+    private static string StatusClass(bool active) => $"badge {(active ? "bg-success" : "bg-secondary")}";
+}

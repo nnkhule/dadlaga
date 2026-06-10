@@ -1,0 +1,33 @@
+@if (TotalPages > 1)
+{
+    <nav class="d-flex justify-content-end">
+        <ul class="pagination mb-0">
+            <li class="page-item @(PageNumber <= 1 ? "disabled" : null)">
+                <button class="page-link" @onclick="() => SetPage(PageNumber - 1)">Previous</button>
+            </li>
+            <li class="page-item disabled">
+                <span class="page-link">@PageNumber / @TotalPages</span>
+            </li>
+            <li class="page-item @(PageNumber >= TotalPages ? "disabled" : null)">
+                <button class="page-link" @onclick="() => SetPage(PageNumber + 1)">Next</button>
+            </li>
+        </ul>
+    </nav>
+}
+
+@code {
+    [Parameter] public int PageNumber { get; set; }
+    [Parameter] public int PageSize { get; set; }
+    [Parameter] public int TotalCount { get; set; }
+    [Parameter] public EventCallback<int> PageChanged { get; set; }
+
+    private int TotalPages => PageSize <= 0 ? 0 : (int)Math.Ceiling(TotalCount / (double)PageSize);
+
+    private async Task SetPage(int page)
+    {
+        if (page < 1 || page > TotalPages)
+            return;
+
+        await PageChanged.InvokeAsync(page);
+    }
+}

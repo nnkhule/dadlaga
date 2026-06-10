@@ -1,0 +1,93 @@
+@page "/notifications"
+@inject ApiClient Api
+
+<h3 class="mb-4">Notifications</h3>
+
+<section class="panel">
+    <div class="row g-2 mb-3">
+        <div class="col-md-3">
+            <select class="form-select" @bind="readFilter">
+                <option value="">All</option>
+                <option value="false">Unread</option>
+                <option value="true">Read</option>
+            </select>
+        </div>
+        <div class="col-md-auto"><button class="btn btn-outline-primary" @onclick="LoadFirstPageAsync">Filter</button></div>
+    </div>
+
+    @if (isLoading)
+    {
+        <LoadingSpinner />
+    }
+    else if (!string.IsNullOrWhiteSpace(error))
+    {
+        <div class="alert alert-danger">@error</div>
+    }
+    else if (notifications.Count == 0)
+    {
+        <div class="empty-state">No notifications were found.</div>
+    }
+    else
+    {
+        <div class="list-group list-group-flush">
+            @foreach (var item in notifications)
+            {
+                <div class="list-group-item px-0">
+                    <div class="d-flex justify-content-between">
+                        <strong>@item.Title</strong>
+                        <span class="@ReadClass(item.IsRead)">@(item.IsRead ? "Read" : "Unread")</span>
+                    </div>
+                    <div>@item.Message</div>
+                    <div class="text-muted small">@((item.CreatedDate == default ? item.CreatedAt : item.CreatedDate).ToLocalTime())</div>
+                </div>
+            }
+        </div>
+        <Pagination PageNumber="@pageNumber" PageSize="@pageSize" TotalCount="@totalCount" PageChanged="ChangePageAsync" />
+    }
+</section>
+
+@code {
+    private IReadOnlyList<NotificationDto> notifications = [];
+    private string? readFilter;
+    private string? error;
+    private bool isLoading = true;
+    private int pageNumber = 1;
+    private int pageSize = 10;
+    private int totalCount;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadFirstPageAsync()
+    {
+        pageNumber = 1;
+        await LoadAsync();
+    }
+
+    private async Task ChangePageAsync(int page)
+    {
+        pageNumber = page;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            isLoading = true;
+            error = null;
+            var result = await Api.GetAsync<PagedResponse<NotificationDto>>($"api/notifications?pageNumber={pageNumber}&pageSize={pageSize}&isRead={readFilter}");
+            notifications = result?.Items ?? [];
+            totalCount = result?.TotalCount ?? 0;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private static string ReadClass(bool isRead) => $"badge {(isRead ? "bg-secondary" : "bg-primary")}";
+}

@@ -1,0 +1,94 @@
+@page "/reports"
+@inject ApiClient Api
+@inject NavigationManager Navigation
+
+<h3 class="mb-4">Reports</h3>
+
+<section class="panel">
+    <div class="row g-2 mb-3">
+        <div class="col-md-3">
+            <select class="form-select" @bind="reportType">
+                <option value="attendance">Attendance Reports</option>
+                <option value="employees">Employee Reports</option>
+                <option value="departments">Department Reports</option>
+            </select>
+        </div>
+        <div class="col-md-2"><input type="date" class="form-control" @bind="from" /></div>
+        <div class="col-md-2"><input type="date" class="form-control" @bind="to" /></div>
+        <div class="col-md-auto"><button class="btn btn-outline-primary" @onclick="LoadAsync">Generate</button></div>
+        <div class="col-md-auto"><button class="btn btn-outline-success" @onclick="ExportExcel">Excel</button></div>
+        <div class="col-md-auto"><button class="btn btn-outline-danger" @onclick="ExportPdf">PDF</button></div>
+    </div>
+
+    @if (isLoading)
+    {
+        <LoadingSpinner />
+    }
+    else if (!string.IsNullOrWhiteSpace(error))
+    {
+        <div class="alert alert-danger">@error</div>
+    }
+    else if (rows.Count == 0)
+    {
+        <div class="empty-state">No report data is available.</div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        @foreach (var column in columns)
+                        {
+                            <th>@column</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in rows)
+                    {
+                        <tr>
+                            @foreach (var column in columns)
+                            {
+                                <td>@(row.TryGetValue(column, out var value) ? value : null)</td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+@code {
+    private string reportType = "attendance";
+    private DateOnly? from;
+    private DateOnly? to;
+    private IReadOnlyList<Dictionary<string, object?>> rows = [];
+    private IReadOnlyList<string> columns = [];
+    private bool isLoading;
+    private string? error;
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            isLoading = true;
+            error = null;
+            var result = await Api.GetAsync<PagedResponse<Dictionary<string, object?>>>($"api/reports/{reportType}?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}");
+            rows = result?.Items ?? [];
+            columns = rows.SelectMany(x => x.Keys).Distinct().ToList();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ExportExcel() => Navigation.NavigateTo($"api/reports/{reportType}/export/excel?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}", forceLoad: true);
+    private void ExportPdf() => Navigation.NavigateTo($"api/reports/{reportType}/export/pdf?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}", forceLoad: true);
+}
