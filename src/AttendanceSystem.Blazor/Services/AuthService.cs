@@ -35,6 +35,31 @@ public sealed class AuthService
     public async ValueTask<string?> GetTokenAsync()
         => await _js.InvokeAsync<string?>("localStorage.getItem", TokenKey);
 
+    public async Task<bool> RefreshTokenAsync()
+    {
+        var refreshToken = await _js.InvokeAsync<string?>("localStorage.getItem", RefreshTokenKey);
+        if (string.IsNullOrWhiteSpace(refreshToken))
+            return false;
+
+        var response = await _http.PostAsJsonAsync("api/auth/refresh", new { RefreshToken = refreshToken });
+        if (!response.IsSuccessStatusCode)
+        {
+            await LogoutAsync();
+            return false;
+        }
+
+        var result = await response.Content.ReadFromJsonAsync<LoginResponseDto>();
+        if (result is null || string.IsNullOrWhiteSpace(result.AccessToken) || string.IsNullOrWhiteSpace(result.RefreshToken))
+        {
+            await LogoutAsync();
+            return false;
+        }
+
+        await _js.InvokeVoidAsync("localStorage.setItem", TokenKey, result.AccessToken);
+        await _js.InvokeVoidAsync("localStorage.setItem", RefreshTokenKey, result.RefreshToken);
+        return true;
+    }
+
     public async Task LogoutAsync()
     {
         await _js.InvokeVoidAsync("localStorage.removeItem", TokenKey);

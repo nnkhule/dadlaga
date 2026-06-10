@@ -50,7 +50,16 @@ public class JwtTokenService
     /// </summary>
     public async Task<TokenResponseDto?> RefreshAsync(string refreshToken, CancellationToken cancellationToken = default)
     {
-        var stored = _dbContext.RefreshTokens.FirstOrDefault(t => t.Token == refreshToken && t.IsActive);
+        if (string.IsNullOrWhiteSpace(refreshToken))
+            return null;
+
+        var stored = await _dbContext.RefreshTokens
+            .FirstOrDefaultAsync(t =>
+                t.Token == refreshToken &&
+                !t.IsRevoked &&
+                t.ExpiresAt > DateTime.UtcNow,
+                cancellationToken);
+
         if (stored is null)
             return null;
 
@@ -58,8 +67,11 @@ public class JwtTokenService
         if (user is null)
             return null;
 
-        stored.Revoke();
-        return await GenerateTokensAsync(user, cancellationToken);
+        var result = await GenerateTokensAsync(user, cancellationToken);
+        stored.Revoke(result.RefreshToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return result;
     }
 
     private async Task<TokenResponseDto> GenerateTokensAsync(ApplicationUser user, CancellationToken cancellationToken)
@@ -68,6 +80,7 @@ public class JwtTokenService
         var claims = new List<Claim>
         {
             new(JwtRegisteredClaimNames.Sub, user.Id),
+            new(ClaimTypes.NameIdentifier, user.Id),
             new(JwtRegisteredClaimNames.Email, user.Email ?? string.Empty),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };

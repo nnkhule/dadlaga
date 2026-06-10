@@ -1,0 +1,23 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v8.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v8.0": {
+      "AttendanceSystem.Domain/1.0.0": {
+        "runtime": {
+          "AttendanceSystem.Domain.dll": {}
+        }
+      }
+    }
+  },
+  "libraries": {
+    "AttendanceSystem.Domain/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

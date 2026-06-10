@@ -1,0 +1,188 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>AttendanceSystem.Domain</name>
+    </assembly>
+    <members>
+        <member name="T:AttendanceSystem.Domain.Common.AggregateRoot">
+            <summary>
+            Aggregate root with domain event collection.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Domain.Common.BaseEntity">
+            <summary>
+            Base type for all domain entities with identity and audit timestamps.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Domain.Common.IDomainEvent">
+            <summary>
+            Marker for domain events raised by aggregates.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Domain.Entities.AttendanceRecord">
+            <summary>
+            Daily attendance record for an employee including check-in/out and computed metrics.
+            </summary>
+        </member>
+        <member name="M:AttendanceSystem.Domain.Entities.AttendanceRecord.CreateCheckIn(System.Guid,System.DateTime,AttendanceSystem.Domain.Enums.AttendanceStatus,System.Decimal,AttendanceSystem.Domain.Enums.VerificationMethod,System.Boolean,System.Boolean,System.Boolean,System.Nullable{System.Double},System.Nullable{System.Double},System.String,System.String)">
+            <summary>
+            Creates a new check-in record.
+            </summary>
+        </member>
+        <member name="M:AttendanceSystem.Domain.Entities.AttendanceRecord.CheckOut(System.DateTime,AttendanceSystem.Domain.Enums.AttendanceStatus,System.TimeSpan,System.Decimal,AttendanceSystem.Domain.Enums.VerificationMethod,System.Nullable{System.Double},System.Nullable{System.Double},System.String)">
+            <summary>
+            Completes check-out and updates status, break, and overtime.
+            </summary>
+        </member>
+        <member name="M:AttendanceSystem.Domain.Entities.AttendanceRecord.ApplyAdjustment(System.Nullable{System.DateTime},System.Nullable{System.DateTime},AttendanceSystem.Domain.Enums.AttendanceStatus,System.Decimal,System.Decimal,System.Nullable{System.TimeSpan},System.Guid)">
+            <summary>
+            Updates metrics after admin-approved time adjustment.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Domain.Entities.AuditLog">
+            <summary>
+            Immutable audit trail for data changes.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Domain.Entities.Department">
+            <summary>
+            Organizational department with optional parent and department head.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Domain.Entities.Employee">
+            <summary>
+            Employee master data linked to identity user and work configuration.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Domain.Entities.GpsPing">
+            <summary>
+            Continuous GPS ping from mobile for auto geo check-in logic.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Domain.Entities.Holiday">
+            <summary>
+            Public or company holiday affecting attendance rules.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Domain.Entities.LeaveRequest">
+            <summary>
+            Leave request including auto-generated birthday leave.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Domain.Entities.Notification">
+            <summary>
+            Stored notification for in-app history and multi-channel delivery tracking.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Domain.Entities.NotificationTemplate">
+            <summary>
+            Localized notification template with variable placeholders.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Domain.Entities.OfficeLocation">
+            <summary>
+            Geofenced office or branch location for GPS verification.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Domain.Entities.OutboxMessage">
+            <summary>
+            Outbox entry for reliable async notification processing.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Domain.Entities.Permission">
+            <summary>
+            Fine-grained permission for RBAC.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Domain.Entities.RefreshToken">
+            <summary>
+            JWT refresh token with rotation support.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Domain.Entities.RolePermission">
+            <summary>
+            Join entity between roles and permissions.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Domain.Entities.SuspiciousActivityAlert">
+            <summary>
+            Alert raised when suspicious attendance patterns are detected.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Domain.Entities.TimeAdjustmentRequest">
+            <summary>
+            Employee request to correct attendance times with admin approval workflow.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Domain.Entities.WorkSchedule">
+            <summary>
+            Configurable work shift with grace period and break policy.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Domain.Enums.AttendanceStatus">
+            <summary>
+            Daily attendance classification for an employee.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Domain.Enums.ContractType">
+            <summary>
+            Employee contract classification.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Domain.Enums.LeaveType">
+            <summary>
+            Types of employee leave.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Domain.Enums.NotificationChannel">
+            <summary>
+            Delivery channel for notifications.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Domain.Enums.RequestStatus">
+            <summary>
+            Approval workflow status for leave and time adjustment requests.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Domain.Enums.ReviewStatus">
+            <summary>
+            Admin review status for suspicious activity alerts.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Domain.Enums.SuspiciousAlertType">
+            <summary>
+            Categories of suspicious attendance activity.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Domain.Enums.VerificationMethod">
+            <summary>
+            How attendance was verified at check-in or check-out.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Domain.Enums.WorkDays">
+            <summary>
+            Bit flags for scheduled work days (Mon–Sun).
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Domain.Events.AttendanceCheckedInEvent">
+            <summary>
+            Raised when an employee checks in.
+            </summary>
+        </member>
+        <member name="M:AttendanceSystem.Domain.Events.AttendanceCheckedInEvent.#ctor(System.Guid,System.Guid,System.DateTime)">
+            <summary>
+            Raised when an employee checks in.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Domain.Events.AttendanceCheckedOutEvent">
+            <summary>
+            Raised when an employee checks out.
+            </summary>
+        </member>
+        <member name="M:AttendanceSystem.Domain.Events.AttendanceCheckedOutEvent.#ctor(System.Guid,System.Guid,System.DateTime)">
+            <summary>
+            Raised when an employee checks out.
+            </summary>
+        </member>
+    </members>
+</doc>

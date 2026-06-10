@@ -39,7 +39,6 @@ public class ProfileController : ControllerBase
             FullName = employee.FullName,
             employee.Email,
             Phone = employee.Phone ?? "",
-            employee.EmployeeCode,
             DepartmentName = employee.Department?.Name,
             Position = "Мэргэжилтэн", 
             Status = "Идэвхтэй",    // Default value as example

@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using AttendanceSystem.Blazor.Models;
+using Microsoft.AspNetCore.Components;
 
 namespace AttendanceSystem.Blazor.Services;
 
@@ -8,37 +9,37 @@ public sealed class ApiClient
 {
     private readonly HttpClient _http;
     private readonly AuthService _auth;
+    private readonly NavigationManager _navigation;
 
-    public ApiClient(HttpClient http, AuthService auth)
+    public ApiClient(HttpClient http, AuthService auth, NavigationManager navigation)
     {
         _http = http;
         _auth = auth;
+        _navigation = navigation;
     }
 
     public async Task<T?> GetAsync<T>(string url, CancellationToken cancellationToken = default)
     {
-        await AuthorizeAsync();
-        return await _http.GetFromJsonAsync<T>(url, cancellationToken);
+        var response = await SendWithRefreshAsync(() => _http.GetAsync(url, cancellationToken));
+        return await response.Content.ReadFromJsonAsync<T>(cancellationToken);
     }
 
     public async Task<HttpResponseMessage> PostAsync<T>(string url, T body, CancellationToken cancellationToken = default)
     {
-        await AuthorizeAsync();
-        return await _http.PostAsJsonAsync(url, body, cancellationToken);
+        return await SendWithRefreshAsync(() => _http.PostAsJsonAsync(url, body, cancellationToken));
     }
 
     public async Task<HttpResponseMessage> PutAsync<T>(string url, T body, CancellationToken cancellationToken = default)
     {
-        await AuthorizeAsync();
-        return await _http.PutAsJsonAsync(url, body, cancellationToken);
+        return await SendWithRefreshAsync(() => _http.PutAsJsonAsync(url, body, cancellationToken));
     }
 
     public Task<DashboardSummaryDto?> GetDashboardSummaryAsync()
-        => GetAsync<DashboardSummaryDto>("api/v1/dashboard/summary");
+        => GetAsync<DashboardSummaryDto>("api/dashboard/summary");
 
     public async Task<IReadOnlyList<RecentActivityDto>?> GetRecentActivitiesAsync()
     {
-        var response = await GetAsync<PagedResponse<RecentActivityResponse>>("api/v1/dashboard/recent-activities?pageNumber=1&pageSize=10");
+        var response = await GetAsync<PagedResponse<RecentActivityResponse>>("api/dashboard/recent-activities?pageNumber=1&pageSize=10");
         return response?.Items
             .Select(x => new RecentActivityDto(x.Id, x.Type, x.Title, x.Description ?? string.Empty, x.CreatedAt))
             .ToList();
@@ -46,7 +47,7 @@ public sealed class ApiClient
 
     public async Task<IReadOnlyList<AttendanceTrendDto>?> GetAttendanceTrendsAsync()
     {
-        var response = await GetAsync<AttendanceTrendResponse>("api/v1/dashboard/attendance-trends");
+        var response = await GetAsync<AttendanceTrendResponse>("api/dashboard/statistics");
         if (response is null)
             return [];
 
@@ -70,6 +71,35 @@ public sealed class ApiClient
         _http.DefaultRequestHeaders.Authorization = string.IsNullOrWhiteSpace(token)
             ? null
             : new AuthenticationHeaderValue("Bearer", token);
+    }
+
+    private async Task<HttpResponseMessage> SendWithRefreshAsync(Func<Task<HttpResponseMessage>> send)
+    {
+        await AuthorizeAsync();
+        var response = await send();
+        if (response.StatusCode != System.Net.HttpStatusCode.Unauthorized)
+        {
+            response.EnsureSuccessStatusCode();
+            return response;
+        }
+
+        response.Dispose();
+        if (await _auth.RefreshTokenAsync())
+        {
+            await AuthorizeAsync();
+            response = await send();
+            if (response.StatusCode != System.Net.HttpStatusCode.Unauthorized)
+            {
+                response.EnsureSuccessStatusCode();
+                return response;
+            }
+
+            response.Dispose();
+        }
+
+        await _auth.LogoutAsync();
+        _navigation.NavigateTo("/login", forceLoad: true);
+        throw new UnauthorizedAccessException("Your session has expired. Please sign in again.");
     }
 
     private sealed record RecentActivityResponse(Guid Id, string Type, string Title, string? Description, DateTime CreatedAt);

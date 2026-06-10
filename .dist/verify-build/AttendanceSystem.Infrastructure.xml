@@ -1,0 +1,152 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>AttendanceSystem.Infrastructure</name>
+    </assembly>
+    <members>
+        <member name="T:AttendanceSystem.Infrastructure.DependencyInjection">
+            <summary>
+            Infrastructure layer service registration.
+            </summary>
+        </member>
+        <member name="M:AttendanceSystem.Infrastructure.DependencyInjection.AddInfrastructure(Microsoft.Extensions.DependencyInjection.IServiceCollection,Microsoft.Extensions.Configuration.IConfiguration)">
+            <summary>
+            Registers persistence, identity, and infrastructure services.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Infrastructure.Identity.ApplicationRole">
+            <summary>
+            Application role with description for RBAC.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Infrastructure.Identity.ApplicationUser">
+            <summary>
+            ASP.NET Core Identity application user.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Infrastructure.Migrations.InitialCreate">
+            <inheritdoc />
+        </member>
+        <member name="M:AttendanceSystem.Infrastructure.Migrations.InitialCreate.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:AttendanceSystem.Infrastructure.Migrations.InitialCreate.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:AttendanceSystem.Infrastructure.Migrations.InitialCreate.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="T:AttendanceSystem.Infrastructure.Migrations.FixRolePermissionKey">
+            <inheritdoc />
+        </member>
+        <member name="M:AttendanceSystem.Infrastructure.Migrations.FixRolePermissionKey.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:AttendanceSystem.Infrastructure.Migrations.FixRolePermissionKey.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:AttendanceSystem.Infrastructure.Migrations.FixRolePermissionKey.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="T:AttendanceSystem.Infrastructure.Persistence.ApplicationDbContext">
+            <summary>
+            EF Core database context for the attendance system.
+            </summary>
+        </member>
+        <member name="M:AttendanceSystem.Infrastructure.Persistence.ApplicationDbContext.OnModelCreating(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="T:AttendanceSystem.Infrastructure.Persistence.Configurations.AttendanceRecordConfiguration">
+            <summary>
+            EF configuration for <see cref="T:AttendanceSystem.Domain.Entities.AttendanceRecord"/>.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Infrastructure.Persistence.Configurations.EmployeeConfiguration">
+            <summary>
+            EF configuration for <see cref="T:AttendanceSystem.Domain.Entities.Employee"/>.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Infrastructure.Persistence.Configurations.RolePermissionConfiguration">
+            <summary>
+            EF configuration for <see cref="T:AttendanceSystem.Domain.Entities.RolePermission"/>.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Infrastructure.Persistence.Repositories.AttendanceRepository">
+            <summary>
+            EF Core implementation of <see cref="T:AttendanceSystem.Application.Interfaces.Repositories.IAttendanceRepository"/>.
+            </summary>
+        </member>
+        <member name="M:AttendanceSystem.Infrastructure.Persistence.Repositories.AttendanceRepository.GetByIdAsync(System.Guid,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:AttendanceSystem.Infrastructure.Persistence.Repositories.AttendanceRepository.GetTodayRecordAsync(System.Guid,System.DateOnly,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:AttendanceSystem.Infrastructure.Persistence.Repositories.AttendanceRepository.GetByEmployeeAsync(System.Guid,System.DateOnly,System.DateOnly,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:AttendanceSystem.Infrastructure.Persistence.Repositories.AttendanceRepository.AddAsync(AttendanceSystem.Domain.Entities.AttendanceRecord,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:AttendanceSystem.Infrastructure.Persistence.Repositories.AttendanceRepository.Update(AttendanceSystem.Domain.Entities.AttendanceRecord)">
+            <inheritdoc />
+        </member>
+        <member name="M:AttendanceSystem.Infrastructure.Persistence.Repositories.AttendanceRepository.GetOpenCheckoutsAsync(System.DateOnly,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:AttendanceSystem.Infrastructure.Persistence.Repositories.AttendanceRepository.GetEmployeesWithoutCheckInAsync(System.DateOnly,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="T:AttendanceSystem.Infrastructure.Persistence.Repositories.EmployeeRepository">
+            <summary>
+            EF Core implementation of <see cref="T:AttendanceSystem.Application.Interfaces.Repositories.IEmployeeRepository"/>.
+            </summary>
+        </member>
+        <member name="M:AttendanceSystem.Infrastructure.Persistence.Repositories.EmployeeRepository.GetByIdAsync(System.Guid,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:AttendanceSystem.Infrastructure.Persistence.Repositories.EmployeeRepository.GetByUserIdAsync(System.String,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:AttendanceSystem.Infrastructure.Persistence.Repositories.EmployeeRepository.GetByCodeAsync(System.String,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:AttendanceSystem.Infrastructure.Persistence.Repositories.EmployeeRepository.GetAllActiveAsync(System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:AttendanceSystem.Infrastructure.Persistence.Repositories.EmployeeRepository.AddAsync(AttendanceSystem.Domain.Entities.Employee,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:AttendanceSystem.Infrastructure.Persistence.Repositories.EmployeeRepository.Update(AttendanceSystem.Domain.Entities.Employee)">
+            <inheritdoc />
+        </member>
+        <member name="T:AttendanceSystem.Infrastructure.Persistence.Seed.ApplicationDbSeeder">
+            <summary>
+            Seeds roles, admin user, departments, and sample employee.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Infrastructure.Persistence.UnitOfWork">
+            <summary>
+            EF Core unit of work.
+            </summary>
+        </member>
+        <member name="M:AttendanceSystem.Infrastructure.Persistence.UnitOfWork.SaveChangesAsync(System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="T:AttendanceSystem.Infrastructure.Services.JwtTokenService">
+            <summary>
+            JWT and refresh token generation and validation.
+            </summary>
+        </member>
+        <member name="M:AttendanceSystem.Infrastructure.Services.JwtTokenService.LoginAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Authenticates user and returns token pair.
+            </summary>
+        </member>
+        <member name="M:AttendanceSystem.Infrastructure.Services.JwtTokenService.RefreshAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Refreshes access token using a valid refresh token.
+            </summary>
+        </member>
+    </members>
+</doc>

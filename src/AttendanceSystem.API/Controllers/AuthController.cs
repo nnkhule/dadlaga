@@ -32,8 +32,11 @@ public class AuthController : ControllerBase
     /// <summary>Refreshes access token using refresh token.</summary>
     [HttpPost("refresh")]
     [AllowAnonymous]
-    public async Task<IActionResult> Refresh([FromBody] RefreshTokenRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> Refresh([FromBody] RefreshTokenRequest? request, CancellationToken cancellationToken)
     {
+        if (request is null || string.IsNullOrWhiteSpace(request.RefreshToken))
+            return Unauthorized();
+
         var result = await _jwtTokenService.RefreshAsync(request.RefreshToken, cancellationToken);
         if (result is null)
             return Unauthorized();

@@ -44,6 +44,39 @@ async function parseResponseText(response) {
   }
 }
 
+
+async function refreshAccessToken() {
+
+    const refreshToken = getRefreshToken();
+
+    if (!refreshToken)
+        return false;
+
+    const response = await fetch(
+        `${API_BASE}/api/v1/auth/refresh`,
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                refreshToken
+            })
+        });
+
+    if (!response.ok)
+        return false;
+
+    const data = await response.json();
+
+    setTokens(
+        data.accessToken,
+        data.refreshToken
+    );
+
+    return true;
+}
+
 async function apiFetch(path, options = {}) {
   const headers = authHeaders(options.headers || {});
   let response = await fetch(`${API_BASE}${path}`, {

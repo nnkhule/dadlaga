@@ -1,0 +1,59 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>AttendanceSystem.API</name>
+    </assembly>
+    <members>
+        <member name="T:AttendanceSystem.API.Controllers.AttendanceController">
+            <summary>
+            Attendance check-in/out and query endpoints.
+            </summary>
+        </member>
+        <member name="M:AttendanceSystem.API.Controllers.AttendanceController.CheckIn(AttendanceSystem.API.Controllers.CheckInRequest,System.Threading.CancellationToken)">
+            <summary>Records employee check-in with optional GPS.</summary>
+        </member>
+        <member name="M:AttendanceSystem.API.Controllers.AttendanceController.CheckOut(AttendanceSystem.API.Controllers.CheckOutRequest,System.Threading.CancellationToken)">
+            <summary>Records employee check-out.</summary>
+        </member>
+        <member name="M:AttendanceSystem.API.Controllers.AttendanceController.Today(System.Threading.CancellationToken)">
+            <summary>Returns today's attendance for the current employee.</summary>
+        </member>
+        <member name="M:AttendanceSystem.API.Controllers.AttendanceController.Statistics(System.Nullable{System.DateOnly},System.Nullable{System.DateOnly},System.Threading.CancellationToken)">
+            <summary>Returns attendance statistics for the current month.</summary>
+        </member>
+        <member name="T:AttendanceSystem.API.Controllers.CheckInRequest">
+            <summary>Check-in API request model.</summary>
+        </member>
+        <member name="M:AttendanceSystem.API.Controllers.CheckInRequest.#ctor(System.Nullable{System.Double},System.Nullable{System.Double},System.Boolean,System.String,System.String)">
+            <summary>Check-in API request model.</summary>
+        </member>
+        <member name="T:AttendanceSystem.API.Controllers.CheckOutRequest">
+            <summary>Check-out API request model.</summary>
+        </member>
+        <member name="M:AttendanceSystem.API.Controllers.CheckOutRequest.#ctor(System.Nullable{System.Double},System.Nullable{System.Double},System.String)">
+            <summary>Check-out API request model.</summary>
+        </member>
+        <member name="T:AttendanceSystem.API.Controllers.AuthController">
+            <summary>
+            Authentication endpoints for JWT login and refresh.
+            </summary>
+        </member>
+        <member name="M:AttendanceSystem.API.Controllers.AuthController.Login(AttendanceSystem.Application.DTOs.Auth.LoginRequestDto,System.Threading.CancellationToken)">
+            <summary>Authenticates user and returns JWT tokens.</summary>
+        </member>
+        <member name="M:AttendanceSystem.API.Controllers.AuthController.Refresh(AttendanceSystem.API.Controllers.RefreshTokenRequest,System.Threading.CancellationToken)">
+            <summary>Refreshes access token using refresh token.</summary>
+        </member>
+        <member name="T:AttendanceSystem.API.Controllers.RefreshTokenRequest">
+            <summary>Refresh token request body.</summary>
+        </member>
+        <member name="M:AttendanceSystem.API.Controllers.RefreshTokenRequest.#ctor(System.String)">
+            <summary>Refresh token request body.</summary>
+        </member>
+        <member name="T:Program">
+            <summary>
+            Entry point for integration tests.
+            </summary>
+        </member>
+    </members>
+</doc>

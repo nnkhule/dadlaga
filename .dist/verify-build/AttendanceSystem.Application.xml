@@ -1,0 +1,218 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>AttendanceSystem.Application</name>
+    </assembly>
+    <members>
+        <member name="T:AttendanceSystem.Application.Common.Result">
+            <summary>
+            Functional result type for use cases without throwing for business failures.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Application.Common.Result`1">
+            <summary>
+            Result carrying a value on success.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Application.Configuration.AttendanceRulesOptions">
+            <summary>
+            Configurable attendance rule thresholds from appsettings.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Application.Configuration.JwtSettings">
+            <summary>
+            JWT authentication settings.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Application.DependencyInjection">
+            <summary>
+            Application layer service registration.
+            </summary>
+        </member>
+        <member name="M:AttendanceSystem.Application.DependencyInjection.AddApplication(Microsoft.Extensions.DependencyInjection.IServiceCollection)">
+            <summary>
+            Registers MediatR, validators, and application services.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Application.DTOs.Attendance.AttendanceHistoryItemDto">
+            <summary>
+            Simple attendance history item for display in mobile UI.
+            </summary>
+        </member>
+        <member name="M:AttendanceSystem.Application.DTOs.Attendance.AttendanceHistoryItemDto.#ctor(System.DateOnly,System.Nullable{System.DateTime},System.Nullable{System.DateTime})">
+            <summary>
+            Simple attendance history item for display in mobile UI.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Application.DTOs.Attendance.AttendanceRecordDto">
+            <summary>
+            Attendance record data transfer object.
+            </summary>
+        </member>
+        <member name="M:AttendanceSystem.Application.DTOs.Attendance.AttendanceRecordDto.#ctor(System.Guid,System.Guid,System.DateOnly,System.DateTime,System.Nullable{System.DateTime},AttendanceSystem.Domain.Enums.AttendanceStatus,System.Decimal,System.Decimal,AttendanceSystem.Domain.Enums.VerificationMethod,System.Boolean,System.Boolean)">
+            <summary>
+            Attendance record data transfer object.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Application.DTOs.Attendance.AttendanceStatisticsDto">
+            <summary>
+            Attendance statistics for the current calendar month.
+            </summary>
+        </member>
+        <member name="M:AttendanceSystem.Application.DTOs.Attendance.AttendanceStatisticsDto.#ctor(System.Int32,System.Int32,System.Int32,System.Decimal,System.String,System.Collections.Generic.IEnumerable{AttendanceSystem.Application.DTOs.Attendance.AttendanceHistoryItemDto})">
+            <summary>
+            Attendance statistics for the current calendar month.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Application.DTOs.Auth.LoginRequestDto">
+            <summary>
+            Login credentials request.
+            </summary>
+        </member>
+        <member name="M:AttendanceSystem.Application.DTOs.Auth.LoginRequestDto.#ctor(System.String,System.String)">
+            <summary>
+            Login credentials request.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Application.DTOs.Auth.TokenResponseDto">
+            <summary>
+            JWT token pair response.
+            </summary>
+        </member>
+        <member name="M:AttendanceSystem.Application.DTOs.Auth.TokenResponseDto.#ctor(System.String,System.String,System.DateTime,System.Nullable{System.Guid})">
+            <summary>
+            JWT token pair response.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Application.Features.Attendance.Commands.CheckIn.CheckInCommand">
+            <summary>
+            Command to record employee check-in.
+            </summary>
+        </member>
+        <member name="M:AttendanceSystem.Application.Features.Attendance.Commands.CheckIn.CheckInCommand.#ctor(System.Guid,System.Nullable{System.Double},System.Nullable{System.Double},System.Boolean,System.String,System.String)">
+            <summary>
+            Command to record employee check-in.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Application.Features.Attendance.Commands.CheckIn.CheckInCommandHandler">
+            <summary>
+            Handles employee check-in with GPS validation and rules engine.
+            </summary>
+        </member>
+        <member name="M:AttendanceSystem.Application.Features.Attendance.Commands.CheckIn.CheckInCommandHandler.Handle(AttendanceSystem.Application.Features.Attendance.Commands.CheckIn.CheckInCommand,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="T:AttendanceSystem.Application.Features.Attendance.Commands.CheckIn.CheckInCommandValidator">
+            <summary>
+            Validates check-in command input.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Application.Features.Attendance.Commands.CheckOut.CheckOutCommand">
+            <summary>
+            Command to record employee check-out.
+            </summary>
+        </member>
+        <member name="M:AttendanceSystem.Application.Features.Attendance.Commands.CheckOut.CheckOutCommand.#ctor(System.Guid,System.Nullable{System.Double},System.Nullable{System.Double},System.String)">
+            <summary>
+            Command to record employee check-out.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Application.Features.Attendance.Commands.CheckOut.CheckOutCommandHandler">
+            <summary>
+            Handles employee check-out with overtime and break calculation.
+            </summary>
+        </member>
+        <member name="M:AttendanceSystem.Application.Features.Attendance.Commands.CheckOut.CheckOutCommandHandler.Handle(AttendanceSystem.Application.Features.Attendance.Commands.CheckOut.CheckOutCommand,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="T:AttendanceSystem.Application.Features.Attendance.Queries.GetAttendanceStatistics.GetAttendanceStatisticsQuery">
+            <summary>
+            Query for attendance statistics for the current month.
+            </summary>
+        </member>
+        <member name="M:AttendanceSystem.Application.Features.Attendance.Queries.GetAttendanceStatistics.GetAttendanceStatisticsQuery.#ctor(System.Guid)">
+            <summary>
+            Query for attendance statistics for the current month.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Application.Features.Attendance.Queries.GetAttendanceStatistics.GetAttendanceStatisticsQueryHandler">
+            <summary>
+            Handles monthly attendance statistics queries.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Application.Features.Attendance.Queries.GetTodayAttendance.GetTodayAttendanceQuery">
+            <summary>
+            Query for today's attendance record for an employee.
+            </summary>
+        </member>
+        <member name="M:AttendanceSystem.Application.Features.Attendance.Queries.GetTodayAttendance.GetTodayAttendanceQuery.#ctor(System.Guid)">
+            <summary>
+            Query for today's attendance record for an employee.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Application.Features.Attendance.Queries.GetTodayAttendance.GetTodayAttendanceQueryHandler">
+            <summary>
+            Returns today's attendance for the employee.
+            </summary>
+        </member>
+        <member name="M:AttendanceSystem.Application.Features.Attendance.Queries.GetTodayAttendance.GetTodayAttendanceQueryHandler.Handle(AttendanceSystem.Application.Features.Attendance.Queries.GetTodayAttendance.GetTodayAttendanceQuery,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="T:AttendanceSystem.Application.Interfaces.IGeofenceService">
+            <summary>
+            GPS distance validation using Haversine formula.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Application.Interfaces.IUnitOfWork">
+            <summary>
+            Unit of work for transactional persistence.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Application.Interfaces.Repositories.IAttendanceRepository">
+            <summary>
+            Persistence for attendance records.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Application.Interfaces.Repositories.IEmployeeRepository">
+            <summary>
+            Persistence for employees.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Application.Services.AttendanceRulesService">
+            <summary>
+            Core attendance rules engine for check-in, check-out, breaks, and overtime.
+            </summary>
+        </member>
+        <member name="M:AttendanceSystem.Application.Services.AttendanceRulesService.EvaluateCheckIn(System.DateTime,AttendanceSystem.Domain.Entities.WorkSchedule,System.DateOnly)">
+            <summary>
+            Evaluates check-in time against schedule and returns status and late minutes.
+            </summary>
+        </member>
+        <member name="M:AttendanceSystem.Application.Services.AttendanceRulesService.EvaluateCheckOut(System.DateTime,AttendanceSystem.Domain.Entities.WorkSchedule,System.DateOnly,AttendanceSystem.Domain.Enums.AttendanceStatus)">
+            <summary>
+            Evaluates check-out against scheduled end time.
+            </summary>
+        </member>
+        <member name="M:AttendanceSystem.Application.Services.AttendanceRulesService.CalculateBreakDuration(System.TimeSpan,AttendanceSystem.Domain.Entities.WorkSchedule)">
+            <summary>
+            Calculates break duration per company policy based on work hours.
+            </summary>
+        </member>
+        <member name="M:AttendanceSystem.Application.Services.AttendanceRulesService.CalculateOvertimeHours(System.TimeSpan,System.TimeSpan,AttendanceSystem.Domain.Entities.WorkSchedule,System.Boolean,System.Boolean)">
+            <summary>
+            Calculates overtime hours with optional multipliers.
+            </summary>
+        </member>
+        <member name="T:AttendanceSystem.Application.Services.GeofenceService">
+            <summary>
+            Haversine-based geofence calculations.
+            </summary>
+        </member>
+        <member name="M:AttendanceSystem.Application.Services.GeofenceService.CalculateDistanceMeters(System.Double,System.Double,System.Double,System.Double)">
+            <inheritdoc />
+        </member>
+        <member name="M:AttendanceSystem.Application.Services.GeofenceService.IsWithinRadius(System.Double,System.Double,System.Double,System.Double,System.Int32)">
+            <inheritdoc />
+        </member>
+    </members>
+</doc>
