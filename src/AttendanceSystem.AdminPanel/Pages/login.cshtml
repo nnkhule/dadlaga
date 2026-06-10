@@ -1,0 +1,122 @@
+@page
+@model AttendanceSystem.AdminPanel.Pages.LoginModel
+@{
+    ViewData["Title"] = "Нэвтрэх";
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="mn">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Нэвтрэх — Цаг Бүртгэл</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-white min-h-screen flex items-center justify-center px-4">
+
+    <div class="w-full max-w-sm">
+
+        @* Logo / header *@
+        <div class="text-center mb-8">
+            <div class="text-4xl mb-3">🕐</div>
+            <h1 class="text-2xl font-bold tracking-tight">Цаг Бүртгэлийн Систем</h1>
+            <p class="text-slate-400 text-sm mt-1">Админ хэсэг</p>
+        </div>
+
+        @* Error banner *@
+        @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+        {
+            <div class="bg-red-500/20 border border-red-500/40 text-red-300 text-sm rounded-lg px-4 py-3 mb-5 flex items-center gap-2">
+                <span>⚠</span>
+                <span>@Model.ErrorMessage</span>
+            </div>
+        }
+
+        @* Login form *@
+        <form method="post" class="bg-slate-800 rounded-2xl p-6 shadow-xl space-y-5">
+            @Html.AntiForgeryToken()
+
+            <div>
+                <label for="Email" class="block text-sm font-medium text-slate-300 mb-1.5">
+                    И-мэйл хаяг
+                </label>
+                <input asp-for="Input.Email"
+                       id="Email"
+                       type="email"
+                       autocomplete="username"
+                       placeholder="admin@attendance.local"
+                       class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3.5 py-2.5 text-sm
+                              placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500
+                              focus:border-transparent transition" />
+                <span asp-validation-for="Input.Email" class="text-red-400 text-xs mt-1 block"></span>
+            </div>
+
+            <div>
+                <label for="Password" class="block text-sm font-medium text-slate-300 mb-1.5">
+                    Нууц үг
+                </label>
+                <div class="relative">
+                    <input asp-for="Input.Password"
+                           id="Password"
+                           type="password"
+                           autocomplete="current-password"
+                           placeholder="••••••••"
+                           class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3.5 py-2.5 text-sm
+                                  placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500
+                                  focus:border-transparent transition pr-10" />
+                    <button type="button"
+                            onclick="togglePassword()"
+                            class="absolute inset-y-0 right-3 text-slate-400 hover:text-slate-200 transition">
+                        <span id="eye-icon">👁</span>
+                    </button>
+                </div>
+                <span asp-validation-for="Input.Password" class="text-red-400 text-xs mt-1 block"></span>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <input asp-for="Input.RememberMe"
+                       id="RememberMe"
+                       type="checkbox"
+                       class="w-4 h-4 rounded border-slate-600 bg-slate-700 text-blue-500
+                              focus:ring-blue-500 focus:ring-offset-slate-800" />
+                <label for="RememberMe" class="text-sm text-slate-300 select-none cursor-pointer">
+                    Намайг сана
+                </label>
+            </div>
+
+            <button type="submit"
+                    id="submit-btn"
+                    class="w-full bg-blue-600 hover:bg-blue-500 active:bg-blue-700
+                           text-white font-semibold rounded-lg py-2.5 text-sm
+                           transition focus:outline-none focus:ring-2 focus:ring-blue-500
+                           focus:ring-offset-2 focus:ring-offset-slate-800 disabled:opacity-50">
+                Нэвтрэх
+            </button>
+        </form>
+
+        <p class="text-center text-slate-500 text-xs mt-6">
+            Attendance System &copy; @DateTime.Now.Year
+        </p>
+    </div>
+
+    <script>
+        function togglePassword() {
+            const input = document.getElementById('Password');
+            const icon  = document.getElementById('eye-icon');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.textContent = '🙈';
+            } else {
+                input.type = 'password';
+                icon.textContent = '👁';
+            }
+        }
+
+        document.querySelector('form').addEventListener('submit', function () {
+            const btn = document.getElementById('submit-btn');
+            btn.disabled = true;
+            btn.textContent = 'Нэвтэрч байна…';
+        });
+    </script>
+</body>
+</html>

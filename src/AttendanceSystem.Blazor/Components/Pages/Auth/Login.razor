@@ -1,0 +1,128 @@
+@page "/login"
+@layout AuthLayout
+
+@using System.Net.Http.Json
+
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+<div class="login-container">
+
+    <div class="login-left">
+        <h1>Attendance System</h1>
+        <p>Smart Attendance Management Platform</p>
+    </div>
+
+    <div class="login-right">
+
+        <div class="login-card">
+
+            <h3 class="mb-4">Sign In</h3>
+
+            @if (!string.IsNullOrEmpty(ErrorMessage))
+            {
+                <div class="alert alert-danger">
+                    @ErrorMessage
+                </div>
+            }
+
+            <div class="mb-3">
+                <label>Email</label>
+                <input class="form-control"
+                       @bind="Email"
+                       placeholder="Enter email" />
+            </div>
+
+            <div class="mb-3">
+                <label>Password</label>
+                <input type="password"
+                       class="form-control"
+                       @bind="Password"
+                       placeholder="Enter password" />
+            </div>
+
+            <button class="btn btn-primary w-100"
+                    @onclick="LoginAsync"
+                    disabled="@IsLoading">
+
+                @if (IsLoading)
+                {
+                    <span class="spinner-border spinner-border-sm"></span>
+                    <span class="ms-2">Signing In...</span>
+                }
+                else
+                {
+                    <span>Login</span>
+                }
+
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
+
+@code {
+
+    private string Email = "";
+    private string Password = "";
+
+    private bool IsLoading;
+    private string ErrorMessage = "";
+
+    public class LoginRequest
+    {
+        public string Email { get; set; } = "";
+        public string Password { get; set; } = "";
+    }
+
+    public class LoginResponse
+    {
+        public string AccessToken { get; set; } = "";
+        public string RefreshToken { get; set; } = "";
+        public DateTime ExpiresAt { get; set; }
+        public Guid EmployeeId { get; set; }
+    }
+
+    private async Task LoginAsync()
+    {
+        try
+        {
+            IsLoading = true;
+            ErrorMessage = "";
+
+            var request = new LoginRequest
+            {
+                Email = Email,
+                Password = Password
+            };
+
+            var response =
+                await Http.PostAsJsonAsync(
+                    "api/auth/login",
+                    request);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result =
+                    await response.Content.ReadFromJsonAsync<LoginResponse>();
+
+                Navigation.NavigateTo("/dashboard");
+            }
+            else
+            {
+                ErrorMessage = "Invalid email or password";
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+}
