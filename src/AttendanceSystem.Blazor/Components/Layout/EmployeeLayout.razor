@@ -63,7 +63,6 @@
     private EmployeeProfileDto? profile;
     private EditModel edit = new();
     private string? error;
-    private bool saving;
     private bool isLoggingOut;
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
@@ -87,7 +86,6 @@
     {
         try
         {
-            saving = true;
             error = null;
             await Api.PutAsync("api/employees/me", new UpdateProfileDto(edit.FullName, edit.Email, edit.Phone, edit.DateOfBirth));
             await LoadAsync();
@@ -95,10 +93,6 @@
         catch (Exception ex)
         {
             error = ex.Message;
-        }
-        finally
-        {
-            saving = false;
         }
     }
 
