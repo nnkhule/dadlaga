@@ -107,6 +107,7 @@ app.UseAuthorization();
 app.MapControllers();
 
 await ApplicationDbSeeder.SeedAsync(app.Services);
+await EmployeeAccountSeeder.SeedEmployeeAccountsAsync(app.Services);
 
 app.Run();
 
