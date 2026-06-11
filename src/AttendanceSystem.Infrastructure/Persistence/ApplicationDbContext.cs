@@ -34,6 +34,20 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
-        builder.Entity<RolePermission>()
-            .HasKey(x => new { x.RoleId, x.PermissionId });    }
+        builder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
+
+        builder.Entity<Employee>()
+            .HasOne<ApplicationUser>()
+            .WithMany()
+            .HasForeignKey(x => x.UserId)
+            .OnDelete(DeleteBehavior.NoAction)
+            .HasConstraintName("FK_Employees_AspNetUsers");
+
+        builder.Entity<ApplicationUser>()
+            .HasOne<Employee>()
+            .WithMany()
+            .HasForeignKey(x => x.EmployeeId)
+            .OnDelete(DeleteBehavior.SetNull)
+            .HasConstraintName("FK_AspNetUsers_Employees");
+    }
 }

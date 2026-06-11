@@ -1,0 +1,117 @@
+@page "/leave"
+@layout EmployeeLayout
+@inject ApiClient Api
+
+<PageHeader Title="Leave" Subtitle="Leave requests from the database" Icon="☑" />
+
+<div class="page-stack">
+    @if (!string.IsNullOrWhiteSpace(error))
+    {
+        <div class="card" style="border-color:var(--clr-danger);color:var(--clr-danger)">@error</div>
+    }
+
+    <div class="row g-4">
+        <div class="col-12 col-lg-5">
+            <EditForm Model="@request" OnValidSubmit="SubmitAsync">
+                <div class="card page-stack">
+                    <h2>New request</h2>
+                    <div class="form-group">
+                        <label>Type</label>
+                        <InputSelect class="form-control" @bind-Value="request.Type">
+                            <option value="Annual">Annual</option>
+                            <option value="Sick">Sick</option>
+                            <option value="Unpaid">Unpaid</option>
+                            <option value="Birthday">Birthday</option>
+                            <option value="Maternity">Maternity</option>
+                            <option value="Other">Other</option>
+                        </InputSelect>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-6 form-group"><label>Start</label><InputDate class="form-control" @bind-Value="request.Start" /></div>
+                        <div class="col-6 form-group"><label>End</label><InputDate class="form-control" @bind-Value="request.End" /></div>
+                    </div>
+                    <div class="muted">Days: @Days</div>
+                    <div class="form-group"><label>Reason</label><InputTextArea class="form-control" @bind-Value="request.Reason" /></div>
+                    <button class="btn-primary" type="submit" disabled="@saving">Submit</button>
+                </div>
+            </EditForm>
+        </div>
+
+        <div class="col-12 col-lg-7">
+            <div class="card page-stack">
+                <h2>History</h2>
+                @if (history.Count == 0)
+                {
+                    <div class="muted">No leave requests found.</div>
+                }
+                else
+                {
+                    @foreach (var item in history)
+                    {
+                        <div class="card">
+                            <strong>@item.LeaveType</strong>
+                            <div class="muted">@item.StartDate.ToString("yyyy-MM-dd") - @item.EndDate.ToString("yyyy-MM-dd")</div>
+                            <div>@Display(item.Reason)</div>
+                            <StatusBadge Status="@(item.Status ?? item.ApprovalStatus ?? string.Empty)" />
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private LeaveForm request = new() { Type = "Annual", Start = DateOnly.FromDateTime(DateTime.Today), End = DateOnly.FromDateTime(DateTime.Today) };
+    private IReadOnlyList<LeaveDto> history = [];
+    private string? error;
+    private bool saving;
+    private int Days => Math.Max(1, request.End.DayNumber - request.Start.DayNumber + 1);
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            error = null;
+            var result = await Api.GetAsync<PagedResponse<LeaveDto>>("api/leave/history");
+            history = result?.Items ?? [];
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            history = [];
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        try
+        {
+            saving = true;
+            error = null;
+            await Api.PostAsync("api/leave/requests", new { StartDate = request.Start.ToString("yyyy-MM-dd"), EndDate = request.End.ToString("yyyy-MM-dd"), request.Type, request.Reason });
+            request = new LeaveForm { Type = request.Type, Start = DateOnly.FromDateTime(DateTime.Today), End = DateOnly.FromDateTime(DateTime.Today) };
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+    private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "--" : value;
+
+    private sealed class LeaveForm
+    {
+        public string Type { get; set; } = string.Empty;
+        public DateOnly Start { get; set; }
+        public DateOnly End { get; set; }
+        public string Reason { get; set; } = string.Empty;
+    }
+}

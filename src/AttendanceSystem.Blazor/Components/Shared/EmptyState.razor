@@ -1,0 +1,17 @@
+<div class="empty-state">
+    <div class="empty-state-icon">@Icon</div>
+    <h3>@Title</h3>
+    <p>@Message</p>
+    @if (!string.IsNullOrWhiteSpace(ActionLabel))
+    {
+        <button class="btn-primary" @onclick="OnAction">@ActionLabel</button>
+    }
+</div>
+
+@code {
+    [Parameter] public string Icon { get; set; } = "∅";
+    [Parameter] public string Title { get; set; } = "Мэдээлэл алга";
+    [Parameter] public string Message { get; set; } = "";
+    [Parameter] public string? ActionLabel { get; set; }
+    [Parameter] public EventCallback OnAction { get; set; }
+}

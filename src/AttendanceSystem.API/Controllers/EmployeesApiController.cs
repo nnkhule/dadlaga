@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using AttendanceSystem.Domain.Entities;
+using AttendanceSystem.Domain.Enums;
 using AttendanceSystem.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -47,6 +49,7 @@ public sealed class EmployeesApiController : ControllerBase
                 e.FullName,
                 e.Email,
                 e.Phone,
+                e.DepartmentId,
                 e.Department == null ? null : e.Department.Name,
                 e.Department == null ? null : e.Department.Name,
                 null,
@@ -66,10 +69,61 @@ public sealed class EmployeesApiController : ControllerBase
             .Include(e => e.Department)
             .Where(e => e.Id == id)
             .Select(e => ToEmployeeDto(e.Id, e.EmployeeCode, e.FullName, e.Email, e.Phone,
-                e.Department == null ? null : e.Department.Name, e.HireDate, e.IsActive))
+                e.DepartmentId, e.Department == null ? null : e.Department.Name, e.HireDate, e.IsActive))
             .FirstOrDefaultAsync(cancellationToken);
 
         return employee is null ? NotFound() : Ok(employee);
+    }
+
+    [HttpPost]
+    public async Task<ActionResult<EmployeeApiDto>> Create([FromBody] EmployeeFormApiDto request, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.EmployeeCode) || string.IsNullOrWhiteSpace(request.FullName) || string.IsNullOrWhiteSpace(request.Email))
+            return BadRequest(new { message = "Employee code, full name, and email are required." });
+
+        if (!request.DepartmentId.HasValue)
+            return BadRequest(new { message = "Department is required." });
+
+        var scheduleId = await _db.WorkSchedules.AsNoTracking().OrderBy(w => w.Name).Select(w => w.Id).FirstOrDefaultAsync(cancellationToken);
+        var officeId = await _db.OfficeLocations.AsNoTracking().OrderBy(o => o.Name).Select(o => o.Id).FirstOrDefaultAsync(cancellationToken);
+        if (scheduleId == Guid.Empty || officeId == Guid.Empty)
+            return BadRequest(new { message = "Work schedule and office location must exist before creating employees." });
+
+        var employee = Employee.Create(
+            request.EmployeeCode.Trim(),
+            request.FullName.Trim(),
+            request.Email.Trim(),
+            request.DepartmentId.Value,
+            scheduleId,
+            officeId,
+            request.HireDate ?? DateOnly.FromDateTime(DateTime.UtcNow),
+            ContractType.FullTime,
+            request.DateOfBirth,
+            request.Phone);
+
+        _db.Employees.Add(employee);
+        await _db.SaveChangesAsync(cancellationToken);
+        return CreatedAtAction(nameof(Details), new { id = employee.Id }, await BuildEmployeeDto(employee.Id, cancellationToken));
+    }
+
+    [HttpPut("{id:guid}")]
+    public async Task<ActionResult<EmployeeApiDto>> Update(Guid id, [FromBody] EmployeeFormApiDto request, CancellationToken cancellationToken)
+    {
+        var employee = await _db.Employees.FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
+        if (employee is null)
+            return NotFound();
+
+        employee.Update(
+            string.IsNullOrWhiteSpace(request.FullName) ? employee.FullName : request.FullName.Trim(),
+            string.IsNullOrWhiteSpace(request.Email) ? employee.Email : request.Email.Trim(),
+            request.Phone,
+            request.DepartmentId ?? employee.DepartmentId,
+            employee.WorkScheduleId,
+            employee.OfficeLocationId,
+            request.DateOfBirth);
+
+        await _db.SaveChangesAsync(cancellationToken);
+        return Ok(await BuildEmployeeDto(id, cancellationToken));
     }
 
     [HttpGet("me")]
@@ -135,8 +189,15 @@ public sealed class EmployeesApiController : ControllerBase
         return Guid.TryParse(claim, out var id) ? id : null;
     }
 
-    private static EmployeeApiDto ToEmployeeDto(Guid id, string code, string name, string email, string? phone, string? department, DateOnly hireDate, bool isActive)
-        => new(id, code, name, email, phone, department, department, null, hireDate, isActive ? "Active" : "Inactive", isActive);
+    private async Task<EmployeeApiDto?> BuildEmployeeDto(Guid id, CancellationToken cancellationToken)
+        => await _db.Employees.AsNoTracking().Include(e => e.Department)
+            .Where(e => e.Id == id)
+            .Select(e => ToEmployeeDto(e.Id, e.EmployeeCode, e.FullName, e.Email, e.Phone,
+                e.DepartmentId, e.Department == null ? null : e.Department.Name, e.HireDate, e.IsActive))
+            .FirstOrDefaultAsync(cancellationToken);
+
+    private static EmployeeApiDto ToEmployeeDto(Guid id, string code, string name, string email, string? phone, Guid departmentId, string? department, DateOnly hireDate, bool isActive)
+        => new(id, code, name, email, phone, departmentId, department, department, null, hireDate, isActive ? "Active" : "Inactive", isActive);
 }
 
 public sealed record EmployeeApiDto(
@@ -145,6 +206,7 @@ public sealed record EmployeeApiDto(
     string FullName,
     string Email,
     string? Phone,
+    Guid DepartmentId,
     string? Department,
     string? DepartmentName,
     string? Position,
@@ -169,3 +231,12 @@ public sealed record EmployeeProfileApiDto(
     bool IsActive);
 
 public sealed record UpdateEmployeeProfileApiDto(string FullName, string Email, string? Phone, DateOnly? DateOfBirth);
+public sealed record EmployeeFormApiDto(
+    string? EmployeeCode,
+    string? FullName,
+    string? Email,
+    string? Phone,
+    Guid? DepartmentId,
+    string? Position,
+    DateOnly? HireDate,
+    DateOnly? DateOfBirth);

@@ -13,6 +13,7 @@ public class Notification : BaseEntity
     public string Body { get; private set; } = string.Empty;
     public NotificationChannel Channel { get; private set; }
     public bool IsRead { get; private set; }
+    public DateTime? ReadAt { get; private set; }
     public Guid? RelatedEntityId { get; private set; }
     public string? RelatedEntityType { get; private set; }
 
@@ -30,5 +31,10 @@ public class Notification : BaseEntity
             RelatedEntityType = relatedEntityType
         };
 
-    public void MarkRead() { IsRead = true; SetUpdated(); }
+    public void MarkRead()
+    {
+        IsRead = true;
+        ReadAt = DateTime.UtcNow;
+        SetUpdated();
+    }
 }

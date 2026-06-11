@@ -1,0 +1,36 @@
+<div class="notification">
+    <button class="icon-btn" @onclick="() => _open = !_open" title="Мэдэгдэл">🔔</button>
+    @if (UnreadCount > 0)
+    {
+        <span class="notification-count">@UnreadCount</span>
+    }
+    @if (_open)
+    {
+        <div class="card notification-menu">
+            @foreach (var item in Items)
+            {
+                <div class="notification-item">
+                    <div class="stat-icon" style="width:36px;height:36px;background:var(--clr-primary-light);color:var(--clr-primary)">@item.Icon</div>
+                    <div>
+                        <strong>@item.Title</strong>
+                        <div class="muted">@item.MinutesAgo минутын өмнө</div>
+                    </div>
+                </div>
+            }
+            <a href="/notifications" class="btn-ghost" style="width:100%;margin-top:10px">Бүгдийг харах</a>
+        </div>
+    }
+</div>
+
+@code {
+    private bool _open;
+    [Parameter] public int UnreadCount { get; set; } = 3;
+    [Parameter] public IReadOnlyList<NotificationItem> Items { get; set; } = new[]
+    {
+        new NotificationItem("📝", "Чөлөөний шинэ хүсэлт", 5),
+        new NotificationItem("⏱", "Цаг засварлах хүсэлт", 12),
+        new NotificationItem("✅", "Ирцийн бүртгэл шинэчлэгдлээ", 18)
+    };
+
+    public sealed record NotificationItem(string Icon, string Title, int MinutesAgo);
+}

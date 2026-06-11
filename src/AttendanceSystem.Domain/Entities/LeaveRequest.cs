@@ -16,6 +16,7 @@ public class LeaveRequest : BaseEntity
     public RequestStatus Status { get; private set; } = RequestStatus.Pending;
     public bool IsBirthdayLeave { get; private set; }
     public Guid? ApprovedBy { get; private set; }
+    public decimal TotalDays { get; private set; }
 
     public Employee? Employee { get; private set; }
 

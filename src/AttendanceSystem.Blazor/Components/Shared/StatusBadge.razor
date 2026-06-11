@@ -1,0 +1,29 @@
+<span class="badge @BadgeClass">@DisplayText</span>
+
+@code {
+    [Parameter] public string Status { get; set; } = "Pending";
+
+    private string Key => Status.Replace(" ", "", StringComparison.OrdinalIgnoreCase).ToLowerInvariant();
+
+    private string DisplayText => Key switch
+    {
+        "present" or "checkedin" or "checkedout" => "Ирсэн",
+        "late" => "Хоцорсон",
+        "absent" => "Ирээгүй",
+        "onleave" or "leave" => "Чөлөөтэй",
+        "approved" => "Батлагдсан",
+        "rejected" => "Татгалзсан",
+        _ => "Хүлээгдэж байна"
+    };
+
+    private string BadgeClass => Key switch
+    {
+        "present" or "checkedin" or "checkedout" => "badge-present",
+        "late" => "badge-late",
+        "absent" => "badge-absent",
+        "onleave" or "leave" => "badge-leave",
+        "approved" => "badge-approved",
+        "rejected" => "badge-rejected",
+        _ => "badge-pending"
+    };
+}

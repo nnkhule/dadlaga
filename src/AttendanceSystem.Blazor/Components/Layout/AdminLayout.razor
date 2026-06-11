@@ -1,0 +1,36 @@
+@inherits LayoutComponentBase
+@inject NavigationManager Nav
+
+<div class="admin-shell @(_collapsed ? "collapsed" : "")">
+    <aside class="admin-sidebar">
+        <a class="admin-brand" href="/admin/dashboard"><span>◆</span><span class="brand-text">AttendIQ Admin</span></a>
+        <nav class="nav-list">
+            @NavItem("/admin/dashboard", "▦", "Самбар")
+            @NavItem("/admin/employees", "☷", "Ажилтнууд")
+            @NavItem("/admin/attendance", "◷", "Ирц")
+            @NavItem("/admin/leave", "☑", "Чөлөө")
+            @NavItem("/admin/reports", "▤", "Тайлан")
+        </nav>
+        <div class="sidebar-bottom">
+            <div class="admin-brand">
+                <span class="avatar" style="width:38px;height:38px;background:rgba(255,255,255,.16)">AD</span>
+                <span class="sidebar-user-text">Admin<br><small>HR Manager</small></span>
+            </div>
+            <button class="collapse-btn" @onclick="() => _collapsed = !_collapsed">@(_collapsed ? "→" : "←")</button>
+        </div>
+    </aside>
+    <div class="admin-main">
+        <header class="admin-topbar">
+            <strong>@Breadcrumb</strong>
+            <div class="action-row"><NotificationBell /><span class="avatar" style="width:38px;height:38px;background:var(--clr-primary-light);color:var(--clr-primary)">A</span></div>
+        </header>
+        <main class="content-wrap">@Body</main>
+    </div>
+</div>
+
+@code {
+    private bool _collapsed;
+    private string Breadcrumb => Nav.Uri.Contains("/admin/", StringComparison.OrdinalIgnoreCase) ? "Admin / " + Nav.Uri.Split('/').Last() : "Admin";
+
+    private RenderFragment NavItem(string href, string icon, string label) => @<a class="nav-link @(Nav.Uri.Contains(href, StringComparison.OrdinalIgnoreCase) ? "active" : "")" href="@href"><span>@icon</span><span class="nav-label">@label</span></a>;
+}

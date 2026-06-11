@@ -1,59 +1,124 @@
 @page
 @model AttendanceSystem.AdminPanel.Pages.LoginModel
 @{
-    ViewData["Title"] = "Нэвтрэх";
+    ViewData["Title"] = "Admin Login";
     Layout = null;
 }
 <!DOCTYPE html>
-<html lang="mn">
+<html lang="en">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Нэвтрэх — Цаг Бүртгэл</title>
+    <title>Admin Login — Attendance System</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+        
+        * {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+            background-attachment: fixed;
+        }
+
+        .glass {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .glass-heavy {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .animate-slide-in {
+            animation: slideIn 0.6s ease-out;
+        }
+
+        .gradient-text {
+            background: linear-gradient(135deg, #3b82f6 0%, #10b981 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+    </style>
 </head>
-<body class="bg-slate-900 text-white min-h-screen flex items-center justify-center px-4">
+<body class="min-h-screen flex items-center justify-center px-4 py-8">
 
-    <div class="w-full max-w-sm">
+    <!-- Animated Background -->
+    <div class="fixed inset-0 overflow-hidden pointer-events-none">
+        <div class="absolute top-0 left-0 w-96 h-96 bg-blue-600/20 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse"></div>
+        <div class="absolute bottom-0 right-0 w-96 h-96 bg-purple-600/20 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse" style="animation-delay: 2s;"></div>
+    </div>
 
-        @* Logo / header *@
-        <div class="text-center mb-8">
-            <div class="text-4xl mb-3">🕐</div>
-            <h1 class="text-2xl font-bold tracking-tight">Цаг Бүртгэлийн Систем</h1>
-            <p class="text-slate-400 text-sm mt-1">Админ хэсэг</p>
+    <div class="w-full max-w-md relative z-10 animate-slide-in">
+
+        <!-- Header -->
+        <div class="text-center mb-12">
+            <div class="inline-block mb-6">
+                <div class="glass-heavy p-4 rounded-2xl">
+                    <svg class="w-12 h-12 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v3.586L7.707 9.293a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 10.586V7z" />
+                    </svg>
+                </div>
+            </div>
+            <h1 class="text-4xl font-bold text-white mb-2">Admin Panel</h1>
+            <p class="text-slate-300">Attendance Management System</p>
         </div>
 
-        @* Error banner *@
+        <!-- Error Banner -->
         @if (!string.IsNullOrEmpty(Model.ErrorMessage))
         {
-            <div class="bg-red-500/20 border border-red-500/40 text-red-300 text-sm rounded-lg px-4 py-3 mb-5 flex items-center gap-2">
-                <span>⚠</span>
-                <span>@Model.ErrorMessage</span>
+            <div class="glass-heavy text-red-300 rounded-xl px-4 py-3 mb-6 flex items-start gap-3 border-red-500/50 animate-slide-in">
+                <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                </svg>
+                <div>
+                    <p class="font-semibold">Login Failed</p>
+                    <p class="text-sm opacity-90">@Model.ErrorMessage</p>
+                </div>
             </div>
         }
 
-        @* Login form *@
-        <form method="post" class="bg-slate-800 rounded-2xl p-6 shadow-xl space-y-5">
+        <!-- Login Form -->
+        <form method="post" class="glass-heavy rounded-2xl p-8 space-y-6">
             @Html.AntiForgeryToken()
 
+            <!-- Email Field -->
             <div>
-                <label for="Email" class="block text-sm font-medium text-slate-300 mb-1.5">
-                    И-мэйл хаяг
+                <label for="Email" class="block text-sm font-semibold text-slate-200 mb-2.5">
+                    Email Address
                 </label>
                 <input asp-for="Input.Email"
                        id="Email"
                        type="email"
                        autocomplete="username"
                        placeholder="admin@attendance.local"
-                       class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3.5 py-2.5 text-sm
-                              placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500
+                       class="w-full glass rounded-lg px-4 py-3 text-white text-sm
+                              placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500
                               focus:border-transparent transition" />
-                <span asp-validation-for="Input.Email" class="text-red-400 text-xs mt-1 block"></span>
+                <span asp-validation-for="Input.Email" class="text-red-400 text-xs mt-1.5 block"></span>
             </div>
 
+            <!-- Password Field -->
             <div>
-                <label for="Password" class="block text-sm font-medium text-slate-300 mb-1.5">
-                    Нууц үг
+                <label for="Password" class="block text-sm font-semibold text-slate-200 mb-2.5">
+                    Password
                 </label>
                 <div class="relative">
                     <input asp-for="Input.Password"
@@ -61,43 +126,85 @@
                            type="password"
                            autocomplete="current-password"
                            placeholder="••••••••"
-                           class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3.5 py-2.5 text-sm
-                                  placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500
-                                  focus:border-transparent transition pr-10" />
+                           class="w-full glass rounded-lg px-4 py-3 text-white text-sm
+                                  placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500
+                                  focus:border-transparent transition pr-12" />
                     <button type="button"
                             onclick="togglePassword()"
                             class="absolute inset-y-0 right-3 text-slate-400 hover:text-slate-200 transition">
-                        <span id="eye-icon">👁</span>
+                        <svg id="eye-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
                     </button>
                 </div>
-                <span asp-validation-for="Input.Password" class="text-red-400 text-xs mt-1 block"></span>
+                <span asp-validation-for="Input.Password" class="text-red-400 text-xs mt-1.5 block"></span>
             </div>
 
-            <div class="flex items-center gap-2">
+            <!-- Remember Me -->
+            <div class="flex items-center">
                 <input asp-for="Input.RememberMe"
                        id="RememberMe"
                        type="checkbox"
-                       class="w-4 h-4 rounded border-slate-600 bg-slate-700 text-blue-500
-                              focus:ring-blue-500 focus:ring-offset-slate-800" />
-                <label for="RememberMe" class="text-sm text-slate-300 select-none cursor-pointer">
-                    Намайг сана
+                       class="w-4 h-4 rounded border-slate-500 bg-slate-700/50 text-blue-500
+                              focus:ring-blue-500 focus:ring-offset-0 cursor-pointer" />
+                <label for="RememberMe" class="ml-2.5 text-sm text-slate-300 select-none cursor-pointer">
+                    Remember me on this device
                 </label>
             </div>
 
+            <!-- Submit Button -->
             <button type="submit"
                     id="submit-btn"
-                    class="w-full bg-blue-600 hover:bg-blue-500 active:bg-blue-700
-                           text-white font-semibold rounded-lg py-2.5 text-sm
+                    class="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800
+                           text-white font-semibold rounded-lg py-3 text-sm
                            transition focus:outline-none focus:ring-2 focus:ring-blue-500
-                           focus:ring-offset-2 focus:ring-offset-slate-800 disabled:opacity-50">
-                Нэвтрэх
+                           focus:ring-offset-2 focus:ring-offset-slate-900
+                           disabled:from-gray-600 disabled:to-gray-700 disabled:opacity-50
+                           transform hover:scale-105 active:scale-95
+                           shadow-lg hover:shadow-xl hover:shadow-blue-500/50">
+                Sign In to Dashboard
             </button>
         </form>
 
-        <p class="text-center text-slate-500 text-xs mt-6">
-            Attendance System &copy; @DateTime.Now.Year
-        </p>
+        <!-- Footer -->
+        <div class="mt-8 text-center space-y-3">
+            <p class="text-slate-400 text-sm">
+                Demo Credentials:
+                <br/>
+                <span class="text-slate-300 font-mono text-xs">admin@attendance.local</span>
+            </p>
+            <p class="text-slate-500 text-xs">
+                &copy; @DateTime.Now.Year Attendance System. All rights reserved.
+            </p>
+        </div>
+
     </div>
+
+    <script>
+        function togglePassword() {
+            const passwordInput = document.getElementById('Password');
+            const eyeIcon = document.getElementById('eye-icon');
+            
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+            } else {
+                passwordInput.type = 'password';
+            }
+        }
+
+        // Add loading state to form
+        const form = document.querySelector('form');
+        const submitBtn = document.getElementById('submit-btn');
+        
+        form?.addEventListener('submit', function() {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Signing in...';
+        });
+    </script>
+
+</body>
+</html>
 
     <script>
         function togglePassword() {

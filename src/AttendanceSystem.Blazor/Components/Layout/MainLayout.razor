@@ -1,19 +1,166 @@
 ﻿@inherits LayoutComponentBase
+@using System.Security.Claims
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager Navigation
 
-<div class="app-layout">
+<div class="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+    <!-- Navigation Bar -->
+    <nav class="bg-white/10 backdrop-blur-md border-b border-white/20 sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 md:px-8">
+            <div class="flex justify-between items-center h-16">
+                <!-- Logo -->
+                <a href="/" class="flex items-center gap-3 text-white hover:text-slate-100 transition">
+                    <div class="bg-gradient-to-br from-blue-400 to-blue-600 p-2 rounded-lg">
+                        <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v3.586L7.707 9.293a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 10.586V7z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-lg">Attendance</h1>
+                        <p class="text-xs text-slate-300">Management System</p>
+                    </div>
+                </a>
 
-    <Sidebar />
+                <!-- Menu Items -->
+                <div class="hidden md:flex items-center gap-8">
+                    <AuthorizeView Roles="SuperAdmin">
+                        <a href="/admin/dashboard" class="text-slate-300 hover:text-white transition flex items-center gap-1">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-3m0 0l7-4 7 4M5 9v10a1 1 0 001 1h12a1 1 0 001-1V9m-9 16l-7-4m0 0V5m7 4l7-4m0 0v10a1 1 0 01-1 1H4a1 1 0 01-1-1V9m9 16l7 4m0 0V5" />
+                            </svg>
+                            Dashboard
+                        </a>
+                    </AuthorizeView>
 
-    <div class="main-content">
+                    <AuthorizeView>
+                        <a href="/attendance" class="text-slate-300 hover:text-white transition flex items-center gap-1">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Check In/Out
+                        </a>
+                    </AuthorizeView>
 
-        <Navbar />
+                    <a href="/admin/reports" class="text-slate-300 hover:text-white transition flex items-center gap-1">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                        Reports
+                    </a>
+                </div>
 
-        <div class="page-content">
-            @Body
+                <!-- User Menu -->
+                <div class="flex items-center gap-4">
+                    <AuthorizeView>
+                        <Authorized>
+                            <button @onclick="ToggleUserMenu" class="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 transition text-white">
+                                <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-sm font-bold">
+                                    @(context?.User?.FindFirst(ClaimTypes.Name)?.Value?.Substring(0, 1) ?? "U")
+                                </div>
+                                <span class="hidden sm:inline text-sm">@(context?.User?.FindFirst(ClaimTypes.Name)?.Value ?? "User")</span>
+                                <svg class="w-4 h-4 transition @(showUserMenu ? "rotate-180" : "")" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                </svg>
+                            </button>
+
+                            @if (showUserMenu)
+                            {
+                                <div class="absolute top-16 right-4 bg-white/20 backdrop-blur-md border border-white/30 rounded-lg shadow-lg overflow-hidden z-50">
+                                    <a href="/profile" class="block px-4 py-2 text-white hover:bg-white/20 transition text-sm">
+                                        প্রোফাইল
+                                    </a>
+                                    <a href="/settings" class="block px-4 py-2 text-white hover:bg-white/20 transition text-sm">
+                                        সেটিংস
+                                    </a>
+                                    <button @onclick="Logout" class="block w-full text-left px-4 py-2 text-white hover:bg-white/20 transition text-sm">
+                                        লগ আউট
+                                    </button>
+                                </div>
+                            }
+                        </Authorized>
+                        <NotAuthorized>
+                            <a href="/login" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition text-sm font-medium">
+                                নেভিগেট করুন
+                            </a>
+                        </NotAuthorized>
+                    </AuthorizeView>
+                </div>
+            </div>
         </div>
+    </nav>
 
-        <Footer />
+    <!-- Main Content -->
+    <main class="min-h-screen">
+        @Body
+    </main>
 
-    </div>
-
+    <!-- Footer -->
+    <footer class="bg-white/5 border-t border-white/20 py-6 mt-16">
+        <div class="max-w-7xl mx-auto px-4 md:px-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+                <div>
+                    <h3 class="text-white font-bold mb-3">Attendance System</h3>
+                    <p class="text-slate-400 text-sm">উন্নত কর্মচারী ইরস ব্যবস্থাপনা সমাধান</p>
+                </div>
+                <div>
+                    <h3 class="text-white font-bold mb-3">দ্রুত লিঙ্ক</h3>
+                    <ul class="space-y-2 text-sm">
+                        <li><a href="#" class="text-slate-400 hover:text-white transition">ড্যাশবোর্ড</a></li>
+                        <li><a href="#" class="text-slate-400 hover:text-white transition">রিপোর্ট</a></li>
+                        <li><a href="#" class="text-slate-400 hover:text-white transition">সহায়তা</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h3 class="text-white font-bold mb-3">যোগাযোগ করুন</h3>
+                    <ul class="space-y-2 text-sm text-slate-400">
+                        <li>📧 support@attendance.local</li>
+                        <li>📞 +88 01234 567890</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="border-t border-white/10 pt-6 text-center text-slate-400 text-sm">
+                <p>&copy; 2024 Attendance System. সকল অধিকার সংরক্ষিত।</p>
+            </div>
+        </div>
+    </footer>
 </div>
+
+@code {
+    private bool showUserMenu = false;
+    private AuthenticationState? authState;
+
+    protected override async Task OnInitializedAsync()
+    {
+        authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+    }
+
+    private void ToggleUserMenu()
+    {
+        showUserMenu = !showUserMenu;
+    }
+
+    private async Task Logout()
+    {
+        // This would call an API endpoint to logout
+        Navigation.NavigateTo("/logout");
+    }
+}
+
+<style>
+    ::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: rgba(59, 130, 246, 0.5);
+        border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background: rgba(59, 130, 246, 0.7);
+    }
+</style>

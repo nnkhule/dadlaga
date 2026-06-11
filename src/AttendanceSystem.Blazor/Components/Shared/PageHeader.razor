@@ -1,0 +1,17 @@
+<div class="page-header">
+    <div class="page-header-main">
+        <div class="page-icon" style="background:var(--clr-primary-light);color:var(--clr-primary)">@Icon</div>
+        <div>
+            <h1>@Title</h1>
+            <p>@Subtitle</p>
+        </div>
+    </div>
+    <div>@Actions</div>
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public string Subtitle { get; set; } = "";
+    [Parameter] public string Icon { get; set; } = "•";
+    [Parameter] public RenderFragment? Actions { get; set; }
+}

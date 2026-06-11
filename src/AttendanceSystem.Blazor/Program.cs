@@ -1,11 +1,17 @@
 using AttendanceSystem.Blazor.Components;
 using AttendanceSystem.Blazor.Services;
+using Microsoft.AspNetCore.Components.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddAuthorizationCore();
+builder.Services.AddCascadingAuthenticationState();
+builder.Services.AddScoped<AuthenticationStateProvider, PersistingAuthenticationStateProvider>();
 
 builder.Services.AddScoped(sp => new HttpClient
 {
@@ -24,7 +30,11 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
-app.UseHttpsRedirection();
+
+if (!app.Environment.IsDevelopment() || builder.Configuration["https_port"] is not null || builder.Configuration["HTTPS_PORT"] is not null)
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseAntiforgery();
 

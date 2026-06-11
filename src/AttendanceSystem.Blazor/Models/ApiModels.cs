@@ -27,6 +27,7 @@ public sealed record EmployeeDto(
     string FullName,
     string Email,
     string? Phone,
+    Guid DepartmentId,
     string? Department,
     string? DepartmentName,
     string? Position,
@@ -98,12 +99,15 @@ public sealed record AttendanceActionRequest(double? Latitude, double? Longitude
 
 public sealed record LeaveDto(
     Guid Id,
+    Guid? EmployeeId,
+    string? EmployeeName,
     DateOnly StartDate,
     DateOnly EndDate,
     string LeaveType,
     string? Reason,
     string? ApprovalStatus,
-    string? Status);
+    string? Status,
+    decimal TotalDays);
 
 public sealed record CreateLeaveDto(DateOnly StartDate, DateOnly EndDate, string LeaveType, string Reason);
 

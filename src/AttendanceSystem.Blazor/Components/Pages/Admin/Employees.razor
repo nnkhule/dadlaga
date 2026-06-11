@@ -1,0 +1,86 @@
+@page "/admin/employees"
+@layout AdminLayout
+@inject ApiClient Api
+@inject NavigationManager Nav
+
+<PageHeader Title="Employees" Subtitle="Employee records loaded from the database" Icon="☷">
+    <Actions><button class="btn-primary" @onclick="CreateEmployee">Add</button></Actions>
+</PageHeader>
+
+<div class="page-stack">
+    <div class="card filter-bar">
+        <input placeholder="Search" @bind="search" @bind:event="oninput" />
+        <button class="btn-ghost" @onclick="LoadAsync">Search</button>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(error))
+    {
+        <div class="card" style="border-color:var(--clr-danger);color:var(--clr-danger)">@error</div>
+    }
+
+    <div class="employee-grid">
+        @foreach (var employee in employees)
+        {
+            <div class="card page-stack">
+                <div class="action-row">
+                    <span class="avatar" style="background:var(--clr-primary-light);color:var(--clr-primary)">@Initials(employee.FullName)</span>
+                    <div>
+                        <strong>@employee.FullName</strong>
+                        <div class="muted">@employee.EmployeeCode</div>
+                    </div>
+                </div>
+                <span class="badge badge-leave">@Display(employee.Department ?? employee.DepartmentName)</span>
+                <div class="muted">@employee.Email</div>
+                <StatusBadge Status="@(employee.Status ?? string.Empty)" />
+                <div class="action-row">
+<button class="btn-ghost"
+        @onclick="@(() => Nav.NavigateTo("/employees/" + employee.Id + "/edit"))">
+    Edit
+</button>
+
+<button class="btn-primary"
+        @onclick="@(() => Nav.NavigateTo("/employees/" + employee.Id))">
+    View
+</button>            </div>
+            </div>
+        }
+    </div>
+
+    @if (employees.Count == 0 && string.IsNullOrWhiteSpace(error))
+    {
+        <EmptyState Title="No employees found" Description="" />
+    }
+</div>
+
+@code {
+    private IReadOnlyList<EmployeeDto> employees = [];
+    private string? search;
+    private string? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            error = null;
+            var result = await Api.GetAsync<PagedResponse<EmployeeDto>>($"api/employees?pageNumber=1&pageSize=100&search={Uri.EscapeDataString(search ?? string.Empty)}");
+            employees = result?.Items ?? [];
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            employees = [];
+        }
+    }
+
+    private void CreateEmployee() => Nav.NavigateTo("/employees/create");
+
+    private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "--" : value;
+
+    private static string Initials(string value)
+    {
+        var parts = value.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return string.Concat(parts.Take(2).Select(p => p[0])).ToUpperInvariant();
+    }
+}

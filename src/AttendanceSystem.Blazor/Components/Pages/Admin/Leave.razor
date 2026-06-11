@@ -1,0 +1,73 @@
+@page "/admin/leave"
+@layout AdminLayout
+@inject ApiClient Api
+
+<PageHeader Title="Leave requests" Subtitle="Leave requests loaded from SQL Server" Icon="☑" />
+
+<div class="page-stack">
+    <div class="tabs">
+        @foreach (var tab in tabs)
+        {
+            <button class="tab @(activeStatus == tab ? "active" : "")" @onclick="() => ChangeTab(tab)">@tab</button>
+        }
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(error))
+    {
+        <div class="card" style="border-color:var(--clr-danger);color:var(--clr-danger)">@error</div>
+    }
+
+    @if (requests.Count == 0)
+    {
+        <div class="card muted">No leave requests found.</div>
+    }
+    else
+    {
+        @foreach (var request in requests)
+        {
+            <div class="card">
+                <div class="section-title">
+                    <div>
+                        <strong>@Display(request.EmployeeName)</strong>
+                        <span class="badge badge-leave">@request.LeaveType</span>
+                        <div class="muted">@request.StartDate.ToString("yyyy-MM-dd") - @request.EndDate.ToString("yyyy-MM-dd") • @request.TotalDays days</div>
+                        <div>@Display(request.Reason)</div>
+                    </div>
+                    <StatusBadge Status="@(request.Status ?? request.ApprovalStatus ?? string.Empty)" />
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private readonly string[] tabs = ["Pending", "Approved", "Rejected"];
+    private string activeStatus = "Pending";
+    private IReadOnlyList<LeaveDto> requests = [];
+    private string? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            error = null;
+            var result = await Api.GetAsync<PagedResponse<LeaveDto>>($"api/leave/requests?status={activeStatus}&pageSize=100");
+            requests = result?.Items ?? [];
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            requests = [];
+        }
+    }
+
+    private async Task ChangeTab(string status)
+    {
+        activeStatus = status;
+        await LoadAsync();
+    }
+
+    private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "--" : value;
+}

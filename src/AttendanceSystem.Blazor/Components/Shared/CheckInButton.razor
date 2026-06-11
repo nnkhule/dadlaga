@@ -1,0 +1,33 @@
+@inject IJSRuntime JS
+
+<button @ref="_button" class="check-button @ButtonState" disabled="@(!IsEnabled || IsLoading)" title="@Title" @onclick="ClickAsync">
+    @if (IsLoading)
+    {
+        <span class="spinner"></span>
+    }
+    else
+    {
+        <span>@Icon</span>
+        <span>@(IsCheckedIn ? "CHECK OUT" : "CHECK IN")</span>
+    }
+</button>
+
+@code {
+    [Parameter] public bool IsCheckedIn { get; set; }
+    [Parameter] public bool IsEnabled { get; set; } = true;
+    [Parameter] public bool IsLoading { get; set; }
+    [Parameter] public EventCallback OnCheckIn { get; set; }
+    [Parameter] public EventCallback OnCheckOut { get; set; }
+
+    private ElementReference _button;
+    private string ButtonState => !IsEnabled ? "disabled" : IsCheckedIn ? "out" : "in";
+    private string Icon => !IsEnabled ? "🔒" : IsCheckedIn ? "✓" : "⌖";
+    private string Title => !IsEnabled ? "Байршил тодорхойлогдоогүй" : IsCheckedIn ? "Гарах" : "Ирэх";
+
+    private async Task ClickAsync()
+    {
+        await JS.InvokeVoidAsync("addRipple", _button, null);
+        if (IsCheckedIn) await OnCheckOut.InvokeAsync();
+        else await OnCheckIn.InvokeAsync();
+    }
+}

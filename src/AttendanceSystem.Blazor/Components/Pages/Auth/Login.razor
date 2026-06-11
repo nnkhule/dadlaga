@@ -52,7 +52,7 @@
                 return;
             }
 
-            Navigation.NavigateTo("/dashboard");
+            Navigation.NavigateTo(result.TargetPath, replace: true);
         }
         catch (Exception ex)
         {

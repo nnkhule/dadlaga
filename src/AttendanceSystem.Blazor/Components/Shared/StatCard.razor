@@ -1,0 +1,39 @@
+@inject IJSRuntime JS
+
+<div class="card stat-card animate-fade-in-up">
+    <div class="stat-icon" style="background:@IconBackground; color:@IconColor">@Icon</div>
+    <div>
+        <span id="@_id" class="stat-value">@Value</span>
+        <div class="stat-label">@Title</div>
+        @if (!string.IsNullOrWhiteSpace(Trend))
+        {
+            <div class="@(TrendUp ? "trend-up" : "trend-down")">@(TrendUp ? "↑" : "↓") @Trend</div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public string Value { get; set; } = "0";
+    [Parameter] public string Icon { get; set; } = "•";
+    [Parameter] public string Color { get; set; } = "Primary";
+    [Parameter] public string? Trend { get; set; }
+    [Parameter] public bool TrendUp { get; set; } = true;
+
+    private readonly string _id = $"stat-{Guid.NewGuid():N}";
+    private string IconColor => Color.ToLowerInvariant() switch
+    {
+        "success" => "var(--clr-success)",
+        "warning" => "var(--clr-warning)",
+        "danger" => "var(--clr-danger)",
+        "info" => "var(--clr-info)",
+        _ => "var(--clr-primary)"
+    };
+    private string IconBackground => $"color-mix(in srgb, {IconColor} 12%, transparent)";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+            await JS.InvokeVoidAsync("countUp", _id, Value, 1000);
+    }
+}

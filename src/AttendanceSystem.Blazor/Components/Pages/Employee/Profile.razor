@@ -1,0 +1,118 @@
+@page "/profile"
+@layout EmployeeLayout
+@inject ApiClient Api
+
+<PageHeader Title="Profile" Subtitle="Employee profile from the database" Icon="◎" />
+
+<div class="page-stack">
+    @if (!string.IsNullOrWhiteSpace(error))
+    {
+        <div class="card" style="border-color:var(--clr-danger);color:var(--clr-danger)">@error</div>
+    }
+
+    @if (profile is null)
+    {
+        <LoadingSpinner />
+    }
+    else
+    {
+        <div class="card" style="display:flex;align-items:center;gap:18px">
+            @if (!string.IsNullOrWhiteSpace(profile.ProfilePhotoUrl))
+            {
+                <img class="avatar" style="width:80px;height:80px;object-fit:cover" src="@profile.ProfilePhotoUrl" alt="" />
+            }
+            else
+            {
+                <div class="avatar" style="width:80px;height:80px;background:var(--clr-primary-light);color:var(--clr-primary);font-size:26px">@Initials(profile.FullName)</div>
+            }
+            <div>
+                <h2 style="margin:0">@profile.FullName</h2>
+                <div class="muted">@Display(profile.Position)</div>
+                <span class="badge badge-leave">@Display(profile.Department ?? profile.DepartmentName)</span>
+            </div>
+        </div>
+
+        <EditForm Model="@edit" OnValidSubmit="SaveAsync">
+            <div class="card page-stack">
+                <h2>Information</h2>
+                <SettingsRow Label="Employee Code" Value="@profile.EmployeeCode" />
+                <div class="form-group"><label>Full Name</label><InputText class="form-control" @bind-Value="edit.FullName" /></div>
+                <div class="form-group"><label>Email</label><InputText class="form-control" @bind-Value="edit.Email" /></div>
+                <div class="form-group"><label>Phone</label><InputText class="form-control" @bind-Value="edit.Phone" /></div>
+                <div class="form-group"><label>Date Of Birth</label><InputDate class="form-control" @bind-Value="edit.DateOfBirth" /></div>
+                <SettingsRow Label="Department" Value="@(profile.Department ?? profile.DepartmentName)" />
+                <SettingsRow Label="Position" Value="@profile.Position" />
+                <SettingsRow Label="Hire Date" Value="@profile.HireDate.ToString("yyyy-MM-dd")" />
+                <button class="btn-primary" type="submit" disabled="@saving">Save</button>
+            </div>
+        </EditForm>
+    }
+</div>
+
+@code {
+    private EmployeeProfileDto? profile;
+    private EditModel edit = new();
+    private string? error;
+    private bool saving;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            error = null;
+            profile = await Api.GetAsync<EmployeeProfileDto>("api/employees/me");
+            if (profile is not null)
+                edit = new EditModel(profile.FullName, profile.Email, profile.Phone, profile.DateOfBirth);
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        try
+        {
+            saving = true;
+            error = null;
+            await Api.PutAsync("api/employees/me", new UpdateProfileDto(edit.FullName, edit.Email, edit.Phone, edit.DateOfBirth));
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+    private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "--" : value;
+
+    private static string Initials(string value)
+    {
+        var parts = value.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return string.Concat(parts.Take(2).Select(p => p[0])).ToUpperInvariant();
+    }
+
+    private sealed class EditModel
+    {
+        public EditModel() { }
+        public EditModel(string fullName, string email, string? phone, DateOnly? dateOfBirth)
+        {
+            FullName = fullName;
+            Email = email;
+            Phone = phone;
+            DateOfBirth = dateOfBirth;
+        }
+
+        public string FullName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string? Phone { get; set; }
+        public DateOnly? DateOfBirth { get; set; }
+    }
+}

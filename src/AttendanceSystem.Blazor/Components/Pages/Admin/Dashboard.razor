@@ -1,0 +1,95 @@
+@page "/admin/dashboard"
+@layout AdminLayout
+@inject ApiClient Api
+@inject IJSRuntime JS
+
+<div class="page-stack">
+    <div>
+        <h1 style="margin:0">Dashboard</h1>
+        <div class="muted">@DateTime.Today.ToString("yyyy-MM-dd")</div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(error))
+    {
+        <div class="card" style="border-color:var(--clr-danger);color:var(--clr-danger)">@error</div>
+    }
+
+    <div class="row g-3">
+        <div class="col-12 col-md-3"><StatCard Title="Present today" Value="@(summary?.PresentToday.ToString() ?? "0")" Icon="✓" Color="Success" /></div>
+        <div class="col-12 col-md-3"><StatCard Title="Late today" Value="@(summary?.LateEmployees.ToString() ?? "0")" Icon="!" Color="Warning" /></div>
+        <div class="col-12 col-md-3"><StatCard Title="Absent today" Value="@(summary?.AbsentToday.ToString() ?? "0")" Icon="×" Color="Danger" /></div>
+        <div class="col-12 col-md-3"><StatCard Title="On leave" Value="@(summary?.OnLeaveEmployees.ToString() ?? "0")" Icon="□" Color="Info" /></div>
+    </div>
+
+    <div class="card">
+        <div class="section-title"><h2>Attendance trend</h2></div>
+        <div class="chart-box"><canvas id="attendanceChart"></canvas></div>
+    </div>
+
+    <div class="card">
+        <div class="section-title"><h2>Today's attendance</h2></div>
+        <table class="data-table">
+            <thead><tr><th>Employee</th><th>Check-in</th><th>Check-out</th><th>Overtime</th><th>Status</th></tr></thead>
+            <tbody>
+                @if (records.Count == 0)
+                {
+                    <tr><td colspan="5" class="muted">No attendance records found.</td></tr>
+                }
+                else
+                {
+                    @foreach (var row in records)
+                    {
+                        <tr>
+                            <td>@Display(row.EmployeeName)</td>
+                            <td>@(row.CheckInTime?.ToString("HH:mm") ?? "--")</td>
+                            <td>@(row.CheckOutTime?.ToString("HH:mm") ?? "--")</td>
+                            <td>@($"{row.OvertimeHours:0.##}h")</td>
+                            <td><StatusBadge Status="@(row.Status ?? row.AttendanceStatus ?? string.Empty)" /></td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+    private DashboardSummaryDto? summary;
+    private IReadOnlyList<AttendanceDto> records = [];
+    private IReadOnlyList<AttendanceTrendDto> trends = [];
+    private string? error;
+    private bool chartRendered;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            summary = await Api.GetDashboardSummaryAsync();
+            trends = await Api.GetAttendanceTrendsAsync() ?? [];
+            var today = DateOnly.FromDateTime(DateTime.Today);
+            var page = await Api.GetAsync<PagedResponse<AttendanceDto>>($"api/attendance/records?from={today:yyyy-MM-dd}&to={today:yyyy-MM-dd}&pageSize=20");
+            records = page?.Items ?? [];
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (chartRendered || trends.Count == 0)
+            return;
+
+        chartRendered = true;
+        await JS.InvokeVoidAsync(
+            "renderAttendanceChart",
+            "attendanceChart",
+            trends.Select(t => t.Date.ToString("MM-dd")).ToArray(),
+            trends.Select(t => t.Present).ToArray(),
+            trends.Select(t => t.Absent).ToArray(),
+            trends.Select(t => t.Late).ToArray());
+    }
+
+    private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "--" : value;
+}

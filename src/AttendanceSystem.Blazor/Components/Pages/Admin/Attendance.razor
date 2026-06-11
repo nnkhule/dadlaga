@@ -1,0 +1,86 @@
+@page "/admin/attendance"
+@layout AdminLayout
+@inject ApiClient Api
+
+<PageHeader Title="Attendance records" Subtitle="Attendance loaded from SQL Server" Icon="◇" />
+
+<div class="page-stack">
+    <div class="card filter-bar">
+        <InputDate @bind-Value="date" />
+        <select @bind="departmentId">
+            <option value="">All departments</option>
+            @foreach (var department in departments)
+            {
+                <option value="@department.Id">@department.Name</option>
+            }
+        </select>
+        <button class="btn-ghost" @onclick="LoadAsync">Load</button>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(error))
+    {
+        <div class="card" style="border-color:var(--clr-danger);color:var(--clr-danger)">@error</div>
+    }
+
+    <div class="card">
+        <table class="data-table">
+            <thead><tr><th>Employee</th><th>Date</th><th>Check-in/out</th><th>Late</th><th>Overtime</th><th>Status</th></tr></thead>
+            <tbody>
+                @if (records.Count == 0)
+                {
+                    <tr><td colspan="6" class="muted">No attendance records found.</td></tr>
+                }
+                else
+                {
+                    @foreach (var record in records)
+                    {
+                        <tr>
+                            <td>@Display(record.EmployeeName)</td>
+                            <td>@record.Date.ToString("yyyy-MM-dd")</td>
+                            <td>@(record.CheckInTime?.ToString("HH:mm") ?? "--") / @(record.CheckOutTime?.ToString("HH:mm") ?? "--")</td>
+                            <td>@record.LateMinutes</td>
+                            <td>@($"{record.OvertimeHours:0.##}h")</td>
+                            <td><StatusBadge Status="@(record.Status ?? record.AttendanceStatus ?? string.Empty)" /></td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+    private DateOnly date = DateOnly.FromDateTime(DateTime.Today);
+    private string? departmentId;
+    private IReadOnlyList<DepartmentDto> departments = [];
+    private IReadOnlyList<AttendanceDto> records = [];
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var departmentResult = await Api.GetAsync<PagedResponse<DepartmentDto>>("api/departments?pageNumber=1&pageSize=1000");
+        departments = departmentResult?.Items ?? [];
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            error = null;
+            var query = $"api/attendance/records?from={date:yyyy-MM-dd}&to={date:yyyy-MM-dd}&pageSize=100";
+            if (Guid.TryParse(departmentId, out var parsed))
+                query += $"&departmentId={parsed}";
+
+            var result = await Api.GetAsync<PagedResponse<AttendanceDto>>(query);
+            records = result?.Items ?? [];
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            records = [];
+        }
+    }
+
+    private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "--" : value;
+}

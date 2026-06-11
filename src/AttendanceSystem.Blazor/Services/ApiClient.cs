@@ -65,12 +65,43 @@ public sealed class ApiClient
         return items;
     }
 
+    public Task<AttendanceDto?> GetTodayAttendanceAsync()
+        => GetAsync<AttendanceDto>("api/attendance/today");
+
+    public Task<AttendanceStatisticsDto?> GetMyAttendanceStatisticsAsync(DateOnly? from = null, DateOnly? to = null)
+    {
+        var query = BuildDateQuery(from, to);
+        return GetAsync<AttendanceStatisticsDto>($"api/attendance/statistics{query}");
+    }
+
+    public async Task<IReadOnlyList<AttendanceDto>> GetMyAttendanceHistoryAsync(DateOnly? from = null, DateOnly? to = null, int pageSize = 7)
+    {
+        var query = BuildDateQuery(from, to, $"pageSize={pageSize}");
+        var response = await GetAsync<PagedResponse<AttendanceDto>>($"api/attendance/history{query}");
+        return response?.Items ?? [];
+    }
+
+    public Task<HttpResponseMessage> CheckInAsync(AttendanceActionRequest request)
+        => PostAsync("api/attendance/checkin", request);
+
+    public Task<HttpResponseMessage> CheckOutAsync(AttendanceActionRequest request)
+        => PostAsync("api/attendance/checkout", request);
+
     private async Task AuthorizeAsync()
     {
         var token = await _auth.GetTokenAsync();
         _http.DefaultRequestHeaders.Authorization = string.IsNullOrWhiteSpace(token)
             ? null
             : new AuthenticationHeaderValue("Bearer", token);
+    }
+
+    private static string BuildDateQuery(DateOnly? from, DateOnly? to, string? extra = null)
+    {
+        var values = new List<string>();
+        if (from.HasValue) values.Add($"from={from:yyyy-MM-dd}");
+        if (to.HasValue) values.Add($"to={to:yyyy-MM-dd}");
+        if (!string.IsNullOrWhiteSpace(extra)) values.Add(extra);
+        return values.Count == 0 ? string.Empty : "?" + string.Join("&", values);
     }
 
     private async Task<HttpResponseMessage> SendWithRefreshAsync(Func<Task<HttpResponseMessage>> send)

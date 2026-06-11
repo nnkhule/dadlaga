@@ -1,0 +1,188 @@
+@page "/attendance"
+@layout EmployeeLayout
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject ApiClient Api
+
+<PageHeader Title="Өнөөдрийн ирц" Subtitle="GPS байршлаар оффисын хүрээнд check-in/check-out хийнэ" Icon="⌖" />
+
+<div class="page-stack">
+    <GpsStatusCard Status="@GpsStatus" Distance="@Distance" RadiusMeters="@OfficeRadius" />
+
+    @if (!string.IsNullOrWhiteSpace(Error))
+    {
+        <div class="card" style="border-color:var(--clr-danger);color:var(--clr-danger)">@Error</div>
+    }
+
+    <div class="row g-4">
+        <div class="col-12 col-lg-7">
+            <div class="row g-3">
+                <div class="col-12 col-md-4"><StatCard Title="Ирсэн цаг" Value="@CheckInText" Icon="↘" Color="Success" /></div>
+                <div class="col-12 col-md-4"><StatCard Title="Явсан цаг" Value="@CheckOutText" Icon="↗" Color="Info" /></div>
+                <div class="col-12 col-md-4"><StatCard Title="Нийт цаг" Value="@TotalHours" Icon="◷" Color="Primary" /></div>
+            </div>
+        </div>
+        <div class="col-12 col-lg-5">
+            <div class="card" style="display:grid;place-items:center;gap:18px;min-height:230px">
+                <div id="employee-clock" style="font-size:28px;font-weight:800">--:--:--</div>
+                <CheckInButton IsCheckedIn="@IsCheckedIn"
+                               IsEnabled="@(GpsStatus == "Inside")"
+                               IsLoading="@IsBusy"
+                               OnCheckIn="CheckInAsync"
+                               OnCheckOut="CheckOutAsync" />
+            </div>
+        </div>
+    </div>
+
+    <div class="card animate-fade-in-up">
+        <div class="section-title"><h2>Сүүлийн 7 хоногийн ирц</h2></div>
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr><th>Огноо</th><th>Ирсэн</th><th>Явсан</th><th>Нийт</th><th>Төлөв</th></tr>
+                </thead>
+                <tbody>
+                    @if (WeekRows.Count == 0)
+                    {
+                        <tr><td colspan="5" class="muted">Ирцийн түүх олдсонгүй.</td></tr>
+                    }
+                    else
+                    {
+                        @foreach (var row in WeekRows)
+                        {
+                            <tr><td>@row.Date</td><td>@row.In</td><td>@row.Out</td><td>@row.Total</td><td><StatusBadge Status="@row.Status" /></td></tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@code {
+    private const double OfficeLat = 47.9123;
+    private const double OfficeLng = 106.9103;
+    private const int OfficeRadius = 500;
+    private DotNetObjectReference<Attendance>? _dotNetRef;
+    private int _watchId = -1;
+    private int _clockId;
+    private string GpsStatus = "Loading";
+    private double Distance;
+    private double? CurrentLat;
+    private double? CurrentLng;
+    private bool IsCheckedIn;
+    private bool IsBusy;
+    private string? Error;
+    private DateTime? CheckInAt;
+    private DateTime? CheckOutAt;
+    private string CheckInText => CheckInAt?.ToString("HH:mm") ?? "--:--";
+    private string CheckOutText => CheckOutAt?.ToString("HH:mm") ?? "--:--";
+    private string TotalHours => CheckInAt is null ? "0h" : $"{Math.Max(0, ((CheckOutAt ?? DateTime.Now) - CheckInAt.Value).TotalHours):0.0}h";
+    private IReadOnlyList<Row> WeekRows = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAttendanceAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        _clockId = await JS.InvokeAsync<int>("startClock", "employee-clock");
+        _dotNetRef = DotNetObjectReference.Create(this);
+        _watchId = await JS.InvokeAsync<int>("watchLocation", _dotNetRef);
+    }
+
+    [JSInvokable]
+    public async Task OnLocationUpdate(double lat, double lng)
+    {
+        CurrentLat = lat;
+        CurrentLng = lng;
+        Distance = await JS.InvokeAsync<double>("getDistance", lat, lng, OfficeLat, OfficeLng);
+        GpsStatus = Distance <= OfficeRadius ? "Inside" : "Outside";
+        Error = null;
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public void OnLocationError(string message)
+    {
+        GpsStatus = "Error";
+        Error = message;
+        StateHasChanged();
+    }
+
+    private async Task CheckInAsync() => await SubmitAsync(checkIn: true);
+    private async Task CheckOutAsync() => await SubmitAsync(checkIn: false);
+
+    private async Task SubmitAsync(bool checkIn)
+    {
+        IsBusy = true;
+        Error = null;
+        try
+        {
+            var request = new AttendanceActionRequest(CurrentLat, CurrentLng, GpsStatus != "Error", "Gps");
+            if (checkIn)
+                await Api.CheckInAsync(request);
+            else
+                await Api.CheckOutAsync(request);
+
+            await LoadAttendanceAsync();
+        }
+        catch (Exception ex)
+        {
+            Error = ex.Message;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private async Task LoadAttendanceAsync()
+    {
+        try
+        {
+            Error = null;
+            var today = await Api.GetTodayAttendanceAsync();
+            var history = await Api.GetMyAttendanceHistoryAsync(
+                DateOnly.FromDateTime(DateTime.Today.AddDays(-6)),
+                DateOnly.FromDateTime(DateTime.Today),
+                7);
+
+            CheckInAt = today?.CheckInTime;
+            CheckOutAt = today?.CheckOutTime;
+            IsCheckedIn = today?.CheckInTime is not null && today.CheckOutTime is null;
+            WeekRows = history.Select(x => new Row(
+                x.Date.ToString("yyyy-MM-dd"),
+                x.CheckInTime?.ToString("HH:mm") ?? "--",
+                x.CheckOutTime?.ToString("HH:mm") ?? "--",
+                $"{x.WorkHours:0.##}h",
+                x.Status ?? x.AttendanceStatus ?? "Pending")).ToList();
+        }
+        catch (Exception ex)
+        {
+            Error = ex.Message;
+            WeekRows = [];
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            if (_watchId >= 0) await JS.InvokeVoidAsync("clearWatch", _watchId);
+            if (_clockId != 0) await JS.InvokeVoidAsync("stopClock", _clockId);
+        }
+        catch (JSDisconnectedException)
+        {
+            // The browser circuit is already gone, so JS-side cleanup is no longer possible.
+        }
+        finally
+        {
+            _dotNetRef?.Dispose();
+        }
+    }
+
+    private sealed record Row(string Date, string In, string Out, string Total, string Status);
+}

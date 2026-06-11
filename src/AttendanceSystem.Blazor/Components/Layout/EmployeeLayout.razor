@@ -1,0 +1,30 @@
+@inherits LayoutComponentBase
+@inject NavigationManager Nav
+
+<div class="employee-shell">
+    <aside class="employee-sidebar">
+        <a class="employee-brand" href="/attendance"><span>◆</span><span>AttendIQ</span></a>
+        <nav class="nav-list">
+            @NavItem("/attendance", "⌖", "Нүүр")
+            @NavItem("/attendance", "◷", "Ирц")
+            @NavItem("/leave", "☑", "Чөлөө")
+            @NavItem("/profile", "◎", "Профайл")
+        </nav>
+        <div class="sidebar-bottom employee-brand">
+            <span class="avatar" style="background:var(--clr-primary-light);color:var(--clr-primary)">Б</span>
+            <span>Б. Энхжин<br><small class="muted">Ажилтан</small></span>
+        </div>
+    </aside>
+    <main class="content-wrap">@Body</main>
+    <nav class="mobile-bottom-nav">
+        @MobileItem("/attendance", "⌖", "Нүүр")
+        @MobileItem("/attendance", "◷", "Ирц")
+        @MobileItem("/leave", "☑", "Чөлөө")
+        @MobileItem("/profile", "◎", "Профайл")
+    </nav>
+</div>
+
+@code {
+    private RenderFragment NavItem(string href, string icon, string label) => @<a class="nav-link @(Nav.Uri.Contains(href, StringComparison.OrdinalIgnoreCase) ? "active" : "")" href="@href"><span>@icon</span><span>@label</span></a>;
+    private RenderFragment MobileItem(string href, string icon, string label) => @<a class="@(Nav.Uri.Contains(href, StringComparison.OrdinalIgnoreCase) ? "active" : "")" href="@href"><span>@icon</span><span>@label</span></a>;
+}

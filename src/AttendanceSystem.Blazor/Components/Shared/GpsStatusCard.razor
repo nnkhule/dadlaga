@@ -1,0 +1,45 @@
+<div class="card card--accent">
+    @if (Status == "Loading")
+    {
+        <div class="skeleton" style="height:22px; max-width:260px"></div>
+        <div class="skeleton" style="height:12px; max-width:180px; margin-top:10px"></div>
+    }
+    else
+    {
+        <div class="gps-row">
+            <span class="pulse-dot @(Status == "Inside" ? "" : Status == "Outside" ? "danger" : "warning")"></span>
+            <div>
+                <strong>@Message</strong>
+                <div class="muted">@Detail</div>
+            </div>
+        </div>
+        @if (Status == "Outside")
+        {
+            <div class="progress" style="margin-top:14px">
+                <div class="progress-bar" style="width:@Progress%"></div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public string Status { get; set; } = "Loading";
+    [Parameter] public double Distance { get; set; }
+    [Parameter] public int RadiusMeters { get; set; } = 500;
+
+    private string Message => Status switch
+    {
+        "Inside" => "Та оффис дотор байна ✓",
+        "Outside" => $"Оффисоос {Distance:N0}м зайтай",
+        "Error" => "Байршил тодорхойлох боломжгүй",
+        _ => "GPS шалгаж байна"
+    };
+    private string Detail => Status switch
+    {
+        "Inside" => $"{Distance:N0}м / зөвшөөрөгдсөн {RadiusMeters}м",
+        "Outside" => $"Зөвшөөрөгдсөн радиус: {RadiusMeters}м",
+        "Error" => "Браузерийн location permission-ийг шалгана уу",
+        _ => "Түр хүлээнэ үү"
+    };
+    private int Progress => Math.Clamp((int)Math.Round(Distance / Math.Max(RadiusMeters, 1) * 100), 0, 100);
+}

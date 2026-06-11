@@ -21,6 +21,7 @@ public static class ApplicationDbSeeder
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<ApplicationRole>>();
 
+        await RepairLegacySchemaAsync(context);
         await context.Database.MigrateAsync();
 
         foreach (var (name, desc) in RoleDefinitions.All)
@@ -89,6 +90,44 @@ public static class ApplicationDbSeeder
         }
 
         logger.LogInformation("Database seed completed.");
+    }
+
+    private static async Task RepairLegacySchemaAsync(ApplicationDbContext context)
+    {
+        await context.Database.ExecuteSqlRawAsync("""
+            IF OBJECT_ID(N'dbo.Employees', N'U') IS NOT NULL
+               AND COL_LENGTH(N'dbo.Employees', N'EmployeeCode') IS NULL
+            BEGIN
+                ALTER TABLE dbo.Employees ADD EmployeeCode nvarchar(450) NULL;
+
+                ;WITH numbered AS
+                (
+                    SELECT
+                        Id,
+                        CONCAT('EMP', RIGHT(CONCAT('000', ROW_NUMBER() OVER (ORDER BY CreatedAt, Id)), 3)) AS Code
+                    FROM dbo.Employees
+                    WHERE EmployeeCode IS NULL
+                )
+                UPDATE e
+                SET EmployeeCode = n.Code
+                FROM dbo.Employees e
+                INNER JOIN numbered n ON e.Id = n.Id;
+
+                ALTER TABLE dbo.Employees ALTER COLUMN EmployeeCode nvarchar(450) NOT NULL;
+            END
+
+            IF OBJECT_ID(N'dbo.Employees', N'U') IS NOT NULL
+               AND COL_LENGTH(N'dbo.Employees', N'EmployeeCode') IS NOT NULL
+               AND NOT EXISTS (
+                    SELECT 1
+                    FROM sys.indexes
+                    WHERE name = N'IX_Employees_EmployeeCode'
+                      AND object_id = OBJECT_ID(N'dbo.Employees')
+               )
+            BEGIN
+                CREATE UNIQUE INDEX IX_Employees_EmployeeCode ON dbo.Employees(EmployeeCode);
+            END
+            """);
     }
 
     private static void SeedMongolianHolidays(ApplicationDbContext context)

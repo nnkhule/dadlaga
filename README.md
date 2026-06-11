@@ -60,7 +60,7 @@ Open Swagger: https://localhost:7000/swagger
 | SuperAdmin | admin@attendance.local | Admin@12345!    |
 | Employee | bat@attendance.local    | Employee@12345! |
 
-Employee check-in requires GPS near office seed coordinates (47.9184, 106.9177).
+Employee check-in requires GPS near office seed coordinates (47.9123, 106.9318).
 
 ### 4. Tests
 

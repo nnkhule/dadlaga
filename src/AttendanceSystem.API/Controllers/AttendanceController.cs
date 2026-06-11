@@ -159,6 +159,68 @@ public class AttendanceController : ControllerBase
         return Ok(new PagedResponseDto<AttendanceHistoryApiDto>(items, pageNumber, pageSize, total));
     }
 
+    [HttpGet("records")]
+    public async Task<IActionResult> Records(
+        [FromQuery] DateOnly? from,
+        [FromQuery] DateOnly? to,
+        [FromQuery] Guid? departmentId,
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 50,
+        CancellationToken cancellationToken = default)
+    {
+        pageNumber = Math.Max(1, pageNumber);
+        pageSize = Math.Clamp(pageSize, 1, 200);
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var start = from ?? today;
+        var end = to ?? today;
+
+        var query = _db.AttendanceRecords
+            .AsNoTracking()
+            .Include(a => a.Employee)
+            .ThenInclude(e => e!.Department)
+            .Where(a => a.Date >= start && a.Date <= end);
+
+        if (departmentId.HasValue)
+            query = query.Where(a => a.Employee != null && a.Employee.DepartmentId == departmentId.Value);
+
+        query = query.OrderByDescending(a => a.Date).ThenBy(a => a.Employee == null ? null : a.Employee.FullName);
+
+        var total = await query.CountAsync(cancellationToken);
+        var items = await query
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .Select(a => new AttendanceHistoryApiDto(
+                a.Id,
+                a.EmployeeId,
+                a.Employee == null ? null : a.Employee.FullName,
+                a.Date,
+                a.CheckInTime,
+                a.CheckOutTime,
+                a.CheckOutTime == null ? 0 : Math.Round((decimal)(a.CheckOutTime.Value - a.CheckInTime).TotalHours, 2),
+                a.OvertimeHours,
+                a.OvertimeHours,
+                a.LateMinutes,
+                a.VerificationMethod.ToString(),
+                a.Status.ToString(),
+                a.Status.ToString()))
+            .ToListAsync(cancellationToken);
+
+        return Ok(new PagedResponseDto<AttendanceHistoryApiDto>(items, pageNumber, pageSize, total));
+    }
+
+    [HttpGet("validate-location")]
+    public async Task<ActionResult<LocationValidationApiDto>> ValidateLocationGet(
+        [FromQuery] double latitude,
+        [FromQuery] double longitude,
+        CancellationToken cancellationToken)
+        => await ValidateLocationCore(latitude, longitude, cancellationToken);
+
+    [HttpPost("validate-location")]
+    public async Task<ActionResult<LocationValidationApiDto>> ValidateLocationPost(
+        [FromBody] LocationValidationRequestApiDto request,
+        CancellationToken cancellationToken)
+        => await ValidateLocationCore(request.Latitude, request.Longitude, cancellationToken);
+
     [HttpGet("debug")]
     public IActionResult Debug()
     {
@@ -176,6 +238,39 @@ public class AttendanceController : ControllerBase
         var claim = User.FindFirstValue("employee_id");
         return Guid.TryParse(claim, out var id) ? id : null;
     }
+
+    private async Task<ActionResult<LocationValidationApiDto>> ValidateLocationCore(double latitude, double longitude, CancellationToken cancellationToken)
+    {
+        var offices = await _db.OfficeLocations.AsNoTracking().Where(o => o.IsActive).ToListAsync(cancellationToken);
+        var nearest = offices
+            .Select(o => new { Office = o, Distance = GetDistanceMeters(latitude, longitude, o.Latitude, o.Longitude) })
+            .OrderBy(x => x.Distance)
+            .FirstOrDefault();
+
+        var isWithin = nearest is not null && nearest.Distance <= nearest.Office.RadiusMeters;
+        return Ok(new LocationValidationApiDto(
+            null,
+            nearest?.Office.Name,
+            nearest?.Distance ?? 0,
+            nearest?.Distance ?? 0,
+            isWithin ? "Inside" : "Outside",
+            isWithin,
+            isWithin,
+            null));
+    }
+
+    private static double GetDistanceMeters(double lat1, double lon1, double lat2, double lon2)
+    {
+        const double radius = 6371000;
+        var dLat = ToRadians(lat2 - lat1);
+        var dLon = ToRadians(lon2 - lon1);
+        var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
+                Math.Cos(ToRadians(lat1)) * Math.Cos(ToRadians(lat2)) *
+                Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
+        return radius * 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+    }
+
+    private static double ToRadians(double degrees) => degrees * Math.PI / 180;
 }
 
 /// <summary>Check-in API request model.</summary>
@@ -214,3 +309,14 @@ public sealed record AttendanceHistoryApiDto(
     string? VerificationMethod,
     string? AttendanceStatus,
     string? Status);
+
+public sealed record LocationValidationRequestApiDto(double Latitude, double Longitude);
+public sealed record LocationValidationApiDto(
+    string? CurrentLocation,
+    string? OfficeLocation,
+    double Distance,
+    double DistanceMeters,
+    string? ValidationStatus,
+    bool IsValid,
+    bool IsWithinAllowedRadius,
+    string? Message);

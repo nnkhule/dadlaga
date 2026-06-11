@@ -1,0 +1,89 @@
+@page "/admin/reports"
+@layout AdminLayout
+@inject ApiClient Api
+
+<PageHeader Title="Reports" Subtitle="Report values loaded from SQL Server" Icon="▤" />
+
+<div class="page-stack">
+    <div class="card filter-bar">
+        <InputDate @bind-Value="from" />
+        <InputDate @bind-Value="to" />
+        <button class="btn-ghost" @onclick="LoadAsync">Load</button>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(error))
+    {
+        <div class="card" style="border-color:var(--clr-danger);color:var(--clr-danger)">@error</div>
+    }
+
+    <div class="card">
+        <h2>Department summary</h2>
+        <table class="data-table">
+            <thead><tr><th>Department</th><th>Present</th><th>Late</th><th>Leave</th></tr></thead>
+            <tbody>
+                @if (summaries.Count == 0)
+                {
+                    <tr><td colspan="4" class="muted">No report data found.</td></tr>
+                }
+                else
+                {
+                    @foreach (var row in summaries)
+                    {
+                        <tr><td>@row.DepartmentName</td><td>@row.Present</td><td>@row.Late</td><td>@row.Leave</td></tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <h2>Overtime</h2>
+        <div class="row g-3">
+            <div class="col-md-4"><StatCard Title="Total overtime" Value="@($"{totalOvertime:0.##}h")" Icon="+" Color="Warning" /></div>
+            <div class="col-md-4"><StatCard Title="Average" Value="@($"{averageOvertime:0.##}h")" Icon="◇" Color="Info" /></div>
+            <div class="col-md-4"><StatCard Title="Highest" Value="@($"{highestOvertime:0.##}h")" Icon="↑" Color="Danger" /></div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private DateOnly from = new(DateTime.Today.Year, DateTime.Today.Month, 1);
+    private DateOnly to = DateOnly.FromDateTime(DateTime.Today);
+    private IReadOnlyList<DepartmentSummary> summaries = [];
+    private decimal totalOvertime;
+    private decimal averageOvertime;
+    private decimal highestOvertime;
+    private string? error;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            error = null;
+            summaries = await Api.GetAsync<IReadOnlyList<DepartmentSummary>>($"api/reports/summary?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}") ?? [];
+            var attendance = await Api.GetAsync<PagedResponse<Dictionary<string, object?>>>("api/reports/attendance?from=" + from.ToString("yyyy-MM-dd") + "&to=" + to.ToString("yyyy-MM-dd") + "&pageSize=200");
+            var overtime = (attendance?.Items ?? []).Select(ReadOvertime).ToList();
+            totalOvertime = overtime.Sum();
+            averageOvertime = overtime.Count == 0 ? 0 : overtime.Average();
+            highestOvertime = overtime.Count == 0 ? 0 : overtime.Max();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            summaries = [];
+            totalOvertime = averageOvertime = highestOvertime = 0;
+        }
+    }
+
+    private static decimal ReadOvertime(Dictionary<string, object?> row)
+    {
+        if (!row.TryGetValue("OvertimeHours", out var value) || value is null)
+            return 0;
+
+        return decimal.TryParse(value.ToString(), out var parsed) ? parsed : 0;
+    }
+
+    private sealed record DepartmentSummary(Guid DepartmentId, string DepartmentName, int Present, int Late, int Leave);
+}
