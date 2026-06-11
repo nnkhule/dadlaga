@@ -33,15 +33,16 @@
                 <div class="muted">@employee.Email</div>
                 <StatusBadge Status="@(employee.Status ?? string.Empty)" />
                 <div class="action-row">
-<button class="btn-ghost"
-        @onclick="@(() => Nav.NavigateTo("/employees/" + employee.Id + "/edit"))">
-    Edit
-</button>
+                    <button class="btn-ghost"
+                            @onclick="() => EditEmployee(employee.Id)">
+                        Edit
+                    </button>
 
-<button class="btn-primary"
-        @onclick="@(() => Nav.NavigateTo("/employees/" + employee.Id))">
-    View
-</button>            </div>
+                    <button class="btn-primary"
+                            @onclick="() => ViewEmployee(employee.Id)">
+                        View
+                    </button>
+                </div>
             </div>
         }
     </div>
@@ -82,5 +83,15 @@
     {
         var parts = value.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         return string.Concat(parts.Take(2).Select(p => p[0])).ToUpperInvariant();
+    }
+
+    private void EditEmployee(Guid id)
+    {
+        Nav.NavigateTo($"/employees/{id}/edit");
+    }
+
+    private void ViewEmployee(Guid id)
+    {
+        Nav.NavigateTo($"/employees/{id}");
     }
 }

@@ -1,19 +1,50 @@
 @inherits LayoutComponentBase
+
+
 @inject NavigationManager Nav
+@inject ApiClient Api
+@inject AuthService Auth
 
 <div class="employee-shell">
     <aside class="employee-sidebar">
         <a class="employee-brand" href="/attendance"><span>◆</span><span>AttendIQ</span></a>
         <nav class="nav-list">
             @NavItem("/attendance", "⌖", "Нүүр")
-            @NavItem("/attendance", "◷", "Ирц")
+            @* @NavItem("/attendance", "◷", "Ирц") *@
             @NavItem("/leave", "☑", "Чөлөө")
             @NavItem("/profile", "◎", "Профайл")
         </nav>
         <div class="sidebar-bottom employee-brand">
             <span class="avatar" style="background:var(--clr-primary-light);color:var(--clr-primary)">Б</span>
-            <span>Б. Энхжин<br><small class="muted">Ажилтан</small></span>
-        </div>
+            <div>
+                @if (profile is null)
+                {
+                    <h2 style="margin:0">Loading...</h2>
+                    <div class="muted">profile loading</div>
+                    <span class="badge badge-leave">--</span>
+                }
+                else
+                {
+                    <h3 style="margin:0">@profile.FullName</h3>
+                    @* <div class="muted">@Display(profile.Position)</div> *@
+                    <span class="badge badge-leave">@Display(profile.Department ?? profile.DepartmentName)</span>
+                }
+            </div>
+                    </div>
+
+<div>
+            <button class="btn btn-logout mt-3" @onclick="LogoutAsync" disabled="@isLoggingOut">
+                @if (isLoggingOut)
+                {
+                    <span>Гарч байна...</span>
+                }
+                else
+                {
+                    <span>🚪 Гарах</span>
+                }
+            </button>
+</div>
+
     </aside>
     <main class="content-wrap">@Body</main>
     <nav class="mobile-bottom-nav">
@@ -27,4 +58,120 @@
 @code {
     private RenderFragment NavItem(string href, string icon, string label) => @<a class="nav-link @(Nav.Uri.Contains(href, StringComparison.OrdinalIgnoreCase) ? "active" : "")" href="@href"><span>@icon</span><span>@label</span></a>;
     private RenderFragment MobileItem(string href, string icon, string label) => @<a class="@(Nav.Uri.Contains(href, StringComparison.OrdinalIgnoreCase) ? "active" : "")" href="@href"><span>@icon</span><span>@label</span></a>;
+
+    
+    private EmployeeProfileDto? profile;
+    private EditModel edit = new();
+    private string? error;
+    private bool saving;
+    private bool isLoggingOut;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            error = null;
+            profile = await Api.GetAsync<EmployeeProfileDto>("api/employees/me");
+            if (profile is not null)
+                edit = new EditModel(profile.FullName, profile.Email, profile.Phone, profile.DateOfBirth);
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        try
+        {
+            saving = true;
+            error = null;
+            await Api.PutAsync("api/employees/me", new UpdateProfileDto(edit.FullName, edit.Email, edit.Phone, edit.DateOfBirth));
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+    private async Task LogoutAsync()
+    {
+        try
+        {
+            isLoggingOut = true;
+            await Auth.LogoutAsync();
+            Nav.NavigateTo("/login", replace: true);
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            isLoggingOut = false;
+        }
+    }
+
+    private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "--" : value;
+
+    private static string Initials(string value)
+    {
+        var parts = value.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return string.Concat(parts.Take(2).Select(p => p[0])).ToUpperInvariant();
+    }
+
+    private sealed class EditModel
+    {
+        public EditModel() { }
+        public EditModel(string fullName, string email, string? phone, DateOnly? dateOfBirth)
+        {
+            FullName = fullName;
+            Email = email;
+            Phone = phone;
+            DateOfBirth = dateOfBirth;
+        }
+
+        public string FullName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string? Phone { get; set; }
+        public DateOnly? DateOfBirth { get; set; }
+    }
 }
+
+<style>
+.btn-logout {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--clr-danger, #dc3545);
+    background: transparent;
+    color: var(--clr-danger, #dc3545);
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-logout:hover:not(:disabled) {
+    background: var(--clr-danger, #dc3545);
+    color: white;
+    transform: translateY(-2px);
+}
+
+.btn-logout:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.mt-3 {
+    margin-top: 12px;
+}
+</style>
