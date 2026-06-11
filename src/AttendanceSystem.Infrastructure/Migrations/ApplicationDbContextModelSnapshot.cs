@@ -98,7 +98,7 @@ namespace AttendanceSystem.Infrastructure.Migrations
 
                     b.HasIndex("EmployeeId");
 
-                    b.ToTable("AttendanceRecords");
+                    b.ToTable("AttendanceRecords", (string)null);
                 });
 
             modelBuilder.Entity("AttendanceSystem.Domain.Entities.AuditLog", b =>
@@ -141,7 +141,7 @@ namespace AttendanceSystem.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("AuditLogs");
+                    b.ToTable("AuditLogs", (string)null);
                 });
 
             modelBuilder.Entity("AttendanceSystem.Domain.Entities.Department", b =>
@@ -176,7 +176,7 @@ namespace AttendanceSystem.Infrastructure.Migrations
 
                     b.HasIndex("ParentDepartmentId");
 
-                    b.ToTable("Departments");
+                    b.ToTable("Departments", (string)null);
                 });
 
             modelBuilder.Entity("AttendanceSystem.Domain.Entities.Employee", b =>
@@ -244,7 +244,7 @@ namespace AttendanceSystem.Infrastructure.Migrations
 
                     b.HasIndex("WorkScheduleId");
 
-                    b.ToTable("Employees");
+                    b.ToTable("Employees", (string)null);
                 });
 
             modelBuilder.Entity("AttendanceSystem.Domain.Entities.GpsPing", b =>
@@ -276,7 +276,7 @@ namespace AttendanceSystem.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("GpsPings");
+                    b.ToTable("GpsPings", (string)null);
                 });
 
             modelBuilder.Entity("AttendanceSystem.Domain.Entities.Holiday", b =>
@@ -306,7 +306,7 @@ namespace AttendanceSystem.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Holidays");
+                    b.ToTable("Holidays", (string)null);
                 });
 
             modelBuilder.Entity("AttendanceSystem.Domain.Entities.LeaveRequest", b =>
@@ -349,7 +349,7 @@ namespace AttendanceSystem.Infrastructure.Migrations
 
                     b.HasIndex("EmployeeId");
 
-                    b.ToTable("LeaveRequests");
+                    b.ToTable("LeaveRequests", (string)null);
                 });
 
             modelBuilder.Entity("AttendanceSystem.Domain.Entities.Notification", b =>
@@ -389,7 +389,7 @@ namespace AttendanceSystem.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Notifications");
+                    b.ToTable("Notifications", (string)null);
                 });
 
             modelBuilder.Entity("AttendanceSystem.Domain.Entities.NotificationTemplate", b =>
@@ -425,7 +425,7 @@ namespace AttendanceSystem.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("NotificationTemplates");
+                    b.ToTable("NotificationTemplates", (string)null);
                 });
 
             modelBuilder.Entity("AttendanceSystem.Domain.Entities.OfficeLocation", b =>
@@ -458,7 +458,7 @@ namespace AttendanceSystem.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("OfficeLocations");
+                    b.ToTable("OfficeLocations", (string)null);
                 });
 
             modelBuilder.Entity("AttendanceSystem.Domain.Entities.OutboxMessage", b =>
@@ -492,7 +492,7 @@ namespace AttendanceSystem.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("OutboxMessages");
+                    b.ToTable("OutboxMessages", (string)null);
                 });
 
             modelBuilder.Entity("AttendanceSystem.Domain.Entities.Permission", b =>
@@ -517,7 +517,7 @@ namespace AttendanceSystem.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Permissions");
+                    b.ToTable("Permissions", (string)null);
                 });
 
             modelBuilder.Entity("AttendanceSystem.Domain.Entities.RefreshToken", b =>
@@ -551,7 +551,7 @@ namespace AttendanceSystem.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("RefreshTokens");
+                    b.ToTable("RefreshTokens", (string)null);
                 });
 
             modelBuilder.Entity("AttendanceSystem.Domain.Entities.RolePermission", b =>
@@ -566,7 +566,7 @@ namespace AttendanceSystem.Infrastructure.Migrations
 
                     b.HasIndex("PermissionId");
 
-                    b.ToTable("RolePermissions");
+                    b.ToTable("RolePermissions", (string)null);
                 });
 
             modelBuilder.Entity("AttendanceSystem.Domain.Entities.SuspiciousActivityAlert", b =>
@@ -609,7 +609,7 @@ namespace AttendanceSystem.Infrastructure.Migrations
 
                     b.HasIndex("EmployeeId");
 
-                    b.ToTable("SuspiciousActivityAlerts");
+                    b.ToTable("SuspiciousActivityAlerts", (string)null);
                 });
 
             modelBuilder.Entity("AttendanceSystem.Domain.Entities.TimeAdjustmentRequest", b =>
@@ -655,7 +655,7 @@ namespace AttendanceSystem.Infrastructure.Migrations
 
                     b.HasIndex("EmployeeId");
 
-                    b.ToTable("TimeAdjustmentRequests");
+                    b.ToTable("TimeAdjustmentRequests", (string)null);
                 });
 
             modelBuilder.Entity("AttendanceSystem.Domain.Entities.WorkSchedule", b =>
@@ -703,7 +703,7 @@ namespace AttendanceSystem.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("WorkSchedules");
+                    b.ToTable("WorkSchedules", (string)null);
                 });
 
             modelBuilder.Entity("AttendanceSystem.Infrastructure.Identity.ApplicationRole", b =>

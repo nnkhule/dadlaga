@@ -29,6 +29,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
     public DbSet<GpsPing> GpsPings => Set<GpsPing>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder builder)
