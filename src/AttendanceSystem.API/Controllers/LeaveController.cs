@@ -78,22 +78,35 @@ namespace AttendanceSystem.API.Controllers
                 query = query.Where(l => l.Status == parsedStatus);
 
             var total = await query.CountAsync(cancellationToken);
-            var items = await query
+            var pageEntities = await query
                 .OrderByDescending(l => l.CreatedAt)
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)
-                .Select(l => new LeaveRequestApiDto(
+                .Select(l => new {
                     l.Id,
                     l.EmployeeId,
-                    l.Employee == null ? null : l.Employee.FullName,
+                    EmployeeName = l.Employee != null ? l.Employee.FullName : null,
+                    l.StartDate,
+                    l.EndDate,
+                    LeaveType = l.LeaveType,
+                    l.Reason,
+                    Status = l.Status
+                })
+                .ToListAsync(cancellationToken);
+
+            var items = pageEntities.Select(l => new LeaveRequestApiDto(
+                    l.Id,
+                    l.EmployeeId,
+                    l.EmployeeName,
                     l.StartDate,
                     l.EndDate,
                     l.LeaveType.ToString(),
                     l.Reason,
                     l.Status.ToString(),
                     l.Status.ToString(),
-                    l.TotalDays))
-                .ToListAsync(cancellationToken);
+                    (decimal)((l.EndDate.ToDateTime(TimeOnly.MinValue) - l.StartDate.ToDateTime(TimeOnly.MinValue)).TotalDays + 1)
+                ))
+                .ToList();
 
             return Ok(new PagedResponseDto<LeaveRequestApiDto>(items, pageNumber, pageSize, total));
         }
@@ -105,11 +118,24 @@ namespace AttendanceSystem.API.Controllers
             if (employeeId is null)
                 return BadRequest(new { error = "Employee profile not linked to user." });
 
-            var items = await _context.LeaveRequests
+            var itemsQuery = await _context.LeaveRequests
                 .AsNoTracking()
                 .Where(l => l.EmployeeId == employeeId.Value)
                 .OrderByDescending(l => l.CreatedAt)
-                .Select(l => new LeaveRequestApiDto(
+                .Select(l => new {
+                    l.Id,
+                    l.EmployeeId,
+                    l.StartDate,
+                    l.EndDate,
+                    LeaveType = l.LeaveType,
+                    l.Reason,
+                    Status = l.Status,
+                    l.CreatedAt
+                })
+                .ToListAsync(cancellationToken);
+
+            // Compute TotalDays in memory to avoid referencing a missing DB column
+            var items = itemsQuery.Select(l => new LeaveRequestApiDto(
                     l.Id,
                     l.EmployeeId,
                     null,
@@ -119,8 +145,9 @@ namespace AttendanceSystem.API.Controllers
                     l.Reason,
                     l.Status.ToString(),
                     l.Status.ToString(),
-                    l.TotalDays))
-                .ToListAsync(cancellationToken);
+                    (decimal)((l.EndDate.ToDateTime(TimeOnly.MinValue) - l.StartDate.ToDateTime(TimeOnly.MinValue)).TotalDays + 1)
+                ))
+                .ToList();
 
             return Ok(new PagedResponseDto<LeaveRequestApiDto>(items, 1, items.Count, items.Count));
         }
@@ -133,7 +160,11 @@ namespace AttendanceSystem.API.Controllers
             if (employeeId.HasValue)
                 query = query.Where(l => l.EmployeeId == employeeId.Value);
 
-            var used = await query.Where(l => l.Status == RequestStatus.Approved).SumAsync(l => l.TotalDays, cancellationToken);
+            var approvedLeaves = await query
+                .Where(l => l.Status == RequestStatus.Approved)
+                .Select(l => new { l.StartDate, l.EndDate })
+                .ToListAsync(cancellationToken);
+            var used = approvedLeaves.Sum(l => (decimal)((l.EndDate.ToDateTime(TimeOnly.MinValue) - l.StartDate.ToDateTime(TimeOnly.MinValue)).TotalDays + 1));
             var pending = await query.CountAsync(l => l.Status == RequestStatus.Pending, cancellationToken);
             return Ok(new LeaveStatisticsApiDto(used, pending));
         }

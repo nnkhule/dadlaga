@@ -8,7 +8,11 @@ using AttendanceSystem.Infrastructure.Persistence;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using AttendanceSystem.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
+
+
+using Microsoft.Extensions.Logging;
 
 namespace AttendanceSystem.API.Controllers;
 
@@ -22,11 +26,13 @@ public class AttendanceController : ControllerBase
 {
     private readonly IMediator _mediator;
     private readonly ApplicationDbContext _db;
+    private readonly ILogger<AttendanceController> _logger;
 
-    public AttendanceController(IMediator mediator, ApplicationDbContext db)
+    public AttendanceController(IMediator mediator, ApplicationDbContext db, ILogger<AttendanceController> logger)
     {
         _mediator = mediator;
         _db = db;
+        _logger = logger;
     }
 
     /// <summary>Records employee check-in with optional GPS.</summary>
@@ -35,7 +41,7 @@ public class AttendanceController : ControllerBase
     {
         var employeeId = GetEmployeeId();
         if (employeeId is null)
-            return BadRequest(new { message = "Employee profile not linked to user." });
+            return BadRequest(new ApiErrorResponse("Employee profile not linked to user."));
 
         var result = await _mediator.Send(new CheckInCommand(
             employeeId.Value,
@@ -46,7 +52,11 @@ public class AttendanceController : ControllerBase
             request.VerificationMethod ?? "Gps"), cancellationToken);
 
         if (!result.IsSuccess)
-            return BadRequest(new { message = result.Error, code = result.ErrorCode });
+        {
+            _logger.LogWarning("Check-in failed for employee {EmployeeId}: {Error} ({ErrorCode})",
+                employeeId, result.Error, result.ErrorCode);
+            return BadRequest(new ApiErrorResponse(result.Error, result.ErrorCode));
+        }
 
         return Ok(result.Value);
     }
@@ -57,7 +67,7 @@ public class AttendanceController : ControllerBase
     {
         var employeeId = GetEmployeeId();
         if (employeeId is null)
-            return BadRequest(new { message = "Employee profile not linked." });
+            return BadRequest(new ApiErrorResponse("Employee profile not linked."));
 
         var result = await _mediator.Send(new CheckOutCommand(
             employeeId.Value,
@@ -66,7 +76,11 @@ public class AttendanceController : ControllerBase
             request.VerificationMethod ?? "Gps"), cancellationToken);
 
         if (!result.IsSuccess)
-            return BadRequest(new { message = result.Error, code = result.ErrorCode });
+        {
+            _logger.LogWarning("Check-out failed for employee {EmployeeId}: {Error} ({ErrorCode})",
+                employeeId, result.Error, result.ErrorCode);
+            return BadRequest(new ApiErrorResponse(result.Error, result.ErrorCode));
+        }
 
         return Ok(result.Value);
     }
@@ -80,7 +94,27 @@ public class AttendanceController : ControllerBase
             return BadRequest();
 
         var result = await _mediator.Send(new GetTodayAttendanceQuery(employeeId.Value), cancellationToken);
-        return Ok(result.Value);
+        if (result.Value is null)
+            return Ok(null);
+
+        var attendance = result.Value;
+        var todayResponse = new TodayAttendanceApiDto(
+            attendance.Id,
+            attendance.EmployeeId,
+            attendance.Date,
+            attendance.CheckInTime,
+            attendance.CheckOutTime,
+            attendance.CheckOutTime == null ? 0 : Math.Round((decimal)(attendance.CheckOutTime.Value - attendance.CheckInTime).TotalHours, 2),
+            attendance.OvertimeHours,
+            attendance.OvertimeHours,
+            attendance.LateMinutes,
+            attendance.VerificationMethod.ToString(),
+            attendance.Status.ToString(),
+            attendance.Status.ToString(),
+            attendance.IsSuspicious,
+            attendance.IsAutoGeo);
+
+        return Ok(todayResponse);
     }
 
     /// <summary>Returns attendance statistics for the current month.</summary>
@@ -89,7 +123,7 @@ public class AttendanceController : ControllerBase
     {
         var employeeId = GetEmployeeId();
         if (employeeId is null)
-            return BadRequest(new { message = "Employee profile not linked to user." });
+            return BadRequest(new ApiErrorResponse("Employee profile not linked to user."));
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var start = from ?? new DateOnly(today.Year, today.Month, 1);
@@ -121,7 +155,7 @@ public class AttendanceController : ControllerBase
     {
         var employeeId = GetEmployeeId();
         if (employeeId is null)
-            return BadRequest(new { message = "Employee profile not linked to user." });
+            return BadRequest(new ApiErrorResponse("Employee profile not linked to user."));
 
         pageNumber = Math.Max(1, pageNumber);
         pageSize = Math.Clamp(pageSize, 1, 100);
@@ -224,11 +258,7 @@ public class AttendanceController : ControllerBase
     [HttpGet("debug")]
     public IActionResult Debug()
     {
-        return Ok(User.Claims.Select(x => new
-        {
-            x.Type,
-            x.Value
-        }));
+        return Ok(User.Claims.Select(x => new ClaimDebugDto(x.Type, x.Value)));
     }
 
  
@@ -239,11 +269,15 @@ public class AttendanceController : ControllerBase
         return Guid.TryParse(claim, out var id) ? id : null;
     }
 
+    private sealed record ApiErrorResponse(string Message, string? Code = null);
+    private sealed record NearestOfficeDistance(OfficeLocation Office, double Distance);
+    private sealed record ClaimDebugDto(string Type, string Value);
+
     private async Task<ActionResult<LocationValidationApiDto>> ValidateLocationCore(double latitude, double longitude, CancellationToken cancellationToken)
     {
         var offices = await _db.OfficeLocations.AsNoTracking().Where(o => o.IsActive).ToListAsync(cancellationToken);
         var nearest = offices
-            .Select(o => new { Office = o, Distance = GetDistanceMeters(latitude, longitude, o.Latitude, o.Longitude) })
+            .Select(o => new NearestOfficeDistance(o, GetDistanceMeters(latitude, longitude, o.Latitude, o.Longitude)))
             .OrderBy(x => x.Distance)
             .FirstOrDefault();
 
@@ -294,6 +328,22 @@ public sealed record AttendanceStatisticsApiDto(
     int LeaveDays,
     decimal OvertimeHours,
     decimal AttendanceRate);
+
+public sealed record TodayAttendanceApiDto(
+    Guid Id,
+    Guid EmployeeId,
+    DateOnly Date,
+    DateTime? CheckInTime,
+    DateTime? CheckOutTime,
+    decimal WorkHours,
+    decimal Overtime,
+    decimal OvertimeHours,
+    decimal LateMinutes,
+    string? VerificationMethod,
+    string? AttendanceStatus,
+    string? Status,
+    bool IsSuspicious,
+    bool IsAutoGeo);
 
 public sealed record AttendanceHistoryApiDto(
     Guid Id,

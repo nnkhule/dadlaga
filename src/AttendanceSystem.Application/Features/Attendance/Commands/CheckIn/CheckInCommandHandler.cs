@@ -9,6 +9,7 @@ using AttendanceSystem.Domain.Enums;
 using MediatR;
 using Microsoft.Extensions.Options;
 
+
 namespace AttendanceSystem.Application.Features.Attendance.Commands.CheckIn;
 
 /// <summary>

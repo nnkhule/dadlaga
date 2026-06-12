@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json.Serialization;
 using AspNetCoreRateLimit;
 using AttendanceSystem.Application.Configuration;
 using AttendanceSystem.Infrastructure;
@@ -9,6 +10,7 @@ using Microsoft.OpenApi.Models;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Serilog;
+using AttendanceSystem.API.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,7 +20,12 @@ builder.Host.UseSerilog((ctx, cfg) =>
        .WriteTo.Console());
 
 builder.Services.AddInfrastructure(builder.Configuration);
-builder.Services.AddControllers();
+builder.Services.AddScoped<IEmployeeStatisticsService, EmployeeStatisticsService>();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {

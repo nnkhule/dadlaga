@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 using AttendanceSystem.Blazor.Models;
 using Microsoft.AspNetCore.Components;
 
@@ -110,8 +111,10 @@ public sealed class ApiClient
         var response = await send();
         if (response.StatusCode != System.Net.HttpStatusCode.Unauthorized)
         {
-            response.EnsureSuccessStatusCode();
-            return response;
+            if (response.IsSuccessStatusCode)
+                return response;
+
+            await ThrowHttpRequestExceptionAsync(response);
         }
 
         response.Dispose();
@@ -121,8 +124,10 @@ public sealed class ApiClient
             response = await send();
             if (response.StatusCode != System.Net.HttpStatusCode.Unauthorized)
             {
-                response.EnsureSuccessStatusCode();
-                return response;
+                if (response.IsSuccessStatusCode)
+                    return response;
+
+                await ThrowHttpRequestExceptionAsync(response);
             }
 
             response.Dispose();
@@ -132,6 +137,36 @@ public sealed class ApiClient
         _navigation.NavigateTo("/login", forceLoad: true);
         throw new UnauthorizedAccessException("Your session has expired. Please sign in again.");
     }
+
+    private static async Task ThrowHttpRequestExceptionAsync(HttpResponseMessage response)
+    {
+        var content = await response.Content.ReadAsStringAsync();
+        var message = content;
+
+        try
+        {
+            var error = JsonSerializer.Deserialize<ApiErrorResponse>(content, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+            if (error is not null)
+            {
+                message = error.Message ?? error.Error ?? error.Detail ?? content;
+            }
+        }
+        catch
+        {
+            // Ignore parsing failures and preserve raw content.
+        }
+
+        response.Dispose();
+        throw new HttpRequestException($"Request failed with status code {(int)response.StatusCode}: {message}");
+    }
+
+    private sealed record ApiErrorResponse(string? Message, string? Error, string? Detail, string? Code);
+
+    public Task<EmployeeStatisticsDto?> GetEmployeeStatisticsAsync()
+        => GetAsync<EmployeeStatisticsDto>("api/v1/statistics/employee");
 
     private sealed record RecentActivityResponse(Guid Id, string Type, string Title, string? Description, DateTime CreatedAt);
     private sealed record AttendanceTrendResponse(IReadOnlyList<string> Labels, IReadOnlyList<int> PresentCounts, IReadOnlyList<int> AbsentCounts, IReadOnlyList<int> LateCounts);

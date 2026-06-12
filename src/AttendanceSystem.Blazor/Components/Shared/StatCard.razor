@@ -3,7 +3,7 @@
 <div class="card stat-card animate-fade-in-up">
     <div class="stat-icon" style="background:@IconBackground; color:@IconColor">@Icon</div>
     <div>
-        <span id="@_id" class="stat-value">@Value</span>
+        <span id="@_id" class="stat-value">@(Value?.ToString() ?? "0")</span>
         <div class="stat-label">@Title</div>
         @if (!string.IsNullOrWhiteSpace(Trend))
         {
@@ -14,7 +14,7 @@
 
 @code {
     [Parameter] public string Title { get; set; } = "";
-    [Parameter] public string Value { get; set; } = "0";
+    [Parameter] public object? Value { get; set; } = "0";
     [Parameter] public string Icon { get; set; } = "•";
     [Parameter] public string Color { get; set; } = "Primary";
     [Parameter] public string? Trend { get; set; }
@@ -34,6 +34,6 @@
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
-            await JS.InvokeVoidAsync("countUp", _id, Value, 1000);
+            await JS.InvokeVoidAsync("countUp", _id, Value?.ToString() ?? "0", 1000);
     }
 }

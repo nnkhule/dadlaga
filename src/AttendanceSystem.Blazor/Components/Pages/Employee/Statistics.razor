@@ -1,0 +1,312 @@
+@page "/statistics"
+@page "/statistic"
+@layout EmployeeLayout
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject ApiClient Api
+
+<PageHeader Title="Employee Statistics" Subtitle="View your attendance, leave, and GPS statistics" Icon="📊" />
+
+@if (!string.IsNullOrWhiteSpace(Error))
+{
+    <div class="card" style="border-color:var(--clr-danger);color:var(--clr-danger)">@Error</div>
+}
+
+@if (stats == null)
+{
+    <div class="card">
+        <div class="section-title"><h2>Loading...</h2></div>
+    </div>
+}
+else
+{
+    <div class="page-stack">
+        <!-- Section 1: Employee Overview -->
+        <div class="card animate-fade-in-up">
+            <div class="section-title"><h2>Employee Overview</h2></div>
+            <div class="row g-4">
+                <div class="col-12 col-md-3">
+                    <StatCard Title="Total Working Days" Value="@($"{stats.Summary.TotalWorkingDays}")" Icon="📅" Color="Info" />
+                </div>
+                <div class="col-12 col-md-3">
+                    <StatCard Title="Present Days" Value="@($"{stats.Summary.PresentDays}")" Icon="✅" Color="Success" />
+                </div>
+                <div class="col-12 col-md-3">
+                    <StatCard Title="Late Days" Value="@($"{stats.Summary.LateDays}")" Icon="⏰" Color="Warning" />
+                </div>
+                <div class="col-12 col-md-3">
+                    <StatCard Title="Absent Days" Value="@($"{stats.Summary.AbsentDays}")" Icon="❌" Color="Danger" />
+                </div>
+            </div>
+            <div class="row g-4 mt-3">
+                <div class="col-12 col-md-3">
+                        <StatCard Title="Total Working Hours" Value="@($"{stats.Summary.TotalWorkingHours:0.0}h")" Icon="◷" Color="Primary" />
+                    </div>
+                    <div class="col-12 col-md-3">
+                        <StatCard Title="Overtime Hours" Value="@($"{stats.Summary.OvertimeHours:0.0}h")" Icon="⏫" Color="Secondary" />
+                </div>
+                <div class="col-12 col-md-3">
+                    <StatCard Title="Leave Requests" Value="@($"{stats.Summary.LeaveRequests}")" Icon="📝" Color="Info" />
+                </div>
+                <div class="col-12 col-md-3">
+                    <StatCard Title="Approved Leaves" Value="@($"{stats.Summary.ApprovedLeaves}")" Icon="👍" Color="Success" />
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 2: Attendance Analytics -->
+        <div class="card animate-fade-in-up">
+            <div class="section-title"><h2>Attendance Analytics</h2></div>
+            <div class="row g-4">
+                <div class="col-12 col-md-3">
+                    <StatCard Title="Monthly Attendance Rate" Value="@($"{stats.AttendanceAnalytics.MonthlyAttendanceRate:0.0}%")" Icon="📈" Color="Info" />
+                </div>
+                <div class="col-12 col-md-3">
+                    <StatCard Title="Monthly Working Hours" Value="@($"{stats.AttendanceAnalytics.MonthlyWorkingHours:0.0}h")" Icon="◷" Color="Primary" />
+                </div>
+                <div class="col-12 col-md-3">
+                    <StatCard Title="Monthly Overtime" Value="@($"{stats.AttendanceAnalytics.MonthlyOvertime:0.0}h")" Icon="⏫" Color="Secondary" />
+                </div>
+                <div class="col-12 col-md-3">
+                    <StatCard Title="Monthly Late Minutes" Value="@($"{stats.AttendanceAnalytics.MonthlyLateMinutes:0}m")" Icon="⏰" Color="Warning" />
+                </div>
+            </div>
+
+            @if (stats.AttendanceAnalytics.MonthlyChartData != null && stats.AttendanceAnalytics.MonthlyChartData.Any())
+            {
+                <div class="card mt-4">
+                    <div class="section-title"><h2>Monthly Trends</h2></div>
+                    <div class="chart-box"><canvas id="monthlyChart"></canvas></div>
+                    <div class="table-responsive mt-3">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Month</th>
+                                    <th>Attendance Rate</th>
+                                    <th>Working Hours</th>
+                                    <th>Overtime</th>
+                                    <th>Late Minutes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var month in stats.AttendanceAnalytics.MonthlyChartData)
+                                {
+                                    <tr>
+                                        <td>@month.Month</td>
+                                        <td>@($"{month.AttendanceRate:0.0}%")</td>
+                                        <td>@($"{month.WorkingHours:0.0}h")</td>
+                                        <td>@($"{month.Overtime:0.0}h")</td>
+                                        <td>@($"{month.LateMinutes:0}m")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <!-- Section 3: Attendance History -->
+        <div class="card animate-fade-in-up">
+            <div class="section-title"><h2>Attendance History</h2></div>
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Check In Time</th>
+                            <th>Check Out Time</th>
+                            <th>Work Hours</th>
+                            <th>Overtime Hours</th>
+                            <th>Late Minutes</th>
+                            <th>Status</th>
+                            <th>Verification Method</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (stats.AttendanceHistory == null || !stats.AttendanceHistory.Any())
+                        {
+                            <tr><td colspan="8" class="muted">No attendance records found.</td></tr>
+                        }
+                        else
+                        {
+                            @foreach (var record in stats.AttendanceHistory)
+                            {
+                                <tr>
+                                    <td>@record.Date.ToString("yyyy-MM-dd")</td>
+                                    <td>@record.CheckInTime?.ToString("HH:mm")</td>
+                                    <td>@record.CheckOutTime?.ToString("HH:mm")</td>
+                                    <td>@($"{record.WorkHours:0.0}h")</td>
+                                    <td>@($"{record.OvertimeHours:0.0}h")</td>
+                                    <td>@record.LateMinutes</td>
+                                    <td>@record.Status</td>
+                                    <td>@record.VerificationMethod</td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Section 4: Leave Statistics -->
+        <div class="card animate-fade-in-up">
+            <div class="section-title"><h2>Leave Statistics</h2></div>
+            <div class="row g-4">
+                <div class="col-12 col-md-3">
+                    <StatCard Title="Total Requests" Value="@($"{stats.LeaveStatistics.TotalRequests}")" Icon="📝" Color="Info" />
+                </div>
+                <div class="col-12 col-md-3">
+                    <StatCard Title="Approved" Value="@($"{stats.LeaveStatistics.Approved}")" Icon="👍" Color="Success" />
+                </div>
+                <div class="col-12 col-md-3">
+                    <StatCard Title="Rejected" Value="@($"{stats.LeaveStatistics.Rejected}")" Icon="👎" Color="Danger" />
+                </div>
+                <div class="col-12 col-md-3">
+                    <StatCard Title="Pending" Value="@($"{stats.LeaveStatistics.Pending}")" Icon="⏳" Color="Warning" />
+                </div>
+            </div>
+
+            <div class="card mt-4">
+                <div class="section-title"><h2>Leave History</h2></div>
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Start Date</th>
+                                <th>End Date</th>
+                                <th>Leave Type</th>
+                                <th>Status</th>
+                                <th>Request Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (stats.LeaveStatistics.LeaveHistory == null || !stats.LeaveStatistics.LeaveHistory.Any())
+                            {
+                                <tr><td colspan="5" class="muted">No leave requests found.</td></tr>
+                            }
+                            else
+                            {
+                                @foreach (var leave in stats.LeaveStatistics.LeaveHistory)
+                                {
+                                    <tr>
+                                        <td>@leave.StartDate.ToString("yyyy-MM-dd")</td>
+                                        <td>@leave.EndDate.ToString("yyyy-MM-dd")</td>
+                                        <td>@leave.LeaveType</td>
+                                        <td>@leave.Status</td>
+                                        <td>@leave.RequestDate.ToString("yyyy-MM-dd")</td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 5: GPS Statistics -->
+        <div class="card animate-fade-in-up">
+            <div class="section-title"><h2>GPS Statistics</h2></div>
+            <div class="row g-4">
+                <div class="col-12 col-md-3">
+                    <StatCard Title="Total GPS Records" Value=@(stats.GpsStatistics.TotalGpsRecords.ToString()) Icon="📍" Color="Info" />
+                </div>
+                <div class="col-12 col-md-3">
+                    <StatCard Title="Last GPS Activity" Value=@(stats.GpsStatistics.LastGpsActivity.ToString("yyyy-MM-dd HH:mm")) Icon="⏰" Color="Primary" />
+                </div>
+                <div class="col-12 col-md-3">
+                    <StatCard Title="Office Check-ins" Value=@(stats.GpsStatistics.OfficeCheckins.ToString()) Icon="🏢" Color="Success" />
+                </div>
+                <div class="col-12 col-md-3">
+                    <StatCard Title="Remote Check-ins" Value=@(stats.GpsStatistics.RemoteCheckins.ToString()) Icon="🏠" Color="Secondary" />
+                </div>
+            </div>
+
+            @if (stats.GpsStatistics.GpsHistory != null && stats.GpsStatistics.GpsHistory.Any())
+            {
+                <div class="card mt-4">
+                    <div class="section-title"><h2>GPS History</h2></div>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Timestamp</th>
+                                    <th>Latitude</th>
+                                    <th>Longitude</th>
+                                    <th>Office Check-in</th>
+                                    <th>Location</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var ping in stats.GpsStatistics.GpsHistory)
+                                {
+                                    <tr>
+                                        <td>@ping.Timestamp.ToString("yyyy-MM-dd HH:mm")</td>
+                                        <td>@ping.Latitude.ToString("0.000000")</td>
+                                        <td>@ping.Longitude.ToString("0.000000")</td>
+                                        <td>@(ping.IsOfficeCheckin ? "Yes" : "No")</td>
+                                        <td>@ping.Location</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private EmployeeStatisticsDto? stats;
+    private string? Error;
+    private bool chartRendered;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadStatisticsAsync();
+    }
+
+    private async Task LoadStatisticsAsync()
+    {
+        try
+        {
+            Error = null;
+            stats = await Api.GetEmployeeStatisticsAsync();
+        }
+        catch (Exception ex)
+        {
+            Error = ex.Message;
+            stats = null;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (chartRendered || stats?.AttendanceAnalytics?.MonthlyChartData == null || !stats.AttendanceAnalytics.MonthlyChartData.Any())
+            return;
+
+        chartRendered = true;
+
+        var labels = stats.AttendanceAnalytics.MonthlyChartData.Select(m => m.Month).ToArray();
+        var attendance = stats.AttendanceAnalytics.MonthlyChartData.Select(m => m.AttendanceRate).ToArray();
+        var hours = stats.AttendanceAnalytics.MonthlyChartData.Select(m => m.WorkingHours).ToArray();
+        var overtime = stats.AttendanceAnalytics.MonthlyChartData.Select(m => m.Overtime).ToArray();
+        var late = stats.AttendanceAnalytics.MonthlyChartData.Select(m => m.LateMinutes).ToArray();
+
+        await JS.InvokeVoidAsync(
+            "renderMonthlyChart",
+            "monthlyChart",
+            labels,
+            attendance,
+            hours,
+            overtime,
+            late);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        // Nothing to dispose
+        await Task.CompletedTask;
+    }
+}

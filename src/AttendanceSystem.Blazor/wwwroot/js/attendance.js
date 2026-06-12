@@ -99,3 +99,72 @@ window.renderAttendanceChart = (canvasId, labels, present, late, absent) => {
     }
   });
 };
+
+window.renderMonthlyChart = (canvasId, labels, attendanceRates, workingHours, overtime, lateMinutes) => {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas || !window.Chart) return;
+  if (canvas._chart) canvas._chart.destroy();
+  canvas._chart = new Chart(canvas, {
+    data: {
+      labels,
+      datasets: [
+        {
+          type: 'line',
+          label: 'Attendance %',
+          data: attendanceRates,
+          yAxisID: 'y1',
+          borderColor: '#3B82F6',
+          backgroundColor: 'rgba(59,130,246,0.1)',
+          tension: 0.4,
+          fill: true
+        },
+        {
+          type: 'bar',
+          label: 'Working Hours',
+          data: workingHours,
+          yAxisID: 'y2',
+          backgroundColor: '#10B981',
+          borderRadius: 6
+        },
+        {
+          type: 'bar',
+          label: 'Overtime',
+          data: overtime,
+          yAxisID: 'y2',
+          backgroundColor: '#F59E0B',
+          borderRadius: 6
+        },
+        {
+          type: 'bar',
+          label: 'Late Minutes',
+          data: lateMinutes,
+          yAxisID: 'y2',
+          backgroundColor: '#EF4444',
+          borderRadius: 6
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: { grid: { display: false } },
+        y1: {
+          type: 'linear',
+          position: 'left',
+          beginAtZero: true,
+          ticks: {
+            callback: function(value) { return value + '%'; }
+          }
+        },
+        y2: {
+          type: 'linear',
+          position: 'right',
+          beginAtZero: true,
+          grid: { display: false }
+        }
+      },
+      plugins: { legend: { position: 'bottom' } }
+    }
+  });
+};
