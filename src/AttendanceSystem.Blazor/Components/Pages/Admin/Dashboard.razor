@@ -3,22 +3,23 @@
 @inject ApiClient Api
 @inject IJSRuntime JS
 
+<PageHeader Title="Admin Dashboard" Subtitle="Live attendance metrics from SQL Server" Icon="▦" />
+
 <div class="page-stack">
-    <div>
-        <h1 style="margin:0">Dashboard</h1>
-        <div class="muted">@DateTime.Today.ToString("yyyy-MM-dd")</div>
-    </div>
+    <div class="card">
+        <div class="section-title">
+            <div>
+                <h2>Today</h2>
+                <div class="muted">@DateOnly.FromDateTime(DateTime.Today).ToString("yyyy-MM-dd")</div>
+            </div>
+        </div>
 
-    @if (!string.IsNullOrWhiteSpace(error))
-    {
-        <div class="card" style="border-color:var(--clr-danger);color:var(--clr-danger)">@error</div>
-    }
-
-    <div class="row g-3">
-        <div class="col-12 col-md-3"><StatCard Title="Present today" Value="@(summary?.PresentToday.ToString() ?? "0")" Icon="✓" Color="Success" /></div>
-        <div class="col-12 col-md-3"><StatCard Title="Late today" Value="@(summary?.LateEmployees.ToString() ?? "0")" Icon="!" Color="Warning" /></div>
-        <div class="col-12 col-md-3"><StatCard Title="Absent today" Value="@(summary?.AbsentToday.ToString() ?? "0")" Icon="×" Color="Danger" /></div>
-        <div class="col-12 col-md-3"><StatCard Title="On leave" Value="@(summary?.OnLeaveEmployees.ToString() ?? "0")" Icon="□" Color="Info" /></div>
+        <div class="row g-3">
+            <div class="col-12 col-md-3"><StatCard Title="Present today" Value="@(summary?.PresentToday.ToString() ?? "0")" Icon="✓" Color="Success" /></div>
+            <div class="col-12 col-md-3"><StatCard Title="Late today" Value="@(summary?.LateEmployees.ToString() ?? "0")" Icon="!" Color="Warning" /></div>
+            <div class="col-12 col-md-3"><StatCard Title="Absent today" Value="@(summary?.AbsentToday.ToString() ?? "0")" Icon="×" Color="Danger" /></div>
+            <div class="col-12 col-md-3"><StatCard Title="On leave" Value="@(summary?.OnLeaveEmployees.ToString() ?? "0")" Icon="□" Color="Info" /></div>
+        </div>
     </div>
 
     <div class="card">

@@ -7,4 +7,8 @@
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="../AttendanceSystem.Application/AttendanceSystem.Application.csproj" />
+  </ItemGroup>
+
 </Project>

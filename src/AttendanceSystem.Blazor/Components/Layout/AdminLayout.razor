@@ -1,5 +1,7 @@
 @inherits LayoutComponentBase
 @inject NavigationManager Nav
+@inject ApiClient Api
+@inject AuthService Auth
 
 <div class="admin-shell @(_collapsed ? "collapsed" : "")">
     <aside class="admin-sidebar">
@@ -13,16 +15,29 @@
         </nav>
         <div class="sidebar-bottom">
             <div class="admin-brand">
-                <span class="avatar" style="width:38px;height:38px;background:rgba(255,255,255,.16)">AD</span>
-                <span class="sidebar-user-text">Admin<br><small>HR Manager</small></span>
+                <span class="avatar" style="width:38px;height:38px;background:rgba(255,255,255,.16)">@GetInitial()</span>
+                <div>
+                    <h3 style="margin:0">@profile?.FullName ?? "Admin"</h3>
+                    <div class="muted">@Display(profile?.Department ?? profile?.DepartmentName)</div>
+                </div>
             </div>
+            <button class="btn btn-logout mt-3" @onclick="LogoutAsync" disabled="@isLoggingOut">
+                @if (isLoggingOut)
+                {
+                    <span>Гарч байна...</span>
+                }
+                else
+                {
+                    <span>🚪 Гарах</span>
+                }
+            </button>
             <button class="collapse-btn" @onclick="() => _collapsed = !_collapsed">@(_collapsed ? "→" : "←")</button>
         </div>
     </aside>
     <div class="admin-main">
         <header class="admin-topbar">
             <strong>@Breadcrumb</strong>
-            <div class="action-row"><NotificationBell /><span class="avatar" style="width:38px;height:38px;background:var(--clr-primary-light);color:var(--clr-primary)">A</span></div>
+            <div class="action-row"><NotificationBell /><span class="avatar" style="width:38px;height:38px;background:var(--clr-primary-light);color:var(--clr-primary)">@GetInitial()</span></div>
         </header>
         <main class="content-wrap">@Body</main>
     </div>
@@ -30,7 +45,42 @@
 
 @code {
     private bool _collapsed;
+    private bool isLoggingOut;
+    private EmployeeProfileDto? profile;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            profile = await Api.GetAsync<EmployeeProfileDto>("api/employees/me");
+        }
+        catch
+        {
+            profile = null;
+        }
+    }
+
     private string Breadcrumb => Nav.Uri.Contains("/admin/", StringComparison.OrdinalIgnoreCase) ? "Admin / " + Nav.Uri.Split('/').Last() : "Admin";
 
     private RenderFragment NavItem(string href, string icon, string label) => @<a class="nav-link @(Nav.Uri.Contains(href, StringComparison.OrdinalIgnoreCase) ? "active" : "")" href="@href"><span>@icon</span><span class="nav-label">@label</span></a>;
+
+    private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "--" : value;
+
+    private async Task LogoutAsync()
+    {
+        isLoggingOut = true;
+        await Auth.LogoutAsync();
+        Nav.NavigateTo("/login", replace: true);
+    }
+
+    private string GetInitial()
+    {
+        if (!string.IsNullOrWhiteSpace(profile?.FullName))
+        {
+            var parts = profile.FullName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            return string.Concat(parts.Take(2).Select(p => p[0])).ToUpperInvariant();
+        }
+
+        return "A";
+    }
 }

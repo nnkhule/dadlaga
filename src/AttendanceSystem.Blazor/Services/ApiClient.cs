@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using AttendanceSystem.Application.DTOs.AI;
 using AttendanceSystem.Blazor.Models;
 using Microsoft.AspNetCore.Components;
 
@@ -87,6 +88,33 @@ public sealed class ApiClient
 
     public Task<HttpResponseMessage> CheckOutAsync(AttendanceActionRequest request)
         => PostAsync("api/attendance/checkout", request);
+
+    public Task<UnreadNotificationCountDto?> GetUnreadNotificationCountAsync()
+        => GetAsync<UnreadNotificationCountDto>("api/notifications/unread-count");
+
+    public async Task<IReadOnlyList<NotificationDto>> GetRecentNotificationsAsync(int pageSize = 5)
+    {
+        var response = await GetAsync<PagedResponse<NotificationDto>>($"api/notifications?pageNumber=1&pageSize={pageSize}");
+        return response?.Items ?? [];
+    }
+
+    public Task<HttpResponseMessage> MarkNotificationReadAsync(Guid id)
+        => PostAsync($"api/notifications/{id}/read", new { });
+
+    public Task<OvertimeSummaryDto?> GetOvertimeSummaryAsync(DateOnly from, DateOnly to)
+        => GetAsync<OvertimeSummaryDto>($"api/reports/overtime-summary?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}");
+
+    public Task<HttpResponseMessage> ApproveLeaveRequestAsync(Guid id)
+        => PostAsync($"api/leave/requests/{id}/approve", new { });
+
+    public Task<HttpResponseMessage> RejectLeaveRequestAsync(Guid id)
+        => PostAsync($"api/leave/requests/{id}/reject", new { });
+
+    public async Task<ChatResponseDto?> PostChatAsync(ChatRequestDto request, CancellationToken cancellationToken = default)
+    {
+        var response = await PostAsync("api/ai/chat", request, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<ChatResponseDto>(cancellationToken: cancellationToken);
+    }
 
     private async Task AuthorizeAsync()
     {

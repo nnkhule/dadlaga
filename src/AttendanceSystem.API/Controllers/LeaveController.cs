@@ -169,6 +169,44 @@ namespace AttendanceSystem.API.Controllers
             return Ok(new LeaveStatisticsApiDto(used, pending));
         }
 
+        [HttpPost("requests/{id:guid}/approve")]
+        public async Task<IActionResult> Approve(Guid id, CancellationToken cancellationToken)
+        {
+            var employeeId = GetEmployeeId();
+            if (employeeId is null)
+                return Unauthorized(new { error = "Employee profile not linked to user." });
+
+            var request = await _context.LeaveRequests.FirstOrDefaultAsync(l => l.Id == id, cancellationToken);
+            if (request is null)
+                return NotFound(new { error = "Leave request not found." });
+
+            if (request.Status != RequestStatus.Pending)
+                return BadRequest(new { error = "Only pending leave requests can be approved." });
+
+            request.Approve(employeeId.Value);
+            await _context.SaveChangesAsync(cancellationToken);
+            return Ok(new { message = "Leave request approved." });
+        }
+
+        [HttpPost("requests/{id:guid}/reject")]
+        public async Task<IActionResult> Reject(Guid id, CancellationToken cancellationToken)
+        {
+            var employeeId = GetEmployeeId();
+            if (employeeId is null)
+                return Unauthorized(new { error = "Employee profile not linked to user." });
+
+            var request = await _context.LeaveRequests.FirstOrDefaultAsync(l => l.Id == id, cancellationToken);
+            if (request is null)
+                return NotFound(new { error = "Leave request not found." });
+
+            if (request.Status != RequestStatus.Pending)
+                return BadRequest(new { error = "Only pending leave requests can be rejected." });
+
+            request.Reject(employeeId.Value);
+            await _context.SaveChangesAsync(cancellationToken);
+            return Ok(new { message = "Leave request rejected." });
+        }
+
         private Guid? GetEmployeeId()
         {
             var claim = User.FindFirstValue("employee_id");

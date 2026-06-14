@@ -1,5 +1,7 @@
+@inject AttendanceSystem.Blazor.Services.ApiClient Api
+
 <div class="notification">
-    <button class="icon-btn" @onclick="() => _open = !_open" title="Мэдэгдэл">🔔</button>
+    <button class="icon-btn" @onclick="ToggleMenu" title="Мэдэгдэл">🔔</button>
     @if (UnreadCount > 0)
     {
         <span class="notification-count">@UnreadCount</span>
@@ -7,30 +9,119 @@
     @if (_open)
     {
         <div class="card notification-menu">
-            @foreach (var item in Items)
+            @if (isLoading)
             {
-                <div class="notification-item">
-                    <div class="stat-icon" style="width:36px;height:36px;background:var(--clr-primary-light);color:var(--clr-primary)">@item.Icon</div>
-                    <div>
-                        <strong>@item.Title</strong>
-                        <div class="muted">@item.MinutesAgo минутын өмнө</div>
-                    </div>
-                </div>
+                <div class="notification-item">Loading...</div>
             }
-            <a href="/notifications" class="btn-ghost" style="width:100%;margin-top:10px">Бүгдийг харах</a>
+            else if (!string.IsNullOrWhiteSpace(loadError))
+            {
+                <div class="alert alert-danger">@loadError</div>
+            }
+            else if (notifications.Count == 0)
+            {
+                <div class="notification-item">No notifications found.</div>
+            }
+            else
+            {
+                @foreach (var notification in notifications)
+                {
+                    <div class="notification-item notification-entry @(notification.IsRead ? "read" : "unread")">
+                        <div>
+                            <strong>@notification.Title</strong>
+                            <div class="muted">@notification.CreatedAt.ToLocalTime()</div>
+                        </div>
+                        @if (!notification.IsRead)
+                        {
+                            <button class="btn btn-link btn-sm p-0" @onclick="() => MarkAsReadAsync(notification.Id)">Mark read</button>
+                        }
+                    </div>
+                }
+            }
+            <div class="d-flex gap-2 mt-3">
+                <a href="/notifications" class="btn btn-sm btn-outline-primary">View all</a>
+                @if (UnreadCount > 0)
+                {
+                    <button class="btn btn-sm btn-primary" @onclick="MarkAllReadAsync">Mark all read</button>
+                }
+            </div>
         </div>
     }
 </div>
 
 @code {
     private bool _open;
-    [Parameter] public int UnreadCount { get; set; } = 3;
-    [Parameter] public IReadOnlyList<NotificationItem> Items { get; set; } = new[]
-    {
-        new NotificationItem("📝", "Чөлөөний шинэ хүсэлт", 5),
-        new NotificationItem("⏱", "Цаг засварлах хүсэлт", 12),
-        new NotificationItem("✅", "Ирцийн бүртгэл шинэчлэгдлээ", 18)
-    };
+    private bool isLoading;
+    private string? loadError;
+    private int UnreadCount;
+    private IReadOnlyList<NotificationDto> notifications = [];
 
-    public sealed record NotificationItem(string Icon, string Title, int MinutesAgo);
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUnreadCountAsync();
+    }
+
+    private async Task ToggleMenu()
+    {
+        _open = !_open;
+        if (_open)
+        {
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadUnreadCountAsync()
+    {
+        try
+        {
+            var unread = await Api.GetUnreadNotificationCountAsync();
+            UnreadCount = unread?.Count ?? 0;
+        }
+        catch
+        {
+            // Fail silently for count load so header still renders.
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            isLoading = true;
+            loadError = null;
+            await LoadUnreadCountAsync();
+            notifications = await Api.GetRecentNotificationsAsync(5);
+        }
+        catch (Exception ex)
+        {
+            loadError = ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task MarkAsReadAsync(Guid id)
+    {
+        try
+        {
+            await Api.MarkNotificationReadAsync(id);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            loadError = ex.Message;
+        }
+    }
+
+    private async Task MarkAllReadAsync()
+    {
+        foreach (var notification in notifications.Where(n => !n.IsRead))
+        {
+            await Api.MarkNotificationReadAsync(notification.Id);
+        }
+
+        await LoadAsync();
+    }
 }
+

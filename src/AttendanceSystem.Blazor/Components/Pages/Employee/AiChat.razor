@@ -1,0 +1,214 @@
+@page "/employee/ai-chat"
+@using AttendanceSystem.Application.DTOs.AI
+@using AttendanceSystem.Blazor.Services
+@using System.Net
+@rendermode InteractiveServer
+
+@attribute [Authorize(Roles = "Employee")]
+@layout EmployeeLayout
+
+<PageTitle>AI Chat</PageTitle>
+
+<div class="container-fluid mt-4 mb-4">
+    <div class="row">
+        <div class="col-md-8 mx-auto">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white d-flex align-items-center">
+                    <i class="fas fa-robot me-2"></i>
+                    <h5 class="mb-0">Attendance Assistant</h5>
+                </div>
+                
+                <div class="card-body chat-container" id="chatContainer">
+                    <div class="chat-messages" id="messages">
+                        <div class="message ai-message mb-3">
+                            <div class="d-flex">
+                                <div class="me-3">
+                                    <i class="fas fa-robot text-primary" style="font-size: 1.5rem;"></i>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <p class="mb-0 text-muted" style="font-size: 0.9rem;">
+                                        <strong>Attendance Assistant</strong>
+                                    </p>
+                                    <p class="mb-0 mt-2">
+                                        Hello! I'm your attendance assistant. I can help you with information about your attendance, late days, leaves, work hours, schedule, and check-in history. What would you like to know?
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-footer bg-light">
+                    <div class="input-group">
+                        <input 
+                            type="text" 
+                            class="form-control" 
+                            placeholder="Ask about your attendance..." 
+                            @bind="messageInput" 
+                            @onkeyup="HandleKeyPress"
+                            disabled="@isLoading"
+                            id="messageInput" />
+                        <button 
+                            class="btn btn-primary" 
+                            type="button" 
+                            @onclick="SendMessage"
+                            disabled="@(isLoading || string.IsNullOrWhiteSpace(messageInput))">
+                            @if (isLoading)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                <span>Sending...</span>
+                            }
+                            else
+                            {
+                                <span><i class="fas fa-paper-plane me-2"></i>Send</span>
+                            }
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Inject]
+    private ApiClient ApiClient { get; set; } = default!;
+
+    private string messageInput = string.Empty;
+    private bool isLoading = false;
+    private List<ChatMessage> messages = new();
+
+    private class ChatMessage
+    {
+        public string Text { get; set; } = string.Empty;
+        public bool IsUser { get; set; }
+        public DateTime Timestamp { get; set; }
+    }
+
+    private async Task SendMessage()
+    {
+        if (string.IsNullOrWhiteSpace(messageInput) || isLoading)
+            return;
+
+        var userMessage = messageInput.Trim();
+        messageInput = string.Empty;
+        isLoading = true;
+
+        try
+        {
+            // Add user message to display
+            messages.Add(new ChatMessage 
+            { 
+                Text = userMessage, 
+                IsUser = true, 
+                Timestamp = DateTime.Now 
+            });
+
+            // Send to API
+            var request = new ChatRequestDto(userMessage);
+            var response = await ApiClient.PostChatAsync(request);
+
+            if (response?.IsSuccessful == true)
+            {
+                messages.Add(new ChatMessage
+                {
+                    Text = response.Response,
+                    IsUser = false,
+                    Timestamp = DateTime.Now
+                });
+            }
+            else
+            {
+                messages.Add(new ChatMessage
+                {
+                    Text = response?.ErrorMessage ?? "An error occurred. Please try again.",
+                    IsUser = false,
+                    Timestamp = DateTime.Now
+                });
+            }
+
+            StateHasChanged();
+            await ScrollToBottom();
+        }
+        catch (Exception ex)
+        {
+            messages.Add(new ChatMessage
+            {
+                Text = $"Error: {ex.Message}",
+                IsUser = false,
+                Timestamp = DateTime.Now
+            });
+            StateHasChanged();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task HandleKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !isLoading && !string.IsNullOrWhiteSpace(messageInput))
+        {
+            await SendMessage();
+        }
+    }
+
+    private async Task ScrollToBottom()
+    {
+        // Auto-scroll will be handled by CSS
+        await Task.Delay(100);
+    }
+}
+
+<style>
+    .chat-container {
+        height: 500px;
+        overflow-y: auto;
+        background-color: #f8f9fa;
+        border-radius: 0.25rem;
+    }
+
+    .chat-messages {
+        padding: 1rem;
+    }
+
+    .message {
+        display: flex;
+        margin-bottom: 1rem;
+        animation: fadeIn 0.3s ease-in;
+    }
+
+    .ai-message p {
+        background-color: #e9ecef;
+        padding: 0.75rem 1rem;
+        border-radius: 0.5rem;
+        border-left: 3px solid #0d6efd;
+    }
+
+    .user-message {
+        justify-content: flex-end;
+    }
+
+    .user-message p {
+        background-color: #0d6efd;
+        color: white;
+        padding: 0.75rem 1rem;
+        border-radius: 0.5rem;
+        max-width: 70%;
+        word-wrap: break-word;
+    }
+</style>
+
+<style>
+    @@keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+</style>

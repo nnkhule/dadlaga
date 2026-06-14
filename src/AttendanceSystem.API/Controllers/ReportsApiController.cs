@@ -146,6 +146,21 @@ public sealed class ReportsApiController : ControllerBase
         return Ok(departments);
     }
 
+    [HttpGet("overtime-summary")]
+    public async Task<ActionResult<OvertimeSummaryApiDto>> OvertimeSummary(
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        CancellationToken cancellationToken)
+    {
+        var query = _db.AttendanceRecords.AsNoTracking().Where(a => a.Date >= from && a.Date <= to);
+        var totalOvertime = await query.SumAsync(a => a.OvertimeHours, cancellationToken);
+        var recordCount = await query.CountAsync(cancellationToken);
+        var averageOvertime = recordCount == 0 ? 0 : await query.AverageAsync(a => a.OvertimeHours, cancellationToken);
+        var highestOvertime = recordCount == 0 ? 0 : await query.MaxAsync(a => a.OvertimeHours, cancellationToken);
+
+        return Ok(new OvertimeSummaryApiDto(totalOvertime, averageOvertime, highestOvertime, recordCount));
+    }
+
     [HttpGet("{reportType}/export/excel")]
     public async Task<IActionResult> ExportExcel(string reportType, [FromQuery] DateOnly from, [FromQuery] DateOnly to, CancellationToken cancellationToken)
         => File(await BuildCsvAsync(reportType, from, to, cancellationToken), "text/csv", $"{reportType}-{from:yyyyMMdd}-{to:yyyyMMdd}.csv");
@@ -182,3 +197,4 @@ public sealed class ReportsApiController : ControllerBase
 }
 
 public sealed record DepartmentReportSummaryApiDto(Guid DepartmentId, string DepartmentName, int Present, int Late, int Leave);
+public sealed record OvertimeSummaryApiDto(decimal TotalOvertimeHours, decimal AverageOvertimeHours, decimal HighestOvertimeHours, int RecordCount);

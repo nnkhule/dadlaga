@@ -35,6 +35,13 @@
                     </div>
                     <StatusBadge Status="@(request.Status ?? request.ApprovalStatus ?? string.Empty)" />
                 </div>
+                @if (string.Equals(request.Status, "Pending", StringComparison.OrdinalIgnoreCase))
+                {
+                    <div class="action-row" style="justify-content:flex-end; gap: 8px;">
+                        <button class="btn btn-danger" @onclick="() => RejectAsync(request.Id)">Reject</button>
+                        <button class="btn btn-success" @onclick="() => ApproveAsync(request.Id)">Approve</button>
+                    </div>
+                }
             </div>
         }
     }
@@ -45,6 +52,7 @@
     private string activeStatus = "Pending";
     private IReadOnlyList<LeaveDto> requests = [];
     private string? error;
+    private bool isProcessing;
 
     protected override Task OnInitializedAsync() => LoadAsync();
 
@@ -67,6 +75,44 @@
     {
         activeStatus = status;
         await LoadAsync();
+    }
+
+    private async Task ApproveAsync(Guid id)
+    {
+        try
+        {
+            error = null;
+            isProcessing = true;
+            await Api.ApproveLeaveRequestAsync(id);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
+    private async Task RejectAsync(Guid id)
+    {
+        try
+        {
+            error = null;
+            isProcessing = true;
+            await Api.RejectLeaveRequestAsync(id);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            isProcessing = false;
+        }
     }
 
     private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "--" : value;

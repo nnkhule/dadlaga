@@ -49,6 +49,10 @@ public static class DependencyInjection
         services.AddScoped<JwtTokenService>();
         services.AddScoped<PasswordService>();
 
+        // AI Services
+        services.AddScoped<IAiProvider, DefaultAiProvider>();
+        services.AddScoped<IAiChatService, AiChatService>();
+
         var redis = configuration.GetConnectionString("Redis");
         if (!string.IsNullOrWhiteSpace(redis))
             services.AddStackExchangeRedisCache(options => options.Configuration = redis);

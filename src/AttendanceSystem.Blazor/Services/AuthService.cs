@@ -12,11 +12,13 @@ public sealed class AuthService
     private const string RefreshTokenKey = "attendance.refreshToken";
     private readonly HttpClient _http;
     private readonly IJSRuntime _js;
+    private readonly PersistingAuthenticationStateProvider _authenticationStateProvider;
 
-    public AuthService(HttpClient http, IJSRuntime js)
+    public AuthService(HttpClient http, IJSRuntime js, PersistingAuthenticationStateProvider authenticationStateProvider)
     {
         _http = http;
         _js = js;
+        _authenticationStateProvider = authenticationStateProvider;
     }
 
     public async Task<(bool Success, string? Error, string TargetPath)> LoginAsync(string email, string password)
@@ -31,6 +33,7 @@ public sealed class AuthService
 
         await _js.InvokeVoidAsync("localStorage.setItem", TokenKey, result.AccessToken);
         await _js.InvokeVoidAsync("localStorage.setItem", RefreshTokenKey, result.RefreshToken);
+        await _authenticationStateProvider.NotifyUserAuthenticationAsync();
         return (true, null, GetLandingPath(result.AccessToken));
     }
 
@@ -65,6 +68,7 @@ public sealed class AuthService
 
         await _js.InvokeVoidAsync("localStorage.setItem", TokenKey, result.AccessToken);
         await _js.InvokeVoidAsync("localStorage.setItem", RefreshTokenKey, result.RefreshToken);
+        await _authenticationStateProvider.NotifyUserAuthenticationAsync();
         return true;
     }
 
@@ -72,6 +76,7 @@ public sealed class AuthService
     {
         await _js.InvokeVoidAsync("localStorage.removeItem", TokenKey);
         await _js.InvokeVoidAsync("localStorage.removeItem", RefreshTokenKey);
+        _authenticationStateProvider.NotifyUserLogout();
     }
 
     private static string GetLandingPath(string? accessToken)

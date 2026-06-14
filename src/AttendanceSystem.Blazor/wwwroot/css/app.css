@@ -88,9 +88,11 @@ button, input, select, textarea { font: inherit; }
 .btn-primary { background: linear-gradient(135deg, #6366F1, #8B5CF6); color: white; box-shadow: 0 8px 18px var(--clr-primary-glow); }
 .btn-success { background: linear-gradient(135deg, #10B981, #059669); color: white; }
 .btn-danger { background: linear-gradient(135deg, #EF4444, #DC2626); color: white; }
+.btn-logout { background: transparent; color: var(--clr-danger); border: 1px solid var(--clr-danger); }
+.btn-logout:hover:not(:disabled) { background: var(--clr-danger); color: white; }
 .btn-ghost { background: transparent; border: 1px solid var(--clr-border); color: var(--clr-text); }
-.btn-primary:hover, .btn-success:hover, .btn-danger:hover { filter: brightness(1.05); }
-.btn:disabled, .btn-primary:disabled, .btn-success:disabled, .btn-danger:disabled { cursor: not-allowed; opacity: .6; }
+.btn-primary:hover, .btn-success:hover, .btn-danger:hover, .btn-logout:hover { filter: brightness(1.05); }
+.btn:disabled, .btn-primary:disabled, .btn-success:disabled, .btn-danger:disabled, .btn-logout:disabled { cursor: not-allowed; opacity: .6; }
 .ripple { position: absolute; border-radius: 50%; background: rgba(255,255,255,.45); transform: scale(0); animation: ripple .6s linear; pointer-events: none; }
 
 .badge { display: inline-flex; align-items: center; gap: 6px; border-radius: var(--radius-full); padding: 5px 9px; font-size: 11px; line-height: 1; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }

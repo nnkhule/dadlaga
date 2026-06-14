@@ -84,6 +84,12 @@ public sealed record AttendanceStatisticsDto(
     decimal OvertimeHours,
     decimal AttendanceRate);
 
+public sealed record OvertimeSummaryDto(
+    decimal TotalOvertimeHours,
+    decimal AverageOvertimeHours,
+    decimal HighestOvertimeHours,
+    int RecordCount);
+
 public sealed record LocationValidationRequest(double Latitude, double Longitude);
 public sealed record LocationValidationDto(
     string? CurrentLocation,
@@ -114,6 +120,7 @@ public sealed record CreateLeaveDto(DateOnly StartDate, DateOnly EndDate, string
 public sealed record ReportRowDto(Dictionary<string, object?> Values);
 
 public sealed record NotificationDto(Guid Id, string Title, string Message, DateTime CreatedDate, DateTime CreatedAt, bool IsRead);
+public sealed record UnreadNotificationCountDto(int Count);
 
 public sealed record CompanySettingsDto(string? CompanyName, string? TimeZone, string? DateFormat, string? TimeFormat, string? LogoUrl);
 public sealed record AttendanceRulesDto(int GraceMinutes, bool RequireGpsForCheckIn, bool RequireGpsForCheckOut, bool AllowRemoteCheckIn, bool OvertimeEnabled);
@@ -125,8 +132,8 @@ public sealed record LoginRequestDto(string Email, string Password);
 public sealed record LoginResponseDto(
     [property: JsonPropertyName("accessToken")] string AccessToken,
     [property: JsonPropertyName("refreshToken")] string RefreshToken,
-    DateTime ExpiresAt,
-    Guid? EmployeeId);
+    [property: JsonPropertyName("expiresAt")] DateTime ExpiresAt,
+    [property: JsonPropertyName("employeeId")] Guid? EmployeeId);
 
 public sealed record MessageDto(string Message);
 

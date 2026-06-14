@@ -9,8 +9,8 @@
 
 <div class="page-stack">
     <div class="card filter-bar">
-        <input placeholder="Search" @bind="search" @bind:event="oninput" />
-        <button class="btn-ghost" @onclick="LoadAsync">Search</button>
+        <input class="form-control" placeholder="Search employees" @bind="search" @bind:event="oninput" />
+        <button class="btn btn-ghost" @onclick="LoadAsync">Search</button>
     </div>
 
     @if (!string.IsNullOrWhiteSpace(error))
@@ -18,39 +18,47 @@
         <div class="card" style="border-color:var(--clr-danger);color:var(--clr-danger)">@error</div>
     }
 
-    <div class="employee-grid">
-        @foreach (var employee in employees)
+    <div class="card">
+        @if (employees.Count == 0)
         {
-            <div class="card page-stack">
-                <div class="action-row">
-                    <span class="avatar" style="background:var(--clr-primary-light);color:var(--clr-primary)">@Initials(employee.FullName)</span>
-                    <div>
-                        <strong>@employee.FullName</strong>
-                        <div class="muted">@employee.EmployeeCode</div>
-                    </div>
-                </div>
-                <span class="badge badge-leave">@Display(employee.Department ?? employee.DepartmentName)</span>
-                <div class="muted">@employee.Email</div>
-                <StatusBadge Status="@(employee.Status ?? string.Empty)" />
-                <div class="action-row">
-                    <button class="btn-ghost"
-                            @onclick="() => EditEmployee(employee.Id)">
-                        Edit
-                    </button>
-
-                    <button class="btn-primary"
-                            @onclick="() => ViewEmployee(employee.Id)">
-                        View
-                    </button>
-                </div>
+            <div class="empty-state">No employees found.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Code</th>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Department</th>
+                            <th>Hire Date</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var employee in employees)
+                        {
+                            <tr>
+                                <td>@employee.EmployeeCode</td>
+                                <td>@employee.FullName</td>
+                                <td>@employee.Email</td>
+                                <td>@Display(employee.Department ?? employee.DepartmentName)</td>
+                                <td>@employee.HireDate.ToString("yyyy-MM-dd")</td>
+                                <td><span class="badge @(employee.IsActive ? "badge-present" : "badge-absent")">@Display(employee.Status ?? (employee.IsActive ? "Active" : "Inactive"))</span></td>
+                                <td>
+                                    <button class="btn btn-ghost" @onclick="() => ViewEmployee(employee.Id)">View</button>
+                                    <button class="btn btn-primary" @onclick="() => EditEmployee(employee.Id)">Edit</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
             </div>
         }
     </div>
-
-    @if (employees.Count == 0 && string.IsNullOrWhiteSpace(error))
-    {
-        <EmptyState Title="No employees found" Description="" />
-    }
 </div>
 
 @code {
@@ -79,19 +87,6 @@
 
     private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "--" : value;
 
-    private static string Initials(string value)
-    {
-        var parts = value.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        return string.Concat(parts.Take(2).Select(p => p[0])).ToUpperInvariant();
-    }
-
-    private void EditEmployee(Guid id)
-    {
-        Nav.NavigateTo($"/employees/{id}/edit");
-    }
-
-    private void ViewEmployee(Guid id)
-    {
-        Nav.NavigateTo($"/employees/{id}");
-    }
+    private void EditEmployee(Guid id) => Nav.NavigateTo($"/employees/{id}/edit");
+    private void ViewEmployee(Guid id) => Nav.NavigateTo($"/employees/{id}");
 }

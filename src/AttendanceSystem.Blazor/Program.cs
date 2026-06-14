@@ -8,10 +8,10 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-builder.Services.AddHttpContextAccessor();
 builder.Services.AddAuthorizationCore();
 builder.Services.AddCascadingAuthenticationState();
-builder.Services.AddScoped<AuthenticationStateProvider, PersistingAuthenticationStateProvider>();
+builder.Services.AddScoped<PersistingAuthenticationStateProvider>();
+builder.Services.AddScoped<AuthenticationStateProvider>(sp => sp.GetRequiredService<PersistingAuthenticationStateProvider>());
 
 builder.Services.AddScoped(sp => new HttpClient
 {
