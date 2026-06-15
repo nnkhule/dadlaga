@@ -6,7 +6,10 @@
 @inject IJSRuntime JS
 @attribute [Authorize(Roles = "Admin,HR")]
 
+
 <PageHeader Title="AI Туслах" Subtitle="Систем дотроос асуулт асуу, шуурхай хариулт ав" />
+
+<div class="page-stack">
 
 <div class="ai-chat-container">
     <div class="ai-chat-messages" @ref="messagesContainer" id="adminChatMessages">
@@ -55,6 +58,7 @@
         <button class="ai-chat-send-btn" @onclick="SendMessage" disabled="@(isLoading || string.IsNullOrWhiteSpace(currentMessage))">
             <i class="bi bi-send-fill"></i>
         </button>
+    </div>
     </div>
 </div>
 
