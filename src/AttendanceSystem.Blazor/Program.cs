@@ -1,12 +1,25 @@
 using AttendanceSystem.Blazor.Components;
 using AttendanceSystem.Blazor.Services;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.Authentication.Cookies;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+// Program.cs-д энэ мөрүүдийг нэмнэ үү
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.LoginPath = "/login";
+        options.LogoutPath = "/logout";
+        options.ExpireTimeSpan = TimeSpan.FromHours(8);
+    });
+
+builder.Services.AddAuthorization();
+
 
 builder.Services.AddAuthorizationCore();
 builder.Services.AddCascadingAuthenticationState();
