@@ -18,5 +18,5 @@ public class PasswordResetToken : BaseEntity
         SetUpdated();
     }
 
-    public bool IsValid => !IsUsed && ExpiresAt > DateTime.UtcNow;
+    public bool IsValid => !IsUsed && ExpiresAt > DateTime.Now;
 }

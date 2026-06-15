@@ -1,10 +1,7 @@
 namespace AttendanceSystem.Application.DTOs.AI;
 
-/// <summary>
-/// AI response to user message.
-/// </summary>
-public record ChatResponseDto(
-    string Response,
-    bool IsSuccessful = true,
-    string? ErrorMessage = null,
-    DateTime RespondedAt = default);
+public class ChatResponseDto
+{
+    public string Reply { get; set; } = string.Empty;
+    public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+}

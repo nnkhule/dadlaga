@@ -31,7 +31,7 @@ public class GetAttendanceStatisticsQueryHandler : IRequestHandler<GetAttendance
         if (employee.WorkSchedule is null)
             return Result<AttendanceStatisticsDto>.Failure("Employee work schedule not configured.", "SCHEDULE_MISSING");
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(DateTime.Now);
         var startOfMonth = new DateOnly(today.Year, today.Month, 1);
         var records = await _attendanceRepository.GetByEmployeeAsync(request.EmployeeId, startOfMonth, today, cancellationToken);
 

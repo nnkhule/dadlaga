@@ -47,7 +47,7 @@ public static class ApplicationDbSeeder
                 dept.Id,
                 schedule.Id,
                 office.Id,
-                DateOnly.FromDateTime(DateTime.UtcNow.AddYears(-1)),
+                DateOnly.FromDateTime(DateTime.Now.AddYears(-1)),
                 ContractType.FullTime,
                 new DateOnly(1990, 5, 15));
 
@@ -133,7 +133,7 @@ public static class ApplicationDbSeeder
     private static void SeedMongolianHolidays(ApplicationDbContext context)
     {
         if (context.Holidays.Any()) return;
-        var year = DateTime.UtcNow.Year;
+        var year = DateTime.Now.Year;
         var holidays = new[]
         {
             ("New Year", new DateOnly(year, 1, 1)),

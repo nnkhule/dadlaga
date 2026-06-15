@@ -52,35 +52,50 @@
         </div>
 
         @if (!isEditing)
-        {
-            <div class="card page-stack">
-                <h2>Information</h2>
+{
+    
 
-                <SettingsRow Label="Employee Code"
-                             Value="@profile.EmployeeCode" />
+    <div class="profile-info-card">
 
-                <SettingsRow Label="Full Name"
-                             Value="@profile.FullName" />
+        <h3>Personal Information</h3>
 
-                <SettingsRow Label="Email"
-                             Value="@profile.Email" />
+        <div class="info-row">
+            <span>Employee Code</span>
+            <strong>@profile.EmployeeCode</strong>
+        </div>
 
-                <SettingsRow Label="Phone"
-                             Value="@profile.Phone" />
+        <div class="info-row">
+            <span>Email</span>
+            <strong>@profile.Email</strong>
+        </div>
 
-                <SettingsRow Label="Date Of Birth"
-                             Value="@(profile.DateOfBirth?.ToString("yyyy-MM-dd"))" />
+        <div class="info-row">
+            <span>Phone</span>
+            <strong>@Display(profile.Phone)</strong>
+        </div>
 
-                <SettingsRow Label="Department"
-                             Value="@(profile.Department ?? profile.DepartmentName)" />
+        <div class="info-row">
+            <span>Date Of Birth</span>
+            <strong>@profile.DateOfBirth?.ToString("yyyy-MM-dd")</strong>
+        </div>
 
-                <SettingsRow Label="Position"
-                             Value="@profile.Position" />
+        <div class="info-row">
+            <span>Department</span>
+            <strong>@Display(profile.Department ?? profile.DepartmentName)</strong>
+        </div>
 
-                <SettingsRow Label="Hire Date"
-                             Value="@profile.HireDate.ToString("yyyy-MM-dd")" />
-            </div>
-        }
+        <div class="info-row">
+            <span>Position</span>
+            <strong>@Display(profile.Position)</strong>
+        </div>
+
+        <div class="info-row">
+            <span>Hire Date</span>
+            <strong>@profile.HireDate.ToString("yyyy-MM-dd")</strong>
+        </div>
+
+    </div>
+}
         else
         {
             <EditForm Model="@edit" OnValidSubmit="SaveAsync">
@@ -143,6 +158,88 @@
         }
     }
 </div>
+
+
+
+<style>
+.profile-card {
+    background: white;
+    border-radius: 20px;
+    padding: 32px;
+    text-align: center;
+    box-shadow: 0 8px 30px rgba(0,0,0,.08);
+}
+
+.profile-image {
+    width: 110px;
+    height: 110px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.avatar-circle {
+    width: 110px;
+    height: 110px;
+    border-radius: 50%;
+    background: var(--clr-primary);
+    color: white;
+    font-size: 36px;
+    font-weight: 700;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    margin: auto;
+}
+
+.profile-card h2 {
+    margin-top: 16px;
+    margin-bottom: 6px;
+}
+
+.profile-position {
+    color: #666;
+    margin-bottom: 10px;
+}
+
+.profile-department {
+    display: inline-block;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: #eef4ff;
+    color: var(--clr-primary);
+    font-weight: 600;
+}
+
+.profile-info-card {
+    background: white;
+    border-radius: 20px;
+    padding: 24px;
+    margin-top: 20px;
+    box-shadow: 0 8px 30px rgba(0,0,0,.08);
+}
+
+.profile-info-card h3 {
+    margin-bottom: 20px;
+}
+
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.info-row:last-child {
+    border-bottom: none;
+}
+
+.mt-3 {
+    margin-top: 16px;
+}
+</style>
 
 @code {
     private EmployeeProfileDto? profile;

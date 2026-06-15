@@ -52,7 +52,7 @@ namespace AttendanceSystem.API.Controllers
             return Created(string.Empty, new
             {
                 message = "Leave request received",
-                receivedAt = DateTime.UtcNow,
+                receivedAt = DateTime.Now,
                 leaveRequest.Id,
                 leaveRequest.EmployeeId,
                 leaveRequest.LeaveType,

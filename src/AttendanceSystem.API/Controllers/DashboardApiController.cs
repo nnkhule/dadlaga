@@ -18,7 +18,7 @@ public sealed class DashboardApiController : ControllerBase
     [HttpGet("summary")]
     public async Task<ActionResult<DashboardSummaryApiDto>> Summary([FromQuery] DateOnly? date, CancellationToken cancellationToken)
     {
-        var targetDate = date ?? DateOnly.FromDateTime(DateTime.UtcNow);
+        var targetDate = date ?? DateOnly.FromDateTime(DateTime.Now);
         var totalEmployees = await _db.Employees.AsNoTracking().CountAsync(cancellationToken);
         var activeEmployees = await _db.Employees.AsNoTracking().CountAsync(e => e.IsActive, cancellationToken);
 
@@ -84,7 +84,7 @@ public sealed class DashboardApiController : ControllerBase
     public async Task<ActionResult<AttendanceTrendApiDto>> Statistics([FromQuery] int days = 7, CancellationToken cancellationToken = default)
     {
         days = Math.Clamp(days, 1, 31);
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(DateTime.Now);
         var from = today.AddDays(-(days - 1));
         var activeEmployees = await _db.Employees.AsNoTracking().CountAsync(e => e.IsActive, cancellationToken);
         var records = await _db.AttendanceRecords

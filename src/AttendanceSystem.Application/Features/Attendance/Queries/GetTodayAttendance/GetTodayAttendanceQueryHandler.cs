@@ -17,7 +17,7 @@ public class GetTodayAttendanceQueryHandler : IRequestHandler<GetTodayAttendance
     /// <inheritdoc />
     public async Task<Result<AttendanceRecordDto?>> Handle(GetTodayAttendanceQuery request, CancellationToken cancellationToken)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(DateTime.Now);
         var record = await _repository.GetTodayRecordAsync(request.EmployeeId, today, cancellationToken);
         if (record is null)
             return Result<AttendanceRecordDto?>.Success(null);

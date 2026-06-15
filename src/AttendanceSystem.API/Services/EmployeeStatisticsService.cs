@@ -32,7 +32,7 @@ namespace AttendanceSystem.API.Services
         public async Task<EmployeeStatisticsDto> GetEmployeeStatisticsAsync(Guid employeeId)
         {
             // Define the period as the current month (from first day to today)
-            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var today = DateOnly.FromDateTime(DateTime.Now);
             var startOfMonth = new DateOnly(today.Year, today.Month, 1);
             var endOfMonth = today; // We want up to today
 
@@ -333,7 +333,7 @@ namespace AttendanceSystem.API.Services
         private async Task<List<MonthlyAttendanceChartDto>> GetMonthlyChartDataAsync(Guid employeeId, int months)
         {
             var chartData = new List<MonthlyAttendanceChartDto>();
-            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var today = DateOnly.FromDateTime(DateTime.Now);
 
             for (int i = 0; i < months; i++)
             {

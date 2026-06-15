@@ -57,7 +57,7 @@ public class JwtTokenService
             .FirstOrDefaultAsync(t =>
                 t.Token == refreshToken &&
                 !t.IsRevoked &&
-                t.ExpiresAt > DateTime.UtcNow,
+                t.ExpiresAt > DateTime.Now,
                 cancellationToken);
 
         if (stored is null)
@@ -101,7 +101,7 @@ public class JwtTokenService
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_settings.SecretKey));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-        var expires = DateTime.UtcNow.AddMinutes(_settings.AccessTokenExpiryMinutes);
+        var expires = DateTime.Now.AddMinutes(_settings.AccessTokenExpiryMinutes);
 
         var token = new JwtSecurityToken(
             issuer: _settings.Issuer,
@@ -111,7 +111,7 @@ public class JwtTokenService
             signingCredentials: creds);
 
         var refresh = RefreshToken.Create(user.Id, GenerateRefreshTokenString(),
-            DateTime.UtcNow.AddDays(_settings.RefreshTokenExpiryDays));
+            DateTime.Now.AddDays(_settings.RefreshTokenExpiryDays));
         await _dbContext.RefreshTokens.AddAsync(refresh, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
 

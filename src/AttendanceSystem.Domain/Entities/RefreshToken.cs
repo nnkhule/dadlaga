@@ -23,5 +23,5 @@ public class RefreshToken : BaseEntity
         SetUpdated();
     }
 
-    public bool IsActive => !IsRevoked && ExpiresAt > DateTime.UtcNow;
+    public bool IsActive => !IsRevoked && ExpiresAt > DateTime.Now;
 }

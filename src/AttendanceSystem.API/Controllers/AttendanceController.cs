@@ -125,7 +125,7 @@ public class AttendanceController : ControllerBase
         if (employeeId is null)
             return BadRequest(new ApiErrorResponse("Employee profile not linked to user."));
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(DateTime.Now);
         var start = from ?? new DateOnly(today.Year, today.Month, 1);
         var end = to ?? today;
 
@@ -159,7 +159,7 @@ public class AttendanceController : ControllerBase
 
         pageNumber = Math.Max(1, pageNumber);
         pageSize = Math.Clamp(pageSize, 1, 100);
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(DateTime.Now);
         var start = from ?? today.AddDays(-30);
         var end = to ?? today;
 
@@ -204,7 +204,7 @@ public class AttendanceController : ControllerBase
     {
         pageNumber = Math.Max(1, pageNumber);
         pageSize = Math.Clamp(pageSize, 1, 200);
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(DateTime.Now);
         var start = from ?? today;
         var end = to ?? today;
 

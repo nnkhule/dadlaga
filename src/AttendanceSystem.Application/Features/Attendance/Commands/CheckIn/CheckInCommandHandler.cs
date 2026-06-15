@@ -47,7 +47,7 @@ public class CheckInCommandHandler : IRequestHandler<CheckInCommand, Result<Atte
         if (employee is null || !employee.IsActive)
             return Result<AttendanceRecordDto>.Failure("Employee not found.", "EMPLOYEE_NOT_FOUND");
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(DateTime.Now);
         var existing = await _attendanceRepository.GetTodayRecordAsync(request.EmployeeId, today, cancellationToken);
         if (existing is not null)
             return Result<AttendanceRecordDto>.Failure("Already checked in today.", "ALREADY_CHECKED_IN");
@@ -57,7 +57,7 @@ public class CheckInCommandHandler : IRequestHandler<CheckInCommand, Result<Atte
         if (schedule is null || office is null)
             return Result<AttendanceRecordDto>.Failure("Employee schedule or office not configured.", "CONFIG_MISSING");
 
-        var checkInTime = DateTime.UtcNow;
+        var checkInTime = DateTime.Now;
         var status = AttendanceStatus.Present;
         decimal lateMinutes = 0;
         var isSuspicious = false;

@@ -7,5 +7,5 @@ namespace AttendanceSystem.Domain.Events;
 /// </summary>
 public sealed record AttendanceCheckedInEvent(Guid RecordId, Guid EmployeeId, DateTime CheckInTime) : IDomainEvent
 {
-    public DateTime OccurredOn { get; } = DateTime.UtcNow;
+    public DateTime OccurredOn { get; } = DateTime.Now;
 }

@@ -1,289 +1,157 @@
-using System.Globalization;
 using AttendanceSystem.Application.DTOs.AI;
 using AttendanceSystem.Application.Interfaces;
-using AttendanceSystem.Domain.Enums;
-using AttendanceSystem.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
+using AttendanceSystem.Infrastructure.Persistence;
+using AttendanceSystem.Domain.Enums;
 
 namespace AttendanceSystem.Infrastructure.Services;
 
-/// <summary>
-/// AI chat service that queries real database data and generates contextual responses.
-/// </summary>
 public class AiChatService : IAiChatService
 {
-    private readonly ApplicationDbContext _dbContext;
     private readonly IAiProvider _aiProvider;
-    private readonly ILogger<AiChatService> _logger;
+    private readonly ApplicationDbContext _dbContext;
 
-    public AiChatService(
-        ApplicationDbContext dbContext,
-        IAiProvider aiProvider,
-        ILogger<AiChatService> logger)
+    public AiChatService(IAiProvider aiProvider, ApplicationDbContext dbContext)
     {
-        _dbContext = dbContext;
         _aiProvider = aiProvider;
-        _logger = logger;
+        _dbContext = dbContext;
     }
 
-    public async Task<string> ProcessEmployeeChatAsync(
-        Guid employeeId,
-        string message,
-        CancellationToken cancellationToken = default)
+    public async Task<ChatResponseDto> GetAdminResponseAsync(
+        ChatRequestDto request, Guid adminId, CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var context = await BuildEmployeeContextAsync(employeeId, cancellationToken);
-            if (context is null)
-                return "Unable to retrieve your employee information.";
+        var context = await BuildAdminContextAsync(cancellationToken);
 
-            var isAvailable = await _aiProvider.IsAvailableAsync(cancellationToken);
-            if (!isAvailable)
-                return GenerateEmployeeResponse(message, context);
+        var systemPrompt =
+            $"Та HR удирдлагын системийн AI туслах. Админ хэрэглэгчид ирц, ажилтан, амралтын " +
+            $"мэдээллийг тайлбарлаж, асуултад товч бөгөөд тодорхой хариулт өгнө.\n\n" +
+            $"Одоогийн систем мэдээлэл:\n" +
+            $"- Нийт ажилтан: {context.TotalEmployees}\n" +
+            $"- Өнөөдөр ирсэн: {context.PresentToday}\n" +
+            $"- Өнөөдөр ирээгүй: {context.AbsentToday}\n" +
+            $"- Чөлөөтэй: {context.OnLeaveToday}\n" +
+            $"- Хүлээгдэж буй амралтын хүсэлт: {context.PendingLeaveRequests}\n" +
+            $"- Хэлтэсүүд: {string.Join(", ", context.DepartmentNames)}\n\n" +
+            $"Хариултаа монгол хэлээр, найрсаг, мэргэжлийн өнгө аястай өг.";
 
-            return await _aiProvider.GenerateEmployeeResponseAsync(message, context, cancellationToken);
-        }
-        catch (Exception ex)
+        var messages = BuildMessageHistory(request);
+        var reply = await _aiProvider.GenerateReplyAsync(systemPrompt, messages, cancellationToken);
+
+        return new ChatResponseDto
         {
-            _logger.LogError(ex, "Error processing employee chat for employee {EmployeeId}", employeeId);
-            return "An error occurred while processing your request. Please try again.";
-        }
+            Reply = reply,
+            Timestamp = DateTime.UtcNow
+        };
     }
 
-    public async Task<string> ProcessAdminChatAsync(
-        string message,
-        CancellationToken cancellationToken = default)
+    public async Task<ChatResponseDto> GetEmployeeResponseAsync(
+        ChatRequestDto request, Guid employeeId, CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var context = await BuildAdminContextAsync(cancellationToken);
+        var context = await BuildEmployeeContextAsync(employeeId, cancellationToken);
 
-            var isAvailable = await _aiProvider.IsAvailableAsync(cancellationToken);
-            if (!isAvailable)
-                return GenerateAdminResponse(message, context);
+        var systemPrompt =
+            $"Та HR системийн AI туслах. Ажилтан '{context.EmployeeName}' ({context.Department} хэлтэс) -тэй ярьж байна.\n\n" +
+            $"Ажилтаны мэдээлэл:\n" +
+            $"- Үлдсэн амралтын хоног: {context.LeaveBalance}\n" +
+            $"- Өнөөдөр ирц бүртгэсэн эсэх: {(context.IsCheckedInToday ? "Тийм" : "Үгүй")}\n" +
+            $"- Сүүлийн ирсэн цаг: {(context.LastCheckIn.HasValue ? context.LastCheckIn.Value.ToString("yyyy-MM-dd HH:mm") : "Байхгүй")}\n" +
+            $"- Сүүлийн явсан цаг: {(context.LastCheckOut.HasValue ? context.LastCheckOut.Value.ToString("yyyy-MM-dd HH:mm") : "Байхгүй")}\n\n" +
+            $"Хариултаа монгол хэлээр, найрсаг, тодорхой өг. Ирц, амралт, цалин зэрэг асуултад дээрх мэдээллийг ашиглан хариул.";
 
-            return await _aiProvider.GenerateAdminResponseAsync(message, context, cancellationToken);
-        }
-        catch (Exception ex)
+        var messages = BuildMessageHistory(request);
+        var reply = await _aiProvider.GenerateReplyAsync(systemPrompt, messages, cancellationToken);
+
+        return new ChatResponseDto
         {
-            _logger.LogError(ex, "Error processing admin chat");
-            return "An error occurred while processing your request. Please try again.";
-        }
+            Reply = reply,
+            Timestamp = DateTime.UtcNow
+        };
     }
 
-    private async Task<EmployeeAiContextDto?> BuildEmployeeContextAsync(
-        Guid employeeId,
-        CancellationToken cancellationToken)
+    private static List<(string Role, string Content)> BuildMessageHistory(ChatRequestDto request)
+    {
+        var messages = new List<(string Role, string Content)>();
+
+        if (request.History != null)
+        {
+            foreach (var msg in request.History)
+            {
+                var role = msg.Role == "assistant" ? "assistant" : "user";
+                messages.Add((role, msg.Content));
+            }
+        }
+
+        messages.Add(("user", request.Message));
+        return messages;
+    }
+
+    private async Task<AdminAiContextDto> BuildAdminContextAsync(CancellationToken cancellationToken)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        var totalEmployees = await _dbContext.Employees.CountAsync(cancellationToken);
+
+        var presentToday = await _dbContext.AttendanceRecords
+            .Where(a => a.Date == today && a.Status == AttendanceStatus.Present)
+            .Select(a => a.EmployeeId)
+            .Distinct()
+            .CountAsync(cancellationToken);
+
+        var onLeaveToday = await _dbContext.LeaveRequests
+            .Where(l => l.Status == RequestStatus.Approved &&
+                        l.StartDate <= today && l.EndDate >= today)
+            .Select(l => l.EmployeeId)
+            .Distinct()
+            .CountAsync(cancellationToken);
+
+        var pendingLeaveRequests = await _dbContext.LeaveRequests
+            .CountAsync(l => l.Status == RequestStatus.Pending, cancellationToken);
+
+        var departmentNames = await _dbContext.Departments
+            .Select(d => d.Name)
+            .ToListAsync(cancellationToken);
+
+        return new AdminAiContextDto
+        {
+            TotalEmployees = totalEmployees,
+            PresentToday = presentToday,
+            AbsentToday = Math.Max(totalEmployees - presentToday - onLeaveToday, 0),
+            OnLeaveToday = onLeaveToday,
+            PendingLeaveRequests = pendingLeaveRequests,
+            DepartmentNames = departmentNames
+        };
+    }
+
+    private async Task<EmployeeAiContextDto> BuildEmployeeContextAsync(Guid employeeId, CancellationToken cancellationToken)
     {
         var employee = await _dbContext.Employees
-            .AsNoTracking()
             .Include(e => e.Department)
-            .Include(e => e.WorkSchedule)
             .FirstOrDefaultAsync(e => e.Id == employeeId, cancellationToken);
 
-        if (employee is null)
-            return null;
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
-        var today = DateTime.UtcNow.Date;
-        var currentMonth = new DateTime(today.Year, today.Month, 1);
-        var nextMonth = currentMonth.AddMonths(1);
+        var todayRecord = await _dbContext.AttendanceRecords
+            .FirstOrDefaultAsync(a => a.EmployeeId == employeeId && a.Date == today, cancellationToken);
 
-        var attendance = await _dbContext.AttendanceRecords
-            .AsNoTracking()
-            .Where(a => a.EmployeeId == employeeId && a.CheckInTime.Date >= currentMonth.Date && a.CheckInTime.Date < nextMonth.Date)
-            .ToListAsync(cancellationToken);
+        var lastRecord = await _dbContext.AttendanceRecords
+            .Where(a => a.EmployeeId == employeeId)
+            .OrderByDescending(a => a.Date)
+            .FirstOrDefaultAsync(cancellationToken);
 
-        var workingDays = attendance.Select(a => a.CheckInTime.Date).Distinct().Count();
-        var lateDays = attendance.Count(a => a.LateMinutes > 0);
-        var presentDays = workingDays;
+        var usedLeaveDays = await _dbContext.LeaveRequests
+            .Where(l => l.EmployeeId == employeeId && l.Status == RequestStatus.Approved)
+            .SumAsync(l => (l.EndDate.DayNumber - l.StartDate.DayNumber + 1), cancellationToken);
 
-        var leaveRequests = await _dbContext.LeaveRequests
-            .AsNoTracking()
-            .Where(lr => lr.EmployeeId == employeeId)
-            .Where(lr => lr.StartDate >= DateOnly.FromDateTime(currentMonth) && lr.StartDate < DateOnly.FromDateTime(nextMonth))
-            .ToListAsync(cancellationToken);
+        const int annualLeaveAllowance = 15;
 
-        var approvedLeaves = leaveRequests.Count(lr => lr.Status == RequestStatus.Approved);
-        var pendingLeaves = leaveRequests.Count(lr => lr.Status == RequestStatus.Pending);
-        var rejectedLeaves = leaveRequests.Count(lr => lr.Status == RequestStatus.Rejected);
-
-        var workSchedule = employee.WorkSchedule;
-
-        var lastAttendance = attendance.OrderByDescending(a => a.CheckInTime).FirstOrDefault();
-
-        var totalHours = attendance
-            .Where(a => a.CheckOutTime.HasValue)
-            .Sum(a => (a.CheckOutTime.Value - a.CheckInTime).TotalHours);
-
-        return new EmployeeAiContextDto(
-            EmployeeId: employeeId,
-            EmployeeEmail: employee.Email,
-            EmployeeFullName: employee.FullName,
-            DepartmentId: employee.DepartmentId,
-            DepartmentName: employee.Department?.Name ?? "Unknown",
-            TotalWorkingDays: workingDays,
-            PresentDays: presentDays,
-            LateDays: lateDays,
-            AbsentDays: 0,
-            TotalWorkingHours: totalHours,
-            OvertimeHours: 0,
-            ApprovedLeaves: approvedLeaves,
-            PendingLeaves: pendingLeaves,
-            RejectedLeaves: rejectedLeaves,
-            WorkScheduleName: workSchedule?.Name ?? "Standard",
-            ShiftStart: workSchedule?.ShiftStart,
-            ShiftEnd: workSchedule?.ShiftEnd,
-            LastCheckIn: lastAttendance?.CheckInTime ?? DateTime.MinValue,
-            LastCheckOut: lastAttendance?.CheckOutTime);
-    }
-
-    private async Task<AdminAiContextDto> BuildAdminContextAsync(
-        CancellationToken cancellationToken)
-    {
-        var today = DateTime.UtcNow.Date;
-        var currentMonth = new DateTime(today.Year, today.Month, 1);
-        var nextMonth = currentMonth.AddMonths(1);
-
-        var totalEmployees = await _dbContext.Employees
-            .AsNoTracking()
-            .CountAsync(cancellationToken);
-
-        var activeEmployees = await _dbContext.Employees
-            .AsNoTracking()
-            .CountAsync(e => e.IsActive, cancellationToken);
-
-        var inactiveEmployees = totalEmployees - activeEmployees;
-
-        var departments = await _dbContext.Departments
-            .AsNoTracking()
-            .CountAsync(cancellationToken);
-
-        var monthAttendance = await _dbContext.AttendanceRecords
-            .AsNoTracking()
-            .Where(a => a.CheckInTime.Date >= currentMonth.Date && a.CheckInTime.Date < nextMonth.Date)
-            .GroupBy(a => a.EmployeeId)
-            .Select(g => new { EmployeeId = g.Key, Present = g.Count(), Late = g.Count(a => a.LateMinutes > 0) })
-            .ToListAsync(cancellationToken);
-
-        var attendanceRate = monthAttendance.Count > 0 
-            ? (monthAttendance.Sum(a => a.Present) * 100.0) / (monthAttendance.Count * 22.0)
-            : 0;
-
-        var latePercentage = monthAttendance.Count > 0 && monthAttendance.Sum(a => a.Present) > 0
-            ? (monthAttendance.Sum(a => a.Late) * 100.0) / monthAttendance.Sum(a => a.Present)
-            : 0;
-
-        var deptStats = await _dbContext.Departments
-            .AsNoTracking()
-            .Include(d => d.Employees)
-            .Select(d => new DepartmentStatsDto(
-                d.Id,
-                d.Name,
-                d.Employees.Count,
-                d.Employees.Count > 0 ? 85.0 : 0,
-                d.Employees.Count > 0 ? 5.0 : 0))
-            .ToListAsync(cancellationToken);
-
-        var leaves = await _dbContext.LeaveRequests
-            .AsNoTracking()
-            .Where(lr => lr.StartDate >= DateOnly.FromDateTime(currentMonth) && lr.StartDate < DateOnly.FromDateTime(nextMonth))
-            .GroupBy(lr => lr.StartDate)
-            .Select(g => new AdminAttendanceTrendDto(
-                g.Key.ToDateTime(TimeOnly.MinValue),
-                0,
-                g.Count(),
-                0))
-            .ToListAsync(cancellationToken);
-
-        return new AdminAiContextDto(
-            TotalEmployees: totalEmployees,
-            ActiveEmployees: activeEmployees,
-            InactiveEmployees: inactiveEmployees,
-            TotalDepartments: departments,
-            AverageAttendanceRate: attendanceRate,
-            AverageLatePercentage: latePercentage,
-            AverageOvertimeHours: 0,
-            TotalPendingLeaves: await _dbContext.LeaveRequests
-                .AsNoTracking()
-                .CountAsync(lr => lr.Status == RequestStatus.Pending, cancellationToken),
-            TotalApprovedLeaves: await _dbContext.LeaveRequests
-                .AsNoTracking()
-                .CountAsync(lr => lr.Status == RequestStatus.Approved, cancellationToken),
-            DepartmentStats: deptStats,
-            AttendanceTrends: leaves);
-    }
-
-    private static string GenerateEmployeeResponse(string message, EmployeeAiContextDto context)
-    {
-        var msg = message.ToLowerInvariant();
-
-        if (msg.Contains("late") || msg.Contains("lateness"))
-            return $"Based on your records, you have been late {context.LateDays} time(s) this month. " +
-                   $"Your shift typically starts at {context.ShiftStart?.ToString("HH:mm") ?? "N/A"}. " +
-                   $"Try arriving 5-10 minutes early to prevent tardiness.";
-
-        if (msg.Contains("attendance") || msg.Contains("present") || msg.Contains("status"))
-            return $"Your attendance this month: {context.PresentDays} days present out of {context.TotalWorkingDays} working days. " +
-                   $"That gives you a {(context.TotalWorkingDays > 0 ? context.PresentDays * 100.0 / context.TotalWorkingDays : 0):F1}% attendance rate.";
-
-        if (msg.Contains("leave") || msg.Contains("vacation") || msg.Contains("time off"))
-            return $"Your leave status this month: " +
-                   $"{context.ApprovedLeaves} approved leave(s), " +
-                   $"{context.PendingLeaves} pending leave(s), " +
-                   $"{context.RejectedLeaves} rejected leave(s).";
-
-        if (msg.Contains("hour") || msg.Contains("worked") || msg.Contains("overtime"))
-            return $"You have worked {context.TotalWorkingHours:F2} hours this month. " +
-                   $"Your overtime is {context.OvertimeHours:F2} hours.";
-
-        if (msg.Contains("schedule") || msg.Contains("shift") || msg.Contains("work time"))
-            return $"Your work schedule: {context.WorkScheduleName}. " +
-                   $"Shift hours: {context.ShiftStart?.ToString("HH:mm") ?? "N/A"} to {context.ShiftEnd?.ToString("HH:mm") ?? "N/A"}.";
-
-        if (msg.Contains("check") || msg.Contains("login") || msg.Contains("recent"))
-            return $"Your last check-in: {context.LastCheckIn:g}. " +
-                   (context.LastCheckOut.HasValue 
-                       ? $"You checked out at {context.LastCheckOut:g}." 
-                       : "You haven't checked out yet.");
-
-        return $"Hello {context.EmployeeFullName}! I can help you with information about your attendance, late days, leaves, work hours, schedule, and check-in history. What would you like to know?";
-    }
-
-    private static string GenerateAdminResponse(string message, AdminAiContextDto context)
-    {
-        var msg = message.ToLowerInvariant();
-
-        if (msg.Contains("attendance"))
-            return $"Current month attendance rate: {context.AverageAttendanceRate:F2}%. " +
-                   $"Active employees: {context.ActiveEmployees} out of {context.TotalEmployees}. " +
-                   $"This indicates a strong attendance trend.";
-
-        if (msg.Contains("late") || msg.Contains("tardiness"))
-            return $"Late percentage this month: {context.AverageLatePercentage:F2}%. " +
-                   $"Consider implementing arrival incentives to reduce tardiness.";
-
-        if (msg.Contains("leave") || msg.Contains("vacation") || msg.Contains("time off"))
-            return $"Leave request status: {context.TotalPendingLeaves} pending, " +
-                   $"{context.TotalApprovedLeaves} approved this month. " +
-                   $"Review pending requests to ensure timely approvals.";
-
-        if (msg.Contains("department") || msg.Contains("team"))
+        return new EmployeeAiContextDto
         {
-            var topDepts = context.DepartmentStats.OrderByDescending(d => d.EmployeeCount).Take(3).ToList();
-            return $"You have {context.TotalDepartments} departments. " +
-                   $"Largest departments: {string.Join(", ", topDepts.Select(d => $"{d.DepartmentName} ({d.EmployeeCount} employees)"))}. " +
-                   $"Average attendance by department: {(context.DepartmentStats.Count > 0 ? context.DepartmentStats.Average(d => d.AttendanceRate) : 0):F1}%.";
-        }
-
-        if (msg.Contains("employee") || msg.Contains("staff") || msg.Contains("headcount"))
-            return $"Total employees: {context.TotalEmployees}. " +
-                   $"Active: {context.ActiveEmployees}. " +
-                   $"Inactive: {context.InactiveEmployees}. " +
-                   $"Consider onboarding or reactivating inactive staff.";
-
-        return $"Welcome to the Admin Dashboard! I can help you with organization-wide analytics about attendance, " +
-               $"late trends, leave requests, departments, and employee statistics. " +
-               $"What would you like to analyze?";
+            EmployeeName = employee?.FullName ?? "Тодорхойгүй",
+            Department = employee?.Department?.Name ?? "Тодорхойгүй",
+            LeaveBalance = Math.Max(annualLeaveAllowance - usedLeaveDays, 0),
+            IsCheckedInToday = todayRecord?.CheckInTime != null,
+            LastCheckIn = todayRecord?.CheckInTime,
+            LastCheckOut = lastRecord?.CheckOutTime
+        };
     }
 }

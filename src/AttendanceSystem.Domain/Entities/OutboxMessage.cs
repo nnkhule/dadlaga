@@ -18,7 +18,7 @@ public class OutboxMessage : BaseEntity
     public static OutboxMessage Create(string eventType, string payload)
         => new() { EventType = eventType, Payload = payload };
 
-    public void MarkProcessed() { ProcessedAt = DateTime.UtcNow; SetUpdated(); }
+    public void MarkProcessed() { ProcessedAt = DateTime.Now; SetUpdated(); }
 
     public void MarkFailed(string error)
     {

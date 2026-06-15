@@ -40,28 +40,50 @@
     </div>
 
     <div class="card animate-fade-in-up">
-        <div class="section-title"><h2>Сүүлийн 30 хоногийн ирц</h2></div>
-        <div class="table-responsive">
-            <table class="data-table">
-                <thead>
-                    <tr><th>Огноо</th><th>Ирсэн</th><th>Явсан</th><th>Нийт</th><th>Төлөв</th></tr>
-                </thead>
-                <tbody>
-                    @if (WeekRows.Count == 0)
+            <div class="section-title"><h2>Attendance History</h2></div>
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Check In Time</th>
+                            <th>Check Out Time</th>
+                            <th>Work Hours</th>
+                            <th>Overtime Hours</th>
+                            <th>Late Minutes</th>
+                            <th>Status</th>
+                            <th>Verification Method</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                @if (WeekRows == null || !WeekRows.Any())
+                {
+                    <tr>
+                        <td colspan="8" class="muted">
+                            No attendance records found.
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var row in WeekRows)
                     {
-                        <tr><td colspan="5" class="muted">Ирцийн түүх олдсонгүй.</td></tr>
+                        <tr>
+                            <td>@row.Date</td>
+                            <td>@row.In</td>
+                            <td>@row.Out</td>
+                            <td>@row.Total</td>
+                            <td>@($"{row.Overtime:0.##}h")</td>
+                            <td>@row.LateMinutes</td>
+                            <td>@row.Status</td>
+                            <td>GPS</td>
+                        </tr>
                     }
-                    else
-                    {
-                        @foreach (var row in WeekRows)
-                        {
-                            <tr><td>@row.Date</td><td>@row.In</td><td>@row.Out</td><td>@row.Total</td><td><StatusBadge Status="@row.Status" /></td></tr>
-                        }
-                    }
-                </tbody>
-            </table>
+                }
+            </tbody>
+                </table>
+            </div>
         </div>
-    </div>
 </div>
 
 @code {
@@ -186,6 +208,8 @@
                 x.CheckInTime?.ToString("HH:mm") ?? "--",
                 x.CheckOutTime?.ToString("HH:mm") ?? "--",
                 $"{x.WorkHours:0.##}h",
+                x.OvertimeHours,
+                x.LateMinutes,
                 x.Status ?? x.AttendanceStatus ?? "Pending")).ToList();
         }
         catch (Exception ex)
@@ -193,6 +217,7 @@
             Error = ex.Message;
             WeekRows = [];
         }
+
     }
 
     public async ValueTask DisposeAsync()
@@ -212,5 +237,15 @@
         }
     }
 
-    private sealed record Row(string Date, string In, string Out, string Total, string Status);
+
+    
+private sealed record Row(
+    string Date,
+    string In,
+    string Out,
+    string Total,
+    decimal Overtime,
+    decimal LateMinutes,
+    string Status
+    );
 }

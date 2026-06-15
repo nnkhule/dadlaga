@@ -204,56 +204,7 @@ else
             </div>
         </div>
 
-        <!-- Section 5: GPS Statistics -->
-        <div class="card animate-fade-in-up">
-            <div class="section-title"><h2>GPS Statistics</h2></div>
-            <div class="row g-4">
-                <div class="col-12 col-md-3">
-                    <StatCard Title="Total GPS Records" Value=@(stats.GpsStatistics.TotalGpsRecords.ToString()) Icon="📍" Color="Info" />
-                </div>
-                <div class="col-12 col-md-3">
-                    <StatCard Title="Last GPS Activity" Value=@(stats.GpsStatistics.LastGpsActivity.ToString("yyyy-MM-dd HH:mm")) Icon="⏰" Color="Primary" />
-                </div>
-                <div class="col-12 col-md-3">
-                    <StatCard Title="Office Check-ins" Value=@(stats.GpsStatistics.OfficeCheckins.ToString()) Icon="🏢" Color="Success" />
-                </div>
-                <div class="col-12 col-md-3">
-                    <StatCard Title="Remote Check-ins" Value=@(stats.GpsStatistics.RemoteCheckins.ToString()) Icon="🏠" Color="Secondary" />
-                </div>
-            </div>
 
-            @if (stats.GpsStatistics.GpsHistory != null && stats.GpsStatistics.GpsHistory.Any())
-            {
-                <div class="card mt-4">
-                    <div class="section-title"><h2>GPS History</h2></div>
-                    <div class="table-responsive">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Timestamp</th>
-                                    <th>Latitude</th>
-                                    <th>Longitude</th>
-                                    <th>Office Check-in</th>
-                                    <th>Location</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var ping in stats.GpsStatistics.GpsHistory)
-                                {
-                                    <tr>
-                                        <td>@ping.Timestamp.ToString("yyyy-MM-dd HH:mm")</td>
-                                        <td>@ping.Latitude.ToString("0.000000")</td>
-                                        <td>@ping.Longitude.ToString("0.000000")</td>
-                                        <td>@(ping.IsOfficeCheckin ? "Yes" : "No")</td>
-                                        <td>@ping.Location</td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            }
-        </div>
     </div>
 }
 

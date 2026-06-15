@@ -96,7 +96,7 @@ public sealed class EmployeesApiController : ControllerBase
             request.DepartmentId.Value,
             scheduleId,
             officeId,
-            request.HireDate ?? DateOnly.FromDateTime(DateTime.UtcNow),
+            request.HireDate ?? DateOnly.FromDateTime(DateTime.Now),
             ContractType.FullTime,
             request.DateOfBirth,
             request.Phone);

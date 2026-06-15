@@ -34,7 +34,7 @@ public class Notification : BaseEntity
     public void MarkRead()
     {
         IsRead = true;
-        ReadAt = DateTime.UtcNow;
+        ReadAt = DateTime.Now;
         SetUpdated();
     }
 }

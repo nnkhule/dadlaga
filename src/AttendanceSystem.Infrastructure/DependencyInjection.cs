@@ -50,7 +50,7 @@ public static class DependencyInjection
         services.AddScoped<PasswordService>();
 
         // AI Services
-        services.AddScoped<IAiProvider, DefaultAiProvider>();
+        services.AddHttpClient<IAiProvider, DefaultAiProvider>();
         services.AddScoped<IAiChatService, AiChatService>();
 
         var redis = configuration.GetConnectionString("Redis");

@@ -50,7 +50,7 @@ public class PasswordService
             return (true, "If the email exists, a password reset link has been sent.");
 
         var token = await _userManager.GeneratePasswordResetTokenAsync(user);
-        var resetToken = PasswordResetToken.Create(user.Id, token, DateTime.UtcNow.AddMinutes(PasswordResetTokenExpiryMinutes));
+        var resetToken = PasswordResetToken.Create(user.Id, token, DateTime.Now.AddMinutes(PasswordResetTokenExpiryMinutes));
         await _dbContext.PasswordResetTokens.AddAsync(resetToken);
         await _dbContext.SaveChangesAsync();
 
@@ -75,7 +75,7 @@ public class PasswordService
                 t.UserId == user.Id &&
                 t.Token == token &&
                 !t.IsUsed &&
-                t.ExpiresAt > DateTime.UtcNow);
+                t.ExpiresAt > DateTime.Now);
 
         if (resetToken is null)
             return (false, "Invalid or expired password reset token.");

@@ -40,7 +40,7 @@ public class CheckOutCommandHandler : IRequestHandler<CheckOutCommand, Result<At
         if (employee?.WorkSchedule is null || employee.OfficeLocation is null)
             return Result<AttendanceRecordDto>.Failure("Employee not configured.", "CONFIG_MISSING");
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(DateTime.Now);
         var record = await _attendanceRepository.GetTodayRecordAsync(request.EmployeeId, today, cancellationToken);
         if (record is null)
             return Result<AttendanceRecordDto>.Failure("No check-in found for today.", "NO_CHECKIN");
@@ -55,7 +55,7 @@ public class CheckOutCommandHandler : IRequestHandler<CheckOutCommand, Result<At
                 employee.OfficeLocation.RadiusMeters))
             return Result<AttendanceRecordDto>.Failure("Та ажлын байрнаас хол байна", "OUT_OF_RANGE");
 
-        var checkOutTime = DateTime.UtcNow;
+        var checkOutTime = DateTime.Now;
         var workDuration = checkOutTime - record.CheckInTime;
         var breakDuration = _rulesService.CalculateBreakDuration(workDuration, employee.WorkSchedule);
         var isWeekend = today.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;

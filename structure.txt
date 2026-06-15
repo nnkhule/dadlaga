@@ -1,0 +1,193 @@
+src
+│
+├── AttendanceSystem.API
+│   │
+│   ├── Program.cs
+│   ├── appsettings.json
+│   ├── appsettings.Development.json
+│   │
+│   ├── Controllers
+│   │   ├── AiController.cs
+│   │   ├── AttendanceController.cs
+│   │   ├── AuthController.cs
+│   │   ├── DashboardApiController.cs
+│   │   ├── DepartmentsApiController.cs
+│   │   ├── EmployeesApiController.cs
+│   │   ├── EmployeeStatisticsController.cs
+│   │   ├── EnterpriseApiControllers.cs
+│   │   ├── LeaveController.cs
+│   │   ├── NotificationsApiController.cs
+│   │   ├── ReportsApiController.cs
+│   │   └── SettingsApiController.cs
+│   │
+│   ├── Dtos
+│   │   └── EmployeeStatisticsDto.cs
+│   │
+│   └── Services
+│       ├── EmployeeStatisticsService.cs
+│       └── IEmployeeStatisticsService.cs
+│
+├── AttendanceSystem.Application
+│   │
+│   ├── DependencyInjection.cs
+│   │
+│   ├── Common
+│   │   └── Result.cs
+│   │
+│   ├── Configuration
+│   │   ├── AttendanceRulesOptions.cs
+│   │   └── JwtSettings.cs
+│   │
+│   ├── DTOs
+│   │   ├── AI
+│   │   │   ├── AdminAiContextDto.cs
+│   │   │   ├── ChatRequestDto.cs
+│   │   │   ├── ChatResponseDto.cs
+│   │   │   └── EmployeeAiContextDto.cs
+│   │   │
+│   │   ├── Attendance
+│   │   │   ├── AttendanceHistoryItemDto.cs
+│   │   │   ├── AttendanceRecordDto.cs
+│   │   │   └── AttendanceStatisticsDto.cs
+│   │   │
+│   │   └── Auth
+│   │       ├── ChangePasswordDto.cs
+│   │       ├── ForgotPasswordDto.cs
+│   │       ├── LoginRequestDto.cs
+│   │       ├── ResetPasswordDto.cs
+│   │       ├── SetupEmployeeAccountDto.cs
+│   │       └── TokenResponseDto.cs
+│   │
+│   ├── Features
+│   │   └── Attendance
+│   │       ├── Commands
+│   │       │   ├── CheckIn
+│   │       │   └── CheckOut
+│   │       │
+│   │       └── Queries
+│   │           ├── GetAttendanceStatistics
+│   │           └── GetTodayAttendance
+│   │
+│   ├── Interfaces
+│   │   ├── IAiChatService.cs
+│   │   ├── IAiProvider.cs
+│   │   ├── IGeofenceService.cs
+│   │   ├── IUnitOfWork.cs
+│   │   ├── Repositories
+│   │   │   ├── IAttendanceRepository.cs
+│   │   │   └── IEmployeeRepository.cs
+│   │
+│   └── Services
+│       ├── AttendanceRulesService.cs
+│       └── GeofenceService.cs
+│
+├── AttendanceSystem.Blazor
+│   │
+│   ├── Program.cs
+│   │
+│   ├── Components
+│   │   │
+│   │   ├── Layout
+│   │   │   ├── AdminLayout.razor
+│   │   │   ├── AuthLayout.razor
+│   │   │   ├── EmployeeLayout.razor
+│   │   │   ├── Footer.razor
+│   │   │   ├── MainLayout.razor
+│   │   │   ├── Navbar.razor
+│   │   │   ├── NavMenu.razor
+│   │   │   ├── ReconnectModal.razor
+│   │   │   └── Sidebar.razor
+│   │   │
+│   │   ├── Pages
+│   │   │   │
+│   │   │   ├── Admin
+│   │   │   │   ├── AiChat.razor
+│   │   │   │   ├── Attendance.razor
+│   │   │   │   ├── Dashboard.razor
+│   │   │   │   ├── Employees.razor
+│   │   │   │   ├── Leave.razor
+│   │   │   │   └── Reports.razor
+│   │   │   │
+│   │   │   ├── Employee
+│   │   │   │   ├── AiChat.razor
+│   │   │   │   ├── Attendance.razor
+│   │   │   │   ├── Leave.razor
+│   │   │   │   ├── Profile.razor
+│   │   │   │   └── Statistics.razor
+│   │   │   │
+│   │   │   ├── Auth
+│   │   │   │   ├── Login.razor
+│   │   │   │   ├── ForgotPassword.razor
+│   │   │   │   ├── ResetPassword.razor
+│   │   │   │   └── ChangePassword.razor
+│   │   │   │
+│   │   │   ├── Dashboard
+│   │   │   │   └── Dashboard.razor
+│   │   │   │
+│   │   │   ├── Departments
+│   │   │   │   ├── DepartmentDetails.razor
+│   │   │   │   ├── DepartmentEdit.razor
+│   │   │   │   └── DepartmentList.razor
+│   │   │   │
+│   │   │   ├── Employees
+│   │   │   │   ├── EmployeeCreate.razor
+│   │   │   │   ├── EmployeeDetails.razor
+│   │   │   │   └── EmployeeList.razor
+│   │   │   │
+│   │   │   ├── Notifications
+│   │   │   │   └── Notifications.razor
+│   │   │   │
+│   │   │   ├── Reports
+│   │   │   │   └── Reports.razor
+│   │   │   │
+│   │   │   └── Settings
+│   │   │       └── Settings.razor
+│   │   │
+│   │   └── Shared
+│   │       ├── CheckInButton.razor
+│   │       ├── EmptyState.razor
+│   │       ├── GpsStatusCard.razor
+│   │       ├── LoadingSpinner.razor
+│   │       ├── NotificationBell.razor
+│   │       ├── PageHeader.razor
+│   │       ├── Pagination.razor
+│   │       ├── SettingsRow.razor
+│   │       ├── StatCard.razor
+│   │       └── StatusBadge.razor
+│   │
+│   ├── Models
+│   │   ├── ApiModels.cs
+│   │   ├── AttendanceRecord.cs
+│   │   ├── DashboardStats.cs
+│   │   ├── Department.cs
+│   │   ├── Employee.cs
+│   │   └── LeaveRequest.cs
+│
+├── AttendanceSystem.Domain
+│   │
+│   ├── Entities
+│   │   ├── Employee.cs
+│   │   ├── AttendanceRecord.cs
+│   │   ├── LeaveRequest.cs
+│   │   ├── Department.cs
+│   │   └── WorkSchedule.cs
+│   │
+│   └── Enums
+│       ├── AttendanceStatus.cs
+│       ├── RequestStatus.cs
+│       └── VerificationMethod.cs
+│
+└── AttendanceSystem.Infrastructure
+    │
+    ├── DependencyInjection.cs
+    │
+    ├── Persistence
+    │   ├── ApplicationDbContext.cs
+    │   └── Configurations
+    │
+    ├── Repositories
+    │
+    └── Services
+        ├── AiChatService.cs
+        ├── DefaultAiProvider.cs
+        └── JwtService.cs
