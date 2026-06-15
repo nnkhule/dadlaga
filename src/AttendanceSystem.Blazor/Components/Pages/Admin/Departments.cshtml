@@ -1,0 +1,30 @@
+@page
+@model AttendanceSystem.AdminPanel.Pages.DepartmentsModel
+@{ ViewData["Title"] = "Хэлтэс"; Layout = null; }
+<!DOCTYPE html><html lang="mn"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Хэлтэс — Attendance Admin</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>*{font-family:sans-serif;}body{background:#0f172a;}.card{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);}</style>
+</head><body class="min-h-screen text-white">
+<main class="p-8">
+  <div class="mb-6">
+    <a href="/Dashboard" class="text-blue-400 hover:text-blue-300 text-sm mb-2 inline-block">← Dashboard</a>
+    <h2 class="text-2xl font-bold">Хэлтэсүүд</h2>
+  </div>
+  @if (!string.IsNullOrEmpty(Model.ApiError))
+  { <div class="bg-red-900/30 border border-red-700/50 rounded-xl p-4 mb-4 text-red-300">⚠ @Model.ApiError</div> }
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    @foreach (var d in Model.Departments)
+    {
+      <div class="card rounded-xl p-5">
+        <h3 class="text-white font-semibold text-lg mb-1">@d.Name</h3>
+        <p class="text-slate-400 text-sm mb-3">@(d.Description ?? "Тайлбар байхгүй")</p>
+        <p class="text-blue-300 text-sm font-medium">👥 @d.EmployeeCount ажилтан</p>
+      </div>
+    }
+    @if (Model.Departments.Count == 0)
+    { <p class="text-slate-400 col-span-3">Хэлтэс олдсонгүй</p> }
+  </div>
+</main>
+</body></html>

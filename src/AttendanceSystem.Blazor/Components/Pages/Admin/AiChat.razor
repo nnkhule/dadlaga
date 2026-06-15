@@ -4,7 +4,7 @@
 @using System.Text.Json
 @inject HttpClient Http
 @inject IJSRuntime JS
-@attribute [Authorize(Roles = "Admin,HR")]
+@attribute [Authorize(Roles = "Admin,SuperAdmin,HRManager,HR")]
 
 
 <PageHeader Title="AI Туслах" Subtitle="Систем дотроос асуулт асуу, шуурхай хариулт ав" />

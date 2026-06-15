@@ -49,11 +49,11 @@
     </aside>
     <main class="content-wrap">@Body</main>
     <nav class="mobile-bottom-nav">
-        @MobileItem("/attendance", "⌖", "Нүүр")
-        @MobileItem("/attendance", "◷", "Ирц")
-        @MobileItem("/leave", "☑", "Чөлөө")
-        @MobileItem("/profile", "◎", "Профайл")
-        @MobileItem("/employee/ai-chat", "🤖", "AI Assistant")
+        @NavItem("/attendance", "⌖", "Нүүр")
+            @NavItem("/leave", "☑", "Чөлөө")
+            @NavItem("/profile", "◎", "Профайл")
+            @NavItem("/statistic", "⚙", "Статистик")
+            @NavItem("/employee/ai-chat", "🤖", "AI Assistant")
     </nav>
 </div>
 

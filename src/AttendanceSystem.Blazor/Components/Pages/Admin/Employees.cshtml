@@ -1,0 +1,67 @@
+@page
+@model AttendanceSystem.AdminPanel.Pages.EmployeesModel
+@{
+    ViewData["Title"] = "Ажилтнууд";
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="mn"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Ажилтнууд — Attendance Admin</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>* { font-family: sans-serif; } body { background: #0f172a; } .card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); }</style>
+</head>
+<body class="min-h-screen text-white">
+<div class="flex h-screen">
+  @await Html.PartialAsync("_Sidebar", "Employees")
+  <main class="flex-1 overflow-auto p-8">
+    <div class="flex items-center justify-between mb-6">
+      <h2 class="text-2xl font-bold text-white">Ажилтнууд</h2>
+      <span class="text-slate-400 text-sm">Нийт: @Model.TotalCount</span>
+    </div>
+    <form method="get" class="mb-4 flex gap-3">
+      <input name="Search" value="@Model.Search" placeholder="Нэрэр хайх..." 
+             class="bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-white text-sm w-64 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+      <button type="submit" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-sm text-white transition">Хайх</button>
+    </form>
+    @if (!string.IsNullOrEmpty(Model.ApiError))
+    {
+      <div class="bg-red-900/30 border border-red-700/50 rounded-xl p-4 mb-4 text-red-300">⚠ @Model.ApiError</div>
+    }
+    <div class="card rounded-xl overflow-hidden">
+      <table class="w-full text-sm">
+        <thead class="bg-slate-800/50">
+          <tr>
+            <th class="text-left px-4 py-3 text-slate-300 font-medium">Нэр</th>
+            <th class="text-left px-4 py-3 text-slate-300 font-medium">И-мэйл</th>
+            <th class="text-left px-4 py-3 text-slate-300 font-medium">Хэлтэс</th>
+            <th class="text-left px-4 py-3 text-slate-300 font-medium">Албан тушаал</th>
+            <th class="text-left px-4 py-3 text-slate-300 font-medium">Төлөв</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-700/50">
+          @foreach (var emp in Model.Employees)
+          {
+            <tr class="hover:bg-slate-800/30 transition">
+              <td class="px-4 py-3 text-white font-medium">@emp.FullName</td>
+              <td class="px-4 py-3 text-slate-300">@emp.Email</td>
+              <td class="px-4 py-3 text-slate-300">@(emp.DepartmentName ?? "—")</td>
+              <td class="px-4 py-3 text-slate-300">@(emp.Position ?? "—")</td>
+              <td class="px-4 py-3">
+                @if (emp.IsActive)
+                { <span class="bg-green-900/40 text-green-300 px-2 py-0.5 rounded text-xs">Идэвхтэй</span> }
+                else
+                { <span class="bg-slate-700 text-slate-400 px-2 py-0.5 rounded text-xs">Идэвхгүй</span> }
+              </td>
+            </tr>
+          }
+          @if (Model.Employees.Count == 0)
+          {
+            <tr><td colspan="5" class="px-4 py-8 text-center text-slate-400">Ажилтан олдсонгүй</td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </main>
+</div>
+</body></html>

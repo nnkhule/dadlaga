@@ -1,3 +1,4 @@
+
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
@@ -11,6 +12,10 @@ public class PersistingAuthenticationStateProvider : AuthenticationStateProvider
     private const string TokenKey = "attendance.accessToken";
     private readonly IJSRuntime _jsRuntime;
 
+    // Prerender үед anonymous state буцаана — JS ажилладаггүй тул
+    private static readonly Task<AuthenticationState> _anonymous =
+        Task.FromResult(new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity())));
+
     public PersistingAuthenticationStateProvider(IJSRuntime jsRuntime)
     {
         _jsRuntime = jsRuntime;
@@ -20,16 +25,45 @@ public class PersistingAuthenticationStateProvider : AuthenticationStateProvider
     {
         try
         {
-            var token = await _jsRuntime.InvokeAsync<string>("localStorage.getItem", TokenKey);
+            // Prerender (SSR) үед IJSRuntime ажилладаггүй — anonymous буцаана
+            if (_jsRuntime is IJSInProcessRuntime)
+            {
+                // WebAssembly — шууд ажиллана
+            }
+            else
+            {
+                // Server-side: prerender болон interactive хоёуланд ажиллана
+                // Харин prerender үед InvokeAsync exception шидэж болно
+            }
+
+            string? token;
+            try
+            {
+                token = await _jsRuntime.InvokeAsync<string?>("localStorage.getItem", TokenKey);
+            }
+            catch (InvalidOperationException)
+            {
+                // Prerender үед JS interop боломжгүй — anonymous буцаана
+                return await _anonymous;
+            }
+            catch (JSException)
+            {
+                return await _anonymous;
+            }
+
             if (string.IsNullOrWhiteSpace(token))
-                return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
+                return await _anonymous;
+
+            // Token хугацаа дууссан эсэх шалгах
+            if (IsTokenExpired(token))
+                return await _anonymous;
 
             var identity = BuildClaimsIdentity(token);
             return new AuthenticationState(new ClaimsPrincipal(identity));
         }
         catch
         {
-            return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
+            return await _anonymous;
         }
     }
 
@@ -41,64 +75,63 @@ public class PersistingAuthenticationStateProvider : AuthenticationStateProvider
 
     public void NotifyUserLogout()
     {
-        NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()))));
+        NotifyAuthenticationStateChanged(_anonymous);
+    }
+
+    private static bool IsTokenExpired(string jwt)
+    {
+        var payload = GetPayload(jwt);
+        if (payload is null) return true;
+
+        if (payload.Value.TryGetProperty("exp", out var exp) && exp.ValueKind == JsonValueKind.Number)
+        {
+            var expiry = DateTimeOffset.FromUnixTimeSeconds(exp.GetInt64());
+            return expiry < DateTimeOffset.UtcNow;
+        }
+        return false;
     }
 
     private static ClaimsIdentity BuildClaimsIdentity(string accessToken)
     {
         var identity = new ClaimsIdentity("jwt");
-        var payload = GetPayload(accessToken);
-        if (!payload.HasValue)
-            return identity;
+        var payload  = GetPayload(accessToken);
+        if (payload is null) return identity;
 
-        var payloadElement = payload.Value;
+        var p = payload.Value;
 
-        void AddClaim(string claimType, string? value)
+        void Add(string type, string? value)
         {
             if (!string.IsNullOrWhiteSpace(value))
-                identity.AddClaim(new Claim(claimType, value!));
+                identity.AddClaim(new Claim(type, value!));
         }
 
-        if (payloadElement.TryGetProperty("sub", out var sub) && sub.ValueKind == JsonValueKind.String)
-            AddClaim(ClaimTypes.NameIdentifier, sub.GetString());
+        if (p.TryGetProperty("sub",   out var sub)   && sub.ValueKind   == JsonValueKind.String) Add(ClaimTypes.NameIdentifier, sub.GetString());
+        if (p.TryGetProperty("name",  out var name)  && name.ValueKind  == JsonValueKind.String) Add(ClaimTypes.Name,           name.GetString());
+        if (p.TryGetProperty("email", out var email) && email.ValueKind == JsonValueKind.String) Add(ClaimTypes.Email,          email.GetString());
 
-        if (payloadElement.TryGetProperty("name", out var name) && name.ValueKind == JsonValueKind.String)
-            AddClaim(ClaimTypes.Name, name.GetString());
-
-        if (payloadElement.TryGetProperty("email", out var email) && email.ValueKind == JsonValueKind.String)
-            AddClaim(ClaimTypes.Email, email.GetString());
-
-        var roleProperties = new[]
+        // Role claim-ууд — ASP.NET Identity-н урт нэр болон богино нэр хоёуланг дэмжих
+        foreach (var key in new[]
         {
             "role",
             "roles",
             "http://schemas.microsoft.com/ws/2008/06/identity/claims/role"
-        };
-
-        foreach (var roleProperty in roleProperties)
+        })
         {
-            if (!payloadElement.TryGetProperty(roleProperty, out var roleValue))
-                continue;
+            if (!p.TryGetProperty(key, out var roleVal)) continue;
 
-            if (roleValue.ValueKind == JsonValueKind.String)
-            {
-                AddClaim(ClaimTypes.Role, roleValue.GetString());
-            }
-            else if (roleValue.ValueKind == JsonValueKind.Array)
-            {
-                foreach (var item in roleValue.EnumerateArray())
-                {
+            if (roleVal.ValueKind == JsonValueKind.String)
+                Add(ClaimTypes.Role, roleVal.GetString());
+            else if (roleVal.ValueKind == JsonValueKind.Array)
+                foreach (var item in roleVal.EnumerateArray())
                     if (item.ValueKind == JsonValueKind.String)
-                        AddClaim(ClaimTypes.Role, item.GetString());
-                }
-            }
+                        Add(ClaimTypes.Role, item.GetString());
         }
 
-        if (!identity.HasClaim(c => c.Type == ClaimTypes.Name) && identity.HasClaim(c => c.Type == ClaimTypes.Email))
-            AddClaim(ClaimTypes.Name, identity.FindFirst(ClaimTypes.Email)?.Value);
-
-        if (!identity.HasClaim(c => c.Type == ClaimTypes.Name) && identity.HasClaim(c => c.Type == ClaimTypes.NameIdentifier))
-            AddClaim(ClaimTypes.Name, identity.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+        // Name fallback
+        if (!identity.HasClaim(c => c.Type == ClaimTypes.Name))
+            Add(ClaimTypes.Name,
+                identity.FindFirst(ClaimTypes.Email)?.Value
+                ?? identity.FindFirst(ClaimTypes.NameIdentifier)?.Value);
 
         return identity;
     }
@@ -106,23 +139,17 @@ public class PersistingAuthenticationStateProvider : AuthenticationStateProvider
     private static JsonElement? GetPayload(string jwt)
     {
         var parts = jwt.Split('.');
-        if (parts.Length < 2)
-            return null;
+        if (parts.Length < 2) return null;
 
-        var payload = parts[1]
-            .Replace('-', '+')
-            .Replace('_', '/');
-        payload = payload.PadRight(payload.Length + (4 - payload.Length % 4) % 4, '=');
+        var b64 = parts[1].Replace('-', '+').Replace('_', '/');
+        b64 = b64.PadRight(b64.Length + (4 - b64.Length % 4) % 4, '=');
 
         try
         {
-            var json = Encoding.UTF8.GetString(Convert.FromBase64String(payload));
-            using var document = JsonDocument.Parse(json);
-            return document.RootElement.Clone();
+            var json = Encoding.UTF8.GetString(Convert.FromBase64String(b64));
+            using var doc = JsonDocument.Parse(json);
+            return doc.RootElement.Clone();
         }
-        catch
-        {
-            return null;
-        }
+        catch { return null; }
     }
 }

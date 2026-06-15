@@ -1,0 +1,64 @@
+@page
+@model AttendanceSystem.AdminPanel.Pages.ReportsModel
+@{ ViewData["Title"] = "Тайлан"; Layout = null; }
+<!DOCTYPE html><html lang="mn"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Тайлан — Attendance Admin</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>*{font-family:sans-serif;}body{background:#0f172a;}.card{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);}</style>
+</head><body class="min-h-screen text-white">
+<main class="p-8 max-w-4xl mx-auto">
+  <div class="mb-6">
+    <a href="/Dashboard" class="text-blue-400 hover:text-blue-300 text-sm mb-2 inline-block">← Dashboard</a>
+    <h2 class="text-2xl font-bold">Тайлан гаргах</h2>
+  </div>
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div class="card rounded-xl p-6">
+      <h3 class="text-white font-semibold mb-3">📅 Сарын ирцийн тайлан</h3>
+      <form method="get" asp-page-handler="Monthly">
+        <div class="flex gap-2 mb-3">
+          <input type="month" name="Month" value="@DateTime.Now.ToString("yyyy-MM")"
+                 class="flex-1 bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm"/>
+        </div>
+        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 rounded-lg py-2 text-sm text-white transition">Тайлан харах</button>
+      </form>
+    </div>
+    <div class="card rounded-xl p-6">
+      <h3 class="text-white font-semibold mb-3">👥 Хэлтсийн тайлан</h3>
+      <form method="get" asp-page-handler="Department">
+        <div class="flex gap-2 mb-3">
+          <input type="month" name="Month" value="@DateTime.Now.ToString("yyyy-MM")"
+                 class="flex-1 bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm"/>
+        </div>
+        <button type="submit" class="w-full bg-purple-600 hover:bg-purple-700 rounded-lg py-2 text-sm text-white transition">Тайлан харах</button>
+      </form>
+    </div>
+  </div>
+  @if (Model.ReportData.Count > 0)
+  {
+    <div class="card rounded-xl mt-6 overflow-hidden">
+      <div class="px-4 py-3 bg-slate-800/50 flex items-center justify-between">
+        <h3 class="text-white font-medium">Тайлангийн үр дүн</h3>
+        <span class="text-slate-400 text-sm">@Model.ReportTitle</span>
+      </div>
+      <table class="w-full text-sm">
+        <thead class="bg-slate-800/30">
+          <tr>
+            @foreach (var header in Model.ReportHeaders)
+            { <th class="text-left px-4 py-2 text-slate-300">@header</th> }
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-700/50">
+          @foreach (var row in Model.ReportData)
+          {
+            <tr class="hover:bg-slate-800/20">
+              @foreach (var cell in row)
+              { <td class="px-4 py-2 text-slate-200">@cell</td> }
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</main>
+</body></html>

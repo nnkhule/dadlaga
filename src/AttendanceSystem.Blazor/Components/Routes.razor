@@ -1,17 +1,28 @@
-﻿<Router AppAssembly="@typeof(Program).Assembly">
+﻿
+@using Microsoft.AspNetCore.Components.Authorization
+@inject NavigationManager Navigation
+
+<Router AppAssembly="@typeof(Program).Assembly">
     <Found Context="routeData">
         <AuthorizeRouteView RouteData="@routeData"
                    DefaultLayout="@typeof(MainLayout)">
             <NotAuthorized>
-                <p>Уучлаарай, та энэ хуудсыг үзэх эрхгүй байна.</p>
+                @{
+                    // Login хуудас биш бол redirect хийх
+                    var current = new Uri(Navigation.Uri).PathAndQuery;
+                    if (!current.StartsWith("/login", StringComparison.OrdinalIgnoreCase))
+                    {
+                        Navigation.NavigateTo($"/login?returnUrl={Uri.EscapeDataString(current)}", replace: true);
+                    }
+                }
+                <p>Нэвтэрч байна...</p>
             </NotAuthorized>
             <Authorizing>
                 <p>Шалгаж байна...</p>
             </Authorizing>
         </AuthorizeRouteView>
     </Found>
-
     <NotFound>
-        <p>Page not found.</p>
+        <p>Хуудас олдсонгүй.</p>
     </NotFound>
 </Router>

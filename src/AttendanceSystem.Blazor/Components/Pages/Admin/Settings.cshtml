@@ -1,0 +1,40 @@
+@page
+@model AttendanceSystem.AdminPanel.Pages.SettingsModel
+@{ ViewData["Title"] = "Тохиргоо"; Layout = null; }
+<!DOCTYPE html><html lang="mn"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Тохиргоо — Attendance Admin</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>*{font-family:sans-serif;}body{background:#0f172a;}.card{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);}</style>
+</head><body class="min-h-screen text-white">
+<main class="p-8 max-w-3xl mx-auto">
+  <div class="mb-6">
+    <a href="/Dashboard" class="text-blue-400 hover:text-blue-300 text-sm mb-2 inline-block">← Dashboard</a>
+    <h2 class="text-2xl font-bold">Тохиргоо</h2>
+  </div>
+  @if (Model.Saved) {
+    <div class="bg-green-900/30 border border-green-700/50 rounded-xl p-4 mb-4 text-green-300">✓ Тохиргоо хадгалагдлаа</div>
+  }
+  <form method="post" class="space-y-4">
+    @Html.AntiForgeryToken()
+    <div class="card rounded-xl p-6">
+      <h3 class="text-white font-semibold mb-4">⏰ Ирцийн дүрэм</h3>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-slate-300 text-sm mb-1">Хоцролтын хязгаар (минут)</label>
+          <input type="number" name="GraceMinutes" value="@Model.GraceMinutes"
+                 class="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white"/>
+        </div>
+        <div>
+          <label class="block text-slate-300 text-sm mb-1">Ажлын цагийн эхлэл</label>
+          <input type="time" name="WorkStartTime" value="@Model.WorkStartTime"
+                 class="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white"/>
+        </div>
+      </div>
+    </div>
+    <button type="submit" class="bg-blue-600 hover:bg-blue-700 px-6 py-2.5 rounded-lg text-white text-sm font-medium transition">
+      Хадгалах
+    </button>
+  </form>
+</main>
+</body></html>

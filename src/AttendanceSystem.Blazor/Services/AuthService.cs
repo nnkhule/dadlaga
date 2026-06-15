@@ -88,6 +88,7 @@ public sealed class AuthService
     private static bool IsAdminRole(string role)
         => role.Equals("Admin", StringComparison.OrdinalIgnoreCase)
            || role.Equals("SuperAdmin", StringComparison.OrdinalIgnoreCase)
+           || role.Equals("HRManager", StringComparison.OrdinalIgnoreCase)
            || role.Equals("HR", StringComparison.OrdinalIgnoreCase)
            || role.Equals("Manager", StringComparison.OrdinalIgnoreCase);
 

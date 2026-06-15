@@ -1,0 +1,73 @@
+@page
+@model AttendanceSystem.AdminPanel.Pages.AttendanceModel
+@{ ViewData["Title"] = "Ирц"; Layout = null; }
+<!DOCTYPE html><html lang="mn"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Ирц — Attendance Admin</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>*{font-family:sans-serif;}body{background:#0f172a;}.card{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);}</style>
+</head><body class="min-h-screen text-white">
+<div class="flex h-screen">
+  <main class="flex-1 overflow-auto p-8">
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <a href="/Dashboard" class="text-blue-400 hover:text-blue-300 text-sm mb-2 inline-block">← Dashboard</a>
+        <h2 class="text-2xl font-bold">Ирцийн бүртгэл</h2>
+      </div>
+    </div>
+    <form method="get" class="mb-4 flex gap-3 items-center">
+      <label class="text-slate-300 text-sm">Огноо:</label>
+      <input type="date" name="Date" value="@(Model.Date ?? DateTime.Now.ToString("yyyy-MM-dd"))"
+             class="bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+      <button type="submit" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-sm text-white">Харах</button>
+    </form>
+    @if (!string.IsNullOrEmpty(Model.ApiError))
+    { <div class="bg-red-900/30 border border-red-700/50 rounded-xl p-4 mb-4 text-red-300">⚠ @Model.ApiError</div> }
+    <div class="card rounded-xl overflow-hidden">
+      <table class="w-full text-sm">
+        <thead class="bg-slate-800/50">
+          <tr>
+            <th class="text-left px-4 py-3 text-slate-300">Нэр</th>
+            <th class="text-left px-4 py-3 text-slate-300">Ирсэн цаг</th>
+            <th class="text-left px-4 py-3 text-slate-300">Гарсан цаг</th>
+            <th class="text-left px-4 py-3 text-slate-300">Төлөв</th>
+            <th class="text-left px-4 py-3 text-slate-300">Хоцролт</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-700/50">
+          @foreach (var r in Model.Records)
+          {
+            <tr class="hover:bg-slate-800/30">
+              <td class="px-4 py-3 text-white font-medium">@r.EmployeeName</td>
+              <td class="px-4 py-3 text-green-300">@(r.CheckIn ?? "—")</td>
+              <td class="px-4 py-3 text-slate-300">@(r.CheckOut ?? "—")</td>
+              <td class="px-4 py-3">
+                @{
+                  var badgeClass = r.Status switch {
+                    "Present" => "bg-green-900/40 text-green-300",
+                    "Late"    => "bg-yellow-900/40 text-yellow-300",
+                    "Absent"  => "bg-red-900/40 text-red-300",
+                    _         => "bg-slate-700 text-slate-300"
+                  };
+                  var statusMn = r.Status switch {
+                    "Present"  => "Ирсэн",
+                    "Late"     => "Хоцорсон",
+                    "Absent"   => "Ирээгүй",
+                    "HalfDay"  => "Хагас өдөр",
+                    "OnLeave"  => "Чөлөөтэй",
+                    _ => r.Status
+                  };
+                }
+                <span class="@badgeClass px-2 py-0.5 rounded text-xs">@statusMn</span>
+              </td>
+              <td class="px-4 py-3 text-slate-300">@(r.LateMinutes.HasValue && r.LateMinutes > 0 ? $"{r.LateMinutes}мин" : "—")</td>
+            </tr>
+          }
+          @if (Model.Records.Count == 0)
+          { <tr><td colspan="5" class="px-4 py-8 text-center text-slate-400">Тухайн өдрийн бүртгэл байхгүй</td></tr> }
+        </tbody>
+      </table>
+    </div>
+  </main>
+</div>
+</body></html>
