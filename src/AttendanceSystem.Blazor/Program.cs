@@ -49,6 +49,9 @@ if (!app.Environment.IsDevelopment() || builder.Configuration["https_port"] is n
     app.UseHttpsRedirection();
 }
 
+app.UseAuthentication();
+app.UseAuthorization();
+
 app.UseAntiforgery();
 
 app.MapStaticAssets();

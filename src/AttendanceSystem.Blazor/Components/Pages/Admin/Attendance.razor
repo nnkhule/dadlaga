@@ -1,5 +1,7 @@
+
 @page "/admin/attendance"
 @layout AdminLayout
+@attribute [Authorize(Roles = "Admin,SuperAdmin,HRManager")] 
 @inject ApiClient Api
 
 <PageHeader Title="Attendance records" Subtitle="Attendance loaded from SQL Server" Icon="◇" />

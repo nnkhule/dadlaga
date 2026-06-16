@@ -2,6 +2,7 @@
 @inject NavigationManager Nav
 @inject ApiClient Api
 @inject AuthService Auth
+@inject HttpClient Http
 
 <div class="admin-shell @(_collapsed ? "collapsed" : "")">
     <aside class="admin-sidebar">
@@ -17,8 +18,8 @@
             <div class="admin-brand">
                 <span class="avatar" style="width:38px;height:38px;background:rgba(255,255,255,.16)">@GetInitial()</span>
                 <div>
-                    <h3 style="margin:0">@profile?.FullName ?? "Admin"</h3>
-                    <div class="muted">@Display(profile?.Department ?? profile?.DepartmentName)</div>
+                    <h3 style="margin:0">@(_displayName)</h3>
+                    <div class="muted">@(_displayRole)</div>
                 </div>
             </div>
             <button class="btn btn-logout mt-3" @onclick="LogoutAsync" disabled="@isLoggingOut">
@@ -46,25 +47,97 @@
 @code {
     private bool _collapsed;
     private bool isLoggingOut;
-    private EmployeeProfileDto? profile;
+    private string _displayName = "Admin";
+    private string _displayRole = "Administrator";
 
     protected override async Task OnInitializedAsync()
     {
+        // ApiClient ашиглахгүй — 401 бол автоматаар logout хийдэг тул
+        // Шууд HttpClient ашиглаж, токен гараар нэмж, 401-ийг чимээгүй алгасна
         try
         {
-            profile = await Api.GetAsync<EmployeeProfileDto>("api/employees/me");
+            var token = await Auth.GetTokenAsync();
+            if (string.IsNullOrWhiteSpace(token))
+                return;
+
+            // Токеноос нэр болон role уншина (API дуудалгүйгээр)
+            var (name, role) = ParseTokenClaims(token);
+            if (!string.IsNullOrWhiteSpace(name))
+                _displayName = name;
+            if (!string.IsNullOrWhiteSpace(role))
+                _displayRole = role;
+
+            // Employee profile байвал нэмж татна (SuperAdmin-д байхгүй — зүгээр)
+            using var request = new System.Net.Http.HttpRequestMessage(
+                System.Net.Http.HttpMethod.Get, "api/employees/me");
+            request.Headers.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+            var response = await Http.SendAsync(request);
+            if (response.IsSuccessStatusCode)
+            {
+                var profile = await response.Content
+                    .ReadFromJsonAsync<EmployeeProfileApiDto>();
+                if (profile is not null)
+                {
+                    _displayName = profile.FullName;
+                    _displayRole = profile.Department ?? _displayRole;
+                }
+            }
+            // 401 → SuperAdmin-д employee profile байхгүй нь нормал, алгасна
         }
         catch
         {
-            profile = null;
+            // Ямар ч алдаа гарсан layout ажилласаар байна
         }
     }
 
-    private string Breadcrumb => Nav.Uri.Contains("/admin/", StringComparison.OrdinalIgnoreCase) ? "Admin / " + Nav.Uri.Split('/').Last() : "Admin";
+    // JWT payload-аас нэр болон role-ийг унших (API дуудалгүйгээр)
+    private static (string Name, string Role) ParseTokenClaims(string jwt)
+    {
+        try
+        {
+            var parts = jwt.Split('.');
+            if (parts.Length < 2) return ("", "");
 
-    private RenderFragment NavItem(string href, string icon, string label) => @<a class="nav-link @(Nav.Uri.Contains(href, StringComparison.OrdinalIgnoreCase) ? "active" : "")" href="@href"><span>@icon</span><span class="nav-label">@label</span></a>;
+            var payload = parts[1].Replace('-', '+').Replace('_', '/');
+            payload = payload.PadRight(payload.Length + (4 - payload.Length % 4) % 4, '=');
+            var json = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(payload));
 
-    private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "--" : value;
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            var name = "";
+            var role = "";
+
+            if (root.TryGetProperty("email", out var emailProp))
+                name = emailProp.GetString() ?? "";
+
+            foreach (var key in new[] { "role", "roles",
+                "http://schemas.microsoft.com/ws/2008/06/identity/claims/role" })
+            {
+                if (!root.TryGetProperty(key, out var roleProp)) continue;
+
+                if (roleProp.ValueKind == System.Text.Json.JsonValueKind.String)
+                    role = roleProp.GetString() ?? "";
+                else if (roleProp.ValueKind == System.Text.Json.JsonValueKind.Array)
+                    role = roleProp.EnumerateArray()
+                        .FirstOrDefault().GetString() ?? "";
+                break;
+            }
+
+            return (name, role);
+        }
+        catch { return ("", ""); }
+    }
+
+    private string Breadcrumb => Nav.Uri.Contains("/admin/", StringComparison.OrdinalIgnoreCase)
+        ? "Admin / " + Nav.Uri.Split('/').Last()
+        : "Admin";
+
+    private RenderFragment NavItem(string href, string icon, string label) =>
+        @<a class="nav-link @(Nav.Uri.Contains(href, StringComparison.OrdinalIgnoreCase) ? "active" : "")"
+            href="@href"><span>@icon</span><span class="nav-label">@label</span></a>;
 
     private async Task LogoutAsync()
     {
@@ -75,12 +148,31 @@
 
     private string GetInitial()
     {
-        if (!string.IsNullOrWhiteSpace(profile?.FullName))
+        if (!string.IsNullOrWhiteSpace(_displayName))
         {
-            var parts = profile.FullName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            return string.Concat(parts.Take(2).Select(p => p[0])).ToUpperInvariant();
+            var parts = _displayName.Split(new[] { ' ', '@' },
+                StringSplitOptions.RemoveEmptyEntries);
+            return parts.Length >= 2
+                ? $"{parts[0][0]}{parts[1][0]}".ToUpperInvariant()
+                : parts[0][0].ToString().ToUpperInvariant();
         }
-
         return "A";
     }
+
+    // Employee profile API response — EmployeesApiController.cs-тэй таарна
+    private sealed record EmployeeProfileApiDto(
+        Guid Id,
+        string? ProfilePhotoUrl,
+        string EmployeeCode,
+        string FullName,
+        string Email,
+        string? Phone,
+        DateOnly? DateOfBirth,
+        string? Department,
+        string? DepartmentName,
+        string? Position,
+        DateOnly HireDate,
+        string? EmploymentStatus,
+        string? Status,
+        bool IsActive);
 }

@@ -1,11 +1,8 @@
 @page "/admin/ai-chat"
-@using AttendanceSystem.Blazor.Models
-@using System.Net.Http.Json
-@using System.Text.Json
+@layout AdminLayout
 @inject HttpClient Http
 @inject IJSRuntime JS
-@attribute [Authorize(Roles = "Admin,SuperAdmin,HRManager,HR")]
-
+@attribute [Authorize(Roles = "SuperAdmin,HRManager,DepartmentHead")]
 
 <PageHeader Title="AI Туслах" Subtitle="Систем дотроос асуулт асуу, шуурхай хариулт ав" />
 

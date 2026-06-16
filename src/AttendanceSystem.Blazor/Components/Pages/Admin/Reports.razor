@@ -1,5 +1,6 @@
 @page "/admin/reports"
 @layout AdminLayout
+@attribute [Authorize(Roles = "Admin,SuperAdmin,HRManager")] 
 @inject ApiClient Api
 
 <PageHeader Title="Reports" Subtitle="Report values loaded from SQL Server" Icon="▤" />

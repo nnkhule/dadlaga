@@ -19,7 +19,7 @@ public class AiController : ControllerBase
     }
 
     [HttpPost("admin/chat")]
-    [Authorize(Roles = "Admin,HR")]
+    [Authorize(Roles = "SuperAdmin,HRManager,DepartmentHead")]  // ← "HR" → "HRManager", "Admin" → "DepartmentHead" нэмсэн
     public async Task<ActionResult<ChatResponseDto>> AdminChat(
         [FromBody] ChatRequestDto request, CancellationToken cancellationToken)
     {
@@ -35,7 +35,7 @@ public class AiController : ControllerBase
     }
 
     [HttpPost("employee/chat")]
-    [Authorize(Roles = "Employee,Admin,HR")]
+    [Authorize(Roles = "Employee,SuperAdmin,HRManager,DepartmentHead")]  // ← "Admin","HR" → зөв role-ууд    
     public async Task<ActionResult<ChatResponseDto>> EmployeeChat(
         [FromBody] ChatRequestDto request, CancellationToken cancellationToken)
     {

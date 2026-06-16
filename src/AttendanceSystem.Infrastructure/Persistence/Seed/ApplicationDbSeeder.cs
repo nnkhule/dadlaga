@@ -16,25 +16,54 @@ public static class ApplicationDbSeeder
     public static async Task SeedAsync(IServiceProvider services)
     {
         using var scope = services.CreateScope();
-        var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("ApplicationDbSeeder");
-        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>()
+            .CreateLogger("ApplicationDbSeeder");
+        var context  = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<ApplicationRole>>();
 
         await RepairLegacySchemaAsync(context);
         await context.Database.MigrateAsync();
 
+        // ── 1. Roles ─────────────────────────────────────────────────────
         foreach (var (name, desc) in RoleDefinitions.All)
         {
             if (!await roleManager.RoleExistsAsync(name))
                 await roleManager.CreateAsync(new ApplicationRole { Name = name, Description = desc });
         }
 
+        // ── 2. SuperAdmin — if(Departments) блокоос ГАДНА, тусдаа ────────
+        //    Departments байсан ч байхгүй ч SuperAdmin заавал үүснэ.
+        const string adminEmail = "admin@attendance.local";
+        if (await userManager.FindByEmailAsync(adminEmail) is null)
+        {
+            logger.LogInformation("SuperAdmin хэрэглэгч үүсгэж байна...");
+            var admin = new ApplicationUser
+            {
+                UserName       = adminEmail,
+                Email          = adminEmail,
+                FullName       = "System Administrator",
+                EmailConfirmed = true
+            };
+            var createResult = await userManager.CreateAsync(admin, "Admin@12345!");
+            if (createResult.Succeeded)
+            {
+                await userManager.AddToRoleAsync(admin, "SuperAdmin");
+                logger.LogInformation("SuperAdmin амжилттай үүслээ: {Email}", adminEmail);
+            }
+            else
+            {
+                logger.LogError("SuperAdmin үүсгэж чадсангүй: {Errors}",
+                    string.Join(", ", createResult.Errors.Select(e => e.Description)));
+            }
+        }
+
+        // ── 3. Departments, WorkSchedule, OfficeLocation, Sample Employee ─
         if (!await context.Departments.AnyAsync())
         {
             var schedule = WorkSchedule.CreateStandard();
-            var office = OfficeLocation.Create("Head Office Ulaanbaatar", 47.9123, 106.9308, 100);
-            var dept = Department.Create("Human Resources");
+            var office   = OfficeLocation.Create("Head Office Ulaanbaatar", 47.9123, 106.9308, 100);
+            var dept     = Department.Create("Human Resources");
             context.WorkSchedules.Add(schedule);
             context.OfficeLocations.Add(office);
             context.Departments.Add(dept);
@@ -54,29 +83,15 @@ public static class ApplicationDbSeeder
             context.Employees.Add(employee);
             await context.SaveChangesAsync();
 
-            const string adminEmail = "admin@attendance.local";
-            if (await userManager.FindByEmailAsync(adminEmail) is null)
-            {
-                var admin = new ApplicationUser
-                {
-                    UserName = adminEmail,
-                    Email = adminEmail,
-                    FullName = "System Administrator",
-                    EmailConfirmed = true
-                };
-                await userManager.CreateAsync(admin, "Admin@12345!");
-                await userManager.AddToRoleAsync(admin, "SuperAdmin");
-            }
-
             const string empEmail = "bat@attendance.local";
             if (await userManager.FindByEmailAsync(empEmail) is null)
             {
                 var empUser = new ApplicationUser
                 {
-                    UserName = empEmail,
-                    Email = empEmail,
-                    FullName = employee.FullName,
-                    EmployeeId = employee.Id,
+                    UserName       = empEmail,
+                    Email          = empEmail,
+                    FullName       = employee.FullName,
+                    EmployeeId     = employee.Id,
                     EmailConfirmed = true
                 };
                 await userManager.CreateAsync(empUser, "Employee@12345!");
@@ -89,7 +104,7 @@ public static class ApplicationDbSeeder
             await context.SaveChangesAsync();
         }
 
-        logger.LogInformation("Database seed completed.");
+        logger.LogInformation("Database seed дууслаа.");
     }
 
     private static async Task RepairLegacySchemaAsync(ApplicationDbContext context)
@@ -136,13 +151,13 @@ public static class ApplicationDbSeeder
         var year = DateTime.Now.Year;
         var holidays = new[]
         {
-            ("New Year", new DateOnly(year, 1, 1)),
-            ("Tsagaan Sar", new DateOnly(year, 2, 10)),
-            ("International Women's Day", new DateOnly(year, 3, 8)),
-            ("Children's Day", new DateOnly(year, 6, 1)),
-            ("Naadam", new DateOnly(year, 7, 11)),
-            ("Republic Day", new DateOnly(year, 11, 26)),
-            ("Independence Day", new DateOnly(year, 12, 29))
+            ("New Year",                    new DateOnly(year,  1,  1)),
+            ("Tsagaan Sar",                 new DateOnly(year,  2, 10)),
+            ("International Women's Day",   new DateOnly(year,  3,  8)),
+            ("Children's Day",              new DateOnly(year,  6,  1)),
+            ("Naadam",                      new DateOnly(year,  7, 11)),
+            ("Republic Day",                new DateOnly(year, 11, 26)),
+            ("Independence Day",            new DateOnly(year, 12, 29))
         };
         foreach (var (name, date) in holidays)
             context.Holidays.Add(Holiday.Create(name, date, recurring: true));
@@ -153,10 +168,10 @@ internal static class RoleDefinitions
 {
     public static readonly (string Name, string Description)[] All =
     [
-        ("SuperAdmin", "Full system access"),
-        ("HRManager", "HR and reports management"),
-        ("DepartmentHead", "Department team management"),
-        ("Employee", "Self-service attendance"),
-        ("Auditor", "Read-only audit access")
+        ("SuperAdmin",      "Full system access"),
+        ("HRManager",       "HR and reports management"),
+        ("DepartmentHead",  "Department team management"),
+        ("Employee",        "Self-service attendance"),
+        ("Auditor",         "Read-only audit access")
     ];
 }

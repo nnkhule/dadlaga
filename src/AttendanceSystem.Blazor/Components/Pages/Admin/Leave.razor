@@ -1,5 +1,6 @@
 @page "/admin/leave"
 @layout AdminLayout
+@attribute [Authorize(Roles = "Admin,SuperAdmin,HRManager")] 
 @inject ApiClient Api
 
 <PageHeader Title="Leave requests" Subtitle="Leave requests loaded from SQL Server" Icon="☑" />
