@@ -9,12 +9,19 @@ public class EmployeeAiContextDto
     public DateTime? LastCheckIn { get; set; }
     public DateTime? LastCheckOut { get; set; }
 
-    // ✅ Эдгээрийг нэм
     public int UsedLeaveDays { get; set; }
     public int TotalAnnualLeave { get; set; }
     public List<LeaveHistoryItem> RecentLeaves { get; set; } = new();
     public List<AttendanceHistoryItem> RecentAttendance { get; set; } = new();
     public int LateCountThisMonth { get; set; }
+
+    // ✅ Шинээр нэмэгдсэн — илүү гүнзгий хувийн контекст
+    public int TenureMonths { get; set; }                  // Ажилласан хугацаа сараар
+    public decimal AvgLateMinutesThisMonth { get; set; }
+    public decimal OvertimeHoursThisMonth { get; set; }
+    public string LateTrend { get; set; } = "stable";       // "improving" | "worsening" | "stable"
+    public int AbsentCountThisMonth { get; set; }
+    public DateOnly? UpcomingApprovedLeave { get; set; }     // Удахгүй эхлэх амарах өдөр байгаа эсэх
 }
 
 public class LeaveHistoryItem

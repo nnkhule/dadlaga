@@ -1,222 +1,919 @@
 @page "/admin/reports"
 @layout AdminLayout
-@attribute [Authorize(Roles = "Admin,SuperAdmin,HRManager")]
+@attribute [Authorize(Roles = "Admin,SuperAdmin,HRManager,HR")]
 @inject ApiClient Api
-@inject NavigationManager Nav
+@inject IJSRuntime JS
 
-<PageHeader Title="Тайлан" Subtitle="SQL Server-ээс ачааллагдсан тайлангийн мэдээлэл" Icon="▤" />
+<PageHeader Title="Тайлан" Subtitle="Ирц, илүү цаг, хэлтсийн дүн — нэг дор" Icon="▤">
+    <Actions>
+        <div class="rpt-export-group">
+            <button class="rpt-export-btn" @onclick='() => ExportCsvAsync("attendance")' disabled="@_loading" title="CSV татах">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                CSV
+            </button>
+        </div>
+    </Actions>
+</PageHeader>
 
 <div class="page-stack">
 
-    @* ── Filter bar ── *@
-    <div class="card filter-bar">
-        <div style="display:flex;align-items:center;gap:8px;flex:1">
-            <label style="font-size:13px;color:var(--clr-text-muted);white-space:nowrap">Эхлэх огноо</label>
-            <InputDate class="form-control" @bind-Value="from" />
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;flex:1">
-            <label style="font-size:13px;color:var(--clr-text-muted);white-space:nowrap">Дуусах огноо</label>
-            <InputDate class="form-control" @bind-Value="to" />
-        </div>
-        <button class="btn btn-primary" @onclick="LoadAsync" disabled="@_loading">
-            @if (_loading) { <span>Уншиж байна...</span> } else { <span>🔍 Харах</span> }
-        </button>
-        <div style="display:flex;gap:6px">
-            <button class="btn btn-ghost" @onclick='() => ExportAsync("attendance")' title="Excel татах">⬇ Excel</button>
-        </div>
-    </div>
-
-    @if (!string.IsNullOrWhiteSpace(error))
-    {
-        <div class="card" style="border-color:var(--clr-danger);color:var(--clr-danger);padding:14px 18px">⚠ @error</div>
-    }
-
-    @* ── Tab switcher ── *@
-    <div class="rpt-tabs">
-        <button class="rpt-tab @(_tab == "summary" ? "rpt-tab--active" : "")" @onclick='() => _tab = "summary"'>▦ Хэлтсийн дүн</button>
-        <button class="rpt-tab @(_tab == "attendance" ? "rpt-tab--active" : "")" @onclick='() => _tab = "attendance"'>◷ Ирцийн бүртгэл</button>
-        <button class="rpt-tab @(_tab == "overtime" ? "rpt-tab--active" : "")" @onclick='() => _tab = "overtime"'>↑ Илүү цаг</button>
-    </div>
-
-    @* ── Department summary ── *@
-    @if (_tab == "summary")
-    {
-        <div class="card">
-            <div class="rpt-card-header">
-                <h2 class="rpt-card-title">Хэлтсийн дүн</h2>
-                <span class="rpt-badge">@summaries.Count хэлтэс</span>
+    @* ── Date range + Employee filter ── *@
+    <div class="card rpt-filter-card">
+        <div class="rpt-filter-row">
+            <div class="rpt-quick-btns">
+                <button class="rpt-quick @(IsQuick("today") ? "rpt-quick--on" : "")" @onclick='() => SetQuick("today")'>Өнөөдөр</button>
+                <button class="rpt-quick @(IsQuick("week")  ? "rpt-quick--on" : "")" @onclick='() => SetQuick("week")'>7 хоног</button>
+                <button class="rpt-quick @(IsQuick("month") ? "rpt-quick--on" : "")" @onclick='() => SetQuick("month")'>Энэ сар</button>
+                <button class="rpt-quick @(IsQuick("last")  ? "rpt-quick--on" : "")" @onclick='() => SetQuick("last")'>Өмнөх сар</button>
+                <button class="rpt-quick @(IsQuick("q1")    ? "rpt-quick--on" : "")" @onclick='() => SetQuick("q1")'>Q1</button>
+                <button class="rpt-quick @(IsQuick("q2")    ? "rpt-quick--on" : "")" @onclick='() => SetQuick("q2")'>Q2</button>
+                <button class="rpt-quick @(IsQuick("q3")    ? "rpt-quick--on" : "")" @onclick='() => SetQuick("q3")'>Q3</button>
+                <button class="rpt-quick @(IsQuick("q4")    ? "rpt-quick--on" : "")" @onclick='() => SetQuick("q4")'>Q4</button>
+                <button class="rpt-quick @(IsQuick("year")  ? "rpt-quick--on" : "")" @onclick='() => SetQuick("year")'>Жил</button>
             </div>
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Хэлтэс</th>
-                        <th>Ирсэн</th>
-                        <th>Хоцорсон</th>
-                        <th>Чөлөөтэй</th>
-                        <th>Нийт %</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @if (summaries.Count == 0)
+            <div class="rpt-date-inputs">
+                <div class="rpt-field">
+                    <label class="rpt-field-label">Эхлэх огноо</label>
+                    <InputDate class="rpt-date-input" @bind-Value="from" />
+                </div>
+                <span class="rpt-date-sep">→</span>
+                <div class="rpt-field">
+                    <label class="rpt-field-label">Дуусах огноо</label>
+                    <InputDate class="rpt-date-input" @bind-Value="to" />
+                </div>
+                <button class="btn btn-primary rpt-load-btn" @onclick="LoadAsync" disabled="@_loading">
+                    @if (_loading)
                     {
-                        <tr><td colspan="5" class="muted" style="text-align:center;padding:24px">Мэдээлэл олдсонгүй.</td></tr>
+                        <span class="rpt-spinner"></span>
+                        <span>Уншиж байна...</span>
                     }
                     else
                     {
-                        @foreach (var row in summaries)
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        <span>Харах</span>
+                    }
+                </button>
+            </div>
+        </div>
+
+        @* ── Employee filter ── *@
+        <div class="rpt-filter-row rpt-emp-filter-row">
+            <div class="rpt-field rpt-emp-field">
+                <label class="rpt-field-label">Ажилтанаар шүүх</label>
+                <div class="rpt-emp-search-wrap @(_empDropdownOpen ? "rpt-emp-search-wrap--open" : "")">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="flex-shrink:0;color:var(--clr-text-muted)">
+                        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                    </svg>
+                    <input class="rpt-emp-search-input"
+                           type="text"
+                           placeholder="Ажилтаны нэрээр хайх..."
+                           value="@_empFilterSearch"
+                           @oninput="OnEmpSearchInput"
+                           @onfocus="() => { if (_empSuggestions.Count > 0) _empDropdownOpen = true; }"
+                           autocomplete="off" />
+                    @if (_empFilterSearch.Length > 0)
+                    {
+                        <button class="rpt-emp-clear" @onclick="ClearEmployeeFilter" title="Цэвэрлэх">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                    }
+                </div>
+                @if (_empDropdownOpen && _empSuggestions.Count > 0)
+                {
+                    <div class="rpt-emp-dropdown">
+                        @foreach (var emp in _empSuggestions)
                         {
-                            var total = row.Present + row.Leave;
-                            var pct = total == 0 ? 0 : (int)Math.Round(row.Present * 100.0 / total);
-                            <tr>
+                            var e = emp;
+                            <div class="rpt-emp-option" @onclick="() => SelectEmployee(e)">
+                                <div class="rpt-emp-avatar rpt-emp-avatar--sm">@Initials(e.FullName)</div>
+                                <div>
+                                    <div class="rpt-emp-option-name">@e.FullName</div>
+                                    <div class="rpt-emp-option-dept">@e.Department</div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+
+            @if (_selectedEmployee is not null)
+            {
+                <div class="rpt-selected-emp-chip">
+                    <div class="rpt-emp-avatar rpt-emp-avatar--sm">@Initials(_selectedEmployee.FullName)</div>
+                    <div>
+                        <div style="font-weight:700;font-size:13px;line-height:1.2">@_selectedEmployee.FullName</div>
+                        <div style="font-size:11px;color:var(--clr-text-muted)">@_selectedEmployee.Department</div>
+                    </div>
+                    <span class="badge badge-present" style="font-size:10px;padding:2px 7px">Шүүгдсэн</span>
+                    <button class="rpt-emp-clear" @onclick="ClearEmployeeFilter" title="Шүүлтүүр хасах">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                </div>
+            }
+        </div>
+
+        @if (_loading)
+        {
+            <div class="rpt-progress"><span class="rpt-progress-inner"></span></div>
+        }
+    </div>
+
+    @* ── Error ── *@
+    @if (!string.IsNullOrWhiteSpace(error))
+    {
+        <div class="card rpt-error">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            @error
+        </div>
+    }
+
+    @* ── KPI strip ── *@
+    <div class="rpt-kpi-row">
+        <div class="rpt-kpi rpt-kpi--present">
+            <div class="rpt-kpi-icon">✓</div>
+            <div>
+                <div class="rpt-kpi-val">@totalPresent</div>
+                <div class="rpt-kpi-lbl">Нийт ирц</div>
+            </div>
+        </div>
+        <div class="rpt-kpi rpt-kpi--late">
+            <div class="rpt-kpi-icon">⏰</div>
+            <div>
+                <div class="rpt-kpi-val">@totalLate</div>
+                <div class="rpt-kpi-lbl">Хоцролт</div>
+            </div>
+        </div>
+        <div class="rpt-kpi rpt-kpi--absent">
+            <div class="rpt-kpi-icon">✗</div>
+            <div>
+                <div class="rpt-kpi-val">@totalAbsent</div>
+                <div class="rpt-kpi-lbl">Чөлөөтэй</div>
+            </div>
+        </div>
+        <div class="rpt-kpi rpt-kpi--ot">
+            <div class="rpt-kpi-icon">↑</div>
+            <div>
+                <div class="rpt-kpi-val">@($"{overtimeSummary?.TotalOvertimeHours ?? 0:0.#}")ц</div>
+                <div class="rpt-kpi-lbl">Нийт илүү цаг</div>
+            </div>
+        </div>
+        <div class="rpt-kpi rpt-kpi--rate">
+            <div class="rpt-kpi-icon">%</div>
+            <div>
+                <div class="rpt-kpi-val">@AttendanceRate%</div>
+                <div class="rpt-kpi-lbl">Ирцийн хувь</div>
+            </div>
+        </div>
+        <div class="rpt-kpi rpt-kpi--avg">
+            <div class="rpt-kpi-icon">◇</div>
+            <div>
+                <div class="rpt-kpi-val">@($"{overtimeSummary?.AverageOvertimeHours ?? 0:0.##}")ц</div>
+                <div class="rpt-kpi-lbl">Дундаж илүү цаг</div>
+            </div>
+        </div>
+    </div>
+
+    @* ── Tab switcher ── *@
+    <div class="rpt-tabs">
+        <button class="rpt-tab @(_tab == "summary"    ? "rpt-tab--active" : "")" @onclick='() => _tab = "summary"'>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+            Хэлтсийн дүн
+        </button>
+        <button class="rpt-tab @(_tab == "attendance" ? "rpt-tab--active" : "")" @onclick='() => _tab = "attendance"'>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Ирцийн бүртгэл
+        </button>
+        <button class="rpt-tab @(_tab == "overtime"   ? "rpt-tab--active" : "")" @onclick='() => _tab = "overtime"'>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+            Илүү цаг
+        </button>
+        <button class="rpt-tab @(_tab == "employees"  ? "rpt-tab--active" : "")" @onclick="SwitchEmployeesTab">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            Ажилтнууд
+        </button>
+    </div>
+
+    @* ══════════════ TAB 1 — Department summary ══════════════ *@
+    @if (_tab == "summary")
+    {
+        <div class="card rpt-card">
+            <div class="rpt-card-header">
+                <div class="rpt-card-title-group">
+                    <h2 class="rpt-card-title">Хэлтсийн дүн</h2>
+                    <span class="rpt-badge">@summaries.Count хэлтэс</span>
+                </div>
+                <div class="rpt-card-actions">
+                    <input class="rpt-search-mini" type="search" placeholder="Хэлтэс хайх…"
+                           value="@_summarySearch"
+                           @oninput="e => _summarySearch = e.Value?.ToString() ?? string.Empty" />
+                </div>
+            </div>
+            @if (FilteredSummaries.Count == 0 && !_loading)
+            {
+                <div class="rpt-empty"><div class="rpt-empty-icon">📊</div><div>Мэдээлэл олдсонгүй.</div></div>
+            }
+            else
+            {
+                <table class="data-table rpt-table">
+                    <thead>
+                        <tr>
+                            <th class="rpt-th-sort @SortCls("dept","name")"    @onclick='() => SetSummarySort("name")'>Хэлтэс @SortArrow("dept","name")</th>
+                            <th class="rpt-th-sort @SortCls("dept","present")" @onclick='() => SetSummarySort("present")'>Ирсэн @SortArrow("dept","present")</th>
+                            <th class="rpt-th-sort @SortCls("dept","late")"    @onclick='() => SetSummarySort("late")'>Хоцорсон @SortArrow("dept","late")</th>
+                            <th class="rpt-th-sort @SortCls("dept","leave")"   @onclick='() => SetSummarySort("leave")'>Чөлөөтэй @SortArrow("dept","leave")</th>
+                            <th>Ирцийн хувь</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in FilteredSummaries)
+                        {
+                            var total    = row.Present + row.Leave;
+                            var pct      = total == 0 ? 0 : (int)Math.Round(row.Present * 100.0 / total);
+                            var barColor = pct >= 90 ? "var(--clr-success)" : pct >= 70 ? "var(--clr-warning)" : "var(--clr-danger)";
+                            <tr class="rpt-row">
                                 <td><strong>@row.DepartmentName</strong></td>
                                 <td><span class="badge badge-present">@row.Present</span></td>
                                 <td><span class="badge badge-late">@row.Late</span></td>
                                 <td><span class="badge badge-absent">@row.Leave</span></td>
                                 <td>
-                                    <div style="display:flex;align-items:center;gap:8px">
-                                        <div class="rpt-bar-wrap">
-                                            <div class="rpt-bar" style="width:@(pct)%"></div>
-                                        </div>
-                                        <span style="font-size:12px;color:var(--clr-text-muted)">@pct%</span>
+                                    <div class="rpt-bar-cell">
+                                        <div class="rpt-bar-wrap"><div class="rpt-bar" style="width:@(pct)%;background:@barColor"></div></div>
+                                        <span class="rpt-bar-pct">@pct%</span>
                                     </div>
                                 </td>
                             </tr>
                         }
-                    }
-                </tbody>
-            </table>
+                    </tbody>
+                </table>
+            }
         </div>
+
+        @if (summaries.Count > 0)
+        {
+            <div class="card rpt-card">
+                <div class="rpt-card-header"><h2 class="rpt-card-title">Харьцааны диаграм</h2></div>
+                <div class="rpt-chart-scroll">
+                    <svg class="rpt-bar-chart" viewBox="0 0 @(Math.Max(summaries.Count * 80, 400)) 220" preserveAspectRatio="xMinYMid meet">
+                        @{
+                            var maxVal = summaries.Max(s => s.Present + s.Leave);
+                            if (maxVal == 0) maxVal = 1;
+                            var chartH = 160; var barW = 22; var grp = 80;
+                        }
+                        @for (var g = 0; g <= 4; g++)
+                        {
+                            var gy = 20 + chartH - (g * chartH / 4);
+                            <line x1="0" y1="@gy" x2="@(summaries.Count * grp)" y2="@gy" stroke="var(--clr-border)" stroke-width="1" stroke-dasharray="4,4" />
+                            <span x="2" y="@(gy - 3)" font-size="9" fill="var(--clr-text-muted)">@(g * maxVal / 4)</span>
+                        }
+                        @for (var i = 0; i < summaries.Count; i++)
+                        {
+                            var s  = summaries[i];
+                            var x  = i * grp + grp / 2 - barW;
+                            var ph = s.Present == 0 ? 0 : (int)((double)s.Present / maxVal * chartH);
+                            var lh = s.Late    == 0 ? 0 : (int)((double)s.Late    / maxVal * chartH);
+                            var py = 20 + chartH - ph;
+                            var ly = 20 + chartH - lh;
+                            <rect x="@x"              y="@py" width="@barW" height="@ph" rx="3" fill="var(--clr-success)" opacity="0.85" />
+                            <rect x="@(x + barW + 4)" y="@ly" width="@barW" height="@lh" rx="3" fill="var(--clr-warning)" opacity="0.85" />
+                            var labelX = i * grp + grp / 2;
+                            <span x="@labelX" y="@(20 + chartH + 16)" font-size="9" text-anchor="middle" fill="var(--clr-text-muted)">@Truncate(s.DepartmentName, 9)</span>
+                        }
+                        <rect x="0"  y="@(20 + chartH + 32)" width="10" height="10" rx="2" fill="var(--clr-success)" />
+                        <text x="14" y="@(20 + chartH + 41)" font-size="10" fill="var(--clr-text-muted)">Ирсэн</text>
+                        <rect x="65" y="@(20 + chartH + 32)" width="10" height="10" rx="2" fill="var(--clr-warning)" />
+                        <text x="79" y="@(20 + chartH + 41)" font-size="10" fill="var(--clr-text-muted)">Хоцорсон</text>
+                    </svg>
+                </div>
+            </div>
+        }
     }
 
-    @* ── Attendance records ── *@
+    @* ══════════════ TAB 2 — Attendance records ══════════════ *@
     @if (_tab == "attendance")
     {
-        <div class="card">
-            <div class="rpt-card-header">
-                <h2 class="rpt-card-title">Ирцийн бүртгэл</h2>
-                <span class="rpt-badge">@_attendanceTotal нийт</span>
-            </div>
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Огноо</th>
-                        <th>Ажилтан</th>
-                        <th>Хэлтэс</th>
-                        <th>Ирсэн цаг</th>
-                        <th>Явсан цаг</th>
-                        <th>Төлөв</th>
-                        <th>Хоцролт</th>
-                        <th>Илүү цаг</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @if (attendanceRows.Count == 0)
-                    {
-                        <tr><td colspan="8" class="muted" style="text-align:center;padding:24px">Мэдээлэл олдсонгүй.</td></tr>
-                    }
-                    else
-                    {
-                        @foreach (var row in attendanceRows)
-                        {
-                            var status = row.TryGetValue("Status", out var s) ? s?.ToString() : null;
-                            <tr>
-                                <td>@FormatDate(row, "Date")</td>
-                                <td><strong>@Val(row, "Employee")</strong></td>
-                                <td>@Val(row, "Department")</td>
-                                <td>@FormatTime(row, "CheckInTime")</td>
-                                <td>@FormatTime(row, "CheckOutTime")</td>
-                                <td><span class="badge @StatusBadge(status)">@(status ?? "—")</span></td>
-                                <td>@(Val(row, "LateMinutes") is "0" or "" or "—" ? "—" : Val(row, "LateMinutes") + " мин")</td>
-                                <td>@(Val(row, "OvertimeHours") is "0" or "0.0" or "0.00" or "" or "—" ? "—" : Val(row, "OvertimeHours") + "ц")</td>
-                            </tr>
-                        }
-                    }
-                </tbody>
-            </table>
-            @if (_attendanceTotal > attendanceRows.Count)
-            {
-                <div style="padding:12px 16px;text-align:center">
-                    <button class="btn btn-ghost" @onclick="LoadMoreAttendance">+ Дэлгэрэнгүй (@attendanceRows.Count / @_attendanceTotal)</button>
+        @* ── Ажилтан сонгосон бол тайлан карт ── *@
+        @if (_selectedEmployee is not null)
+        {
+            <div class="card rpt-emp-report-card">
+                <div class="rpt-card-header">
+                    <div class="rpt-card-title-group">
+                        <div class="rpt-emp-avatar" style="width:40px;height:40px;font-size:15px;flex-shrink:0">
+                            @Initials(_selectedEmployee.FullName)
+                        </div>
+                        <div>
+                            <h2 class="rpt-card-title" style="margin:0">@_selectedEmployee.FullName</h2>
+                            <div style="font-size:12px;color:var(--clr-text-muted);margin-top:2px">
+                                @_selectedEmployee.Department · @from.ToString("yyyy-MM-dd") – @to.ToString("yyyy-MM-dd")
+                            </div>
+                        </div>
+                    </div>
+                    <div class="rpt-emp-stats-row">
+                        <div class="rpt-emp-stat rpt-emp-stat--present">
+                            <span class="rpt-emp-stat-val">@_empStats.Present</span>
+                            <span class="rpt-emp-stat-lbl">Ирсэн</span>
+                        </div>
+                        <div class="rpt-emp-stat rpt-emp-stat--late">
+                            <span class="rpt-emp-stat-val">@_empStats.Late</span>
+                            <span class="rpt-emp-stat-lbl">Хоцорсон</span>
+                        </div>
+                        <div class="rpt-emp-stat rpt-emp-stat--absent">
+                            <span class="rpt-emp-stat-val">@_empStats.Absent</span>
+                            <span class="rpt-emp-stat-lbl">Ирээгүй</span>
+                        </div>
+                        <div class="rpt-emp-stat rpt-emp-stat--ot">
+                            <span class="rpt-emp-stat-val">@($"{_empStats.OvertimeHours:0.#}")ц</span>
+                            <span class="rpt-emp-stat-lbl">Илүү цаг</span>
+                        </div>
+                        <div class="rpt-emp-stat rpt-emp-stat--rate">
+                            <span class="rpt-emp-stat-val">@_empStats.AttendanceRate%</span>
+                            <span class="rpt-emp-stat-lbl">Ирцийн %</span>
+                        </div>
+                    </div>
                 </div>
+            </div>
+        }
+
+        <div class="card rpt-card">
+            <div class="rpt-card-header">
+                <div class="rpt-card-title-group">
+                    <h2 class="rpt-card-title">Ирцийн бүртгэл</h2>
+                    <span class="rpt-badge">@_attendanceTotal нийт</span>
+                </div>
+                <div class="rpt-card-actions">
+                    <input class="rpt-search-mini" type="search" placeholder="Нэр хайх…"
+                           value="@_attSearch"
+                           @oninput="e => _attSearch = e.Value?.ToString() ?? string.Empty" />
+                    <select class="rpt-select-mini" @bind="_attStatusFilter">
+                        <option value="">Бүх төлөв</option>
+                        <option value="Present">Ирсэн</option>
+                        <option value="Late">Хоцорсон</option>
+                        <option value="Absent">Ирээгүй</option>
+                        <option value="OnLeave">Чөлөөтэй</option>
+                    </select>
+                </div>
+            </div>
+            @if (FilteredAttendance.Count == 0 && !_loading)
+            {
+                <div class="rpt-empty"><div class="rpt-empty-icon">📋</div><div>Ирцийн бүртгэл олдсонгүй.</div></div>
+            }
+            else
+            {
+                <div class="rpt-table-wrap">
+                    <table class="data-table rpt-table">
+                        <thead>
+                            <tr>
+                                <th class="rpt-th-sort @SortCls("att","date")"     @onclick='() => SetAttSort("date")'>Огноо @SortArrow("att","date")</th>
+                                <th class="rpt-th-sort @SortCls("att","employee")" @onclick='() => SetAttSort("employee")'>Ажилтан @SortArrow("att","employee")</th>
+                                <th>Хэлтэс</th>
+                                <th>Ирэх</th>
+                                <th>Явах</th>
+                                <th>Төлөв</th>
+                                <th class="rpt-th-sort @SortCls("att","late")"     @onclick='() => SetAttSort("late")'>Хоцролт @SortArrow("att","late")</th>
+                                <th class="rpt-th-sort @SortCls("att","overtime")" @onclick='() => SetAttSort("overtime")'>Илүү цаг @SortArrow("att","overtime")</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in PagedAttendance)
+                            {
+                                var status = row.TryGetValue("Status", out var s) ? s?.ToString() : null;
+                                var late   = row.TryGetValue("LateMinutes",   out var lm) ? lm?.ToString() : "0";
+                                var ot     = row.TryGetValue("OvertimeHours", out var oh) ? oh?.ToString() : "0";
+                                <tr class="rpt-row">
+                                    <td class="rpt-date-cell">@FormatDate(row, "Date")</td>
+                                    <td>
+                                        <div class="rpt-emp-cell">
+                                            <div class="rpt-emp-avatar">@Initials(Val(row, "Employee"))</div>
+                                            <strong>@Val(row, "Employee")</strong>
+                                        </div>
+                                    </td>
+                                    <td class="rpt-muted-cell">@Val(row, "Department")</td>
+                                    <td><span class="rpt-time rpt-time--in">@FormatTime(row, "CheckInTime")</span></td>
+                                    <td><span class="rpt-time rpt-time--out">@FormatTime(row, "CheckOutTime")</span></td>
+                                    <td><span class="badge @StatusBadge(status)">@StatusLabel(status)</span></td>
+                                    <td>
+                                        @if (late is "0" or "" or "—" or null) { <span class="rpt-nil">—</span> }
+                                        else { <span class="rpt-chip-late">+@late мин</span> }
+                                    </td>
+                                    <td>
+                                        @if (ot is "0" or "0.0" or "0.00" or "" or "—" or null) { <span class="rpt-nil">—</span> }
+                                        else { <span class="rpt-chip-ot">@ot ц</span> }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                @if (AttTotalPages > 1)
+                {
+                    <div class="rpt-pagination">
+                        <span class="rpt-page-info">@FilteredAttendance.Count нийт · хуудас @_attPage / @AttTotalPages</span>
+                        <div class="rpt-page-btns">
+                            <button class="rpt-page-btn" disabled="@(_attPage == 1)" @onclick="() => _attPage--">‹</button>
+                            @for (var p = Math.Max(1, _attPage - 2); p <= Math.Min(AttTotalPages, _attPage + 2); p++)
+                            {
+                                var pg = p;
+                                <button class="rpt-page-btn @(pg == _attPage ? "rpt-page-btn--on" : "")" @onclick="() => _attPage = pg">@p</button>
+                            }
+                            <button class="rpt-page-btn" disabled="@(_attPage == AttTotalPages)" @onclick="() => _attPage++">›</button>
+                        </div>
+                        @if (_attendanceTotal > attendanceRows.Count)
+                        {
+                            <button class="btn btn-ghost" style="font-size:13px" @onclick="LoadMoreAttendance">
+                                + Дэлгэрэнгүй (@attendanceRows.Count / @_attendanceTotal)
+                            </button>
+                        }
+                    </div>
+                }
             }
         </div>
     }
 
-    @* ── Overtime ── *@
+    @* ══════════════ TAB 3 — Overtime ══════════════ *@
     @if (_tab == "overtime")
     {
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px">
-            <div class="rpt-stat-card rpt-stat-warning">
-                <div class="rpt-stat-icon">⏱</div>
-                <div class="rpt-stat-value">@($"{overtimeSummary?.TotalOvertimeHours ?? 0:0.##}")ц</div>
-                <div class="rpt-stat-label">Нийт илүү цаг</div>
+        <div class="rpt-ot-grid">
+            <div class="rpt-ot-card rpt-ot-card--primary">
+                <div class="rpt-ot-icon">⏱</div>
+                <div class="rpt-ot-val">@($"{overtimeSummary?.TotalOvertimeHours ?? 0:0.##}")ц</div>
+                <div class="rpt-ot-lbl">Нийт илүү цаг</div>
+                <div class="rpt-ot-sub">@from.ToString("yyyy-MM-dd") – @to.ToString("yyyy-MM-dd")</div>
             </div>
-            <div class="rpt-stat-card rpt-stat-info">
-                <div class="rpt-stat-icon">◇</div>
-                <div class="rpt-stat-value">@($"{overtimeSummary?.AverageOvertimeHours ?? 0:0.##}")ц</div>
-                <div class="rpt-stat-label">Дундаж илүү цаг</div>
+            <div class="rpt-ot-card rpt-ot-card--info">
+                <div class="rpt-ot-icon">◇</div>
+                <div class="rpt-ot-val">@($"{overtimeSummary?.AverageOvertimeHours ?? 0:0.##}")ц</div>
+                <div class="rpt-ot-lbl">Дундаж / бүртгэл</div>
+                <div class="rpt-ot-sub">@(overtimeSummary?.RecordCount ?? 0) бүртгэлд үндэслэсэн</div>
             </div>
-            <div class="rpt-stat-card rpt-stat-danger">
-                <div class="rpt-stat-icon">↑</div>
-                <div class="rpt-stat-value">@($"{overtimeSummary?.HighestOvertimeHours ?? 0:0.##}")ц</div>
-                <div class="rpt-stat-label">Хамгийн их</div>
+            <div class="rpt-ot-card rpt-ot-card--warning">
+                <div class="rpt-ot-icon">↑</div>
+                <div class="rpt-ot-val">@($"{overtimeSummary?.HighestOvertimeHours ?? 0:0.##}")ц</div>
+                <div class="rpt-ot-lbl">Хамгийн их нэг бүртгэл</div>
+                <div class="rpt-ot-sub">Дээд хязгаар</div>
             </div>
-            <div class="rpt-stat-card rpt-stat-success">
-                <div class="rpt-stat-icon">📋</div>
-                <div class="rpt-stat-value">@(overtimeSummary?.RecordCount ?? 0)</div>
-                <div class="rpt-stat-label">Нийт бүртгэл</div>
+            <div class="rpt-ot-card rpt-ot-card--success">
+                <div class="rpt-ot-icon">📋</div>
+                <div class="rpt-ot-val">@(overtimeSummary?.RecordCount ?? 0)</div>
+                <div class="rpt-ot-lbl">Нийт бүртгэл</div>
+                <div class="rpt-ot-sub">Илүү цагтай өдрүүд</div>
             </div>
+        </div>
+        @if (overtimeSummary is not null && overtimeSummary.TotalOvertimeHours > 0)
+        {
+            var avg = (double)overtimeSummary.AverageOvertimeHours;
+            var max = (double)overtimeSummary.HighestOvertimeHours;
+            var pct = max == 0 ? 0 : (int)(avg / max * 100);
+            <div class="card rpt-card">
+                <div class="rpt-card-header"><h2 class="rpt-card-title">Дундаж / Хамгийн их харьцаа</h2></div>
+                <div style="padding:16px 20px">
+                    <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--clr-text-muted);margin-bottom:8px">
+                        <span>Дундаж: @($"{avg:0.##}")ц</span>
+                        <span>Хамгийн их: @($"{max:0.##}")ц</span>
+                    </div>
+                    <div class="progress">
+                        <div class="progress-bar" style="width:@pct%;background:linear-gradient(135deg,var(--clr-warning),var(--clr-danger))"></div>
+                    </div>
+                    <div style="font-size:12px;color:var(--clr-text-muted);margin-top:8px">Дундаж нь хамгийн их-ийн @pct% байна</div>
+                </div>
+            </div>
+        }
+    }
+
+    @* ══════════════ TAB 4 — Employees ══════════════ *@
+    @if (_tab == "employees")
+    {
+        <div class="card rpt-card">
+            <div class="rpt-card-header">
+                <div class="rpt-card-title-group">
+                    <h2 class="rpt-card-title">Ажилтнуудын жагсаалт</h2>
+                    <span class="rpt-badge">@_empTotal нийт</span>
+                </div>
+                <div class="rpt-card-actions">
+                    <input class="rpt-search-mini" type="search" placeholder="Нэр хайх…"
+                           value="@_empSearch"
+                           @oninput="e => _empSearch = e.Value?.ToString() ?? string.Empty" />
+                    <button class="rpt-export-btn" @onclick='() => ExportCsvAsync("employees")'>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        CSV
+                    </button>
+                </div>
+            </div>
+            @if (FilteredEmployees.Count == 0 && !_loading)
+            {
+                <div class="rpt-empty"><div class="rpt-empty-icon">👤</div><div>Ажилтан олдсонгүй.</div></div>
+            }
+            else
+            {
+                <table class="data-table rpt-table">
+                    <thead>
+                        <tr>
+                            <th class="rpt-th-sort @SortCls("emp","code")" @onclick='() => SetEmpSort("code")'>Код @SortArrow("emp","code")</th>
+                            <th class="rpt-th-sort @SortCls("emp","name")" @onclick='() => SetEmpSort("name")'>Нэр @SortArrow("emp","name")</th>
+                            <th>И-мэйл</th>
+                            <th class="rpt-th-sort @SortCls("emp","dept")" @onclick='() => SetEmpSort("dept")'>Хэлтэс @SortArrow("emp","dept")</th>
+                            <th class="rpt-th-sort @SortCls("emp","hire")" @onclick='() => SetEmpSort("hire")'>Ажилласан @SortArrow("emp","hire")</th>
+                            <th>Төлөв</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in FilteredEmployees)
+                        {
+                            var active = row.TryGetValue("IsActive", out var ia) && ia?.ToString() == "True";
+                            <tr class="rpt-row">
+                                <td class="rpt-muted-cell">@Val(row, "EmployeeCode")</td>
+                                <td>
+                                    <div class="rpt-emp-cell">
+                                        <div class="rpt-emp-avatar">@Initials(Val(row, "FullName"))</div>
+                                        <div>
+                                            <div style="font-weight:600">@Val(row, "FullName")</div>
+                                            <div style="font-size:11px;color:var(--clr-text-muted)">@Val(row, "Phone")</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="rpt-muted-cell">@Val(row, "Email")</td>
+                                <td>@Val(row, "Department")</td>
+                                <td class="rpt-date-cell">@FormatDateObj(row, "HireDate")</td>
+                                <td>
+                                    @if (active) { <span class="badge badge-present">Идэвхтэй</span> }
+                                    else         { <span class="badge badge-absent">Идэвхгүй</span>  }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+                @if (_empTotal > employeeRows.Count)
+                {
+                    <div style="padding:12px 16px;text-align:center">
+                        <button class="btn btn-ghost" style="font-size:13px" @onclick="LoadMoreEmployees">
+                            + Дэлгэрэнгүй (@employeeRows.Count / @_empTotal)
+                        </button>
+                    </div>
+                }
+            }
         </div>
     }
 </div>
 
-@code {
-    private DateOnly from = new(DateTime.Today.Year, DateTime.Today.Month, 1);
-    private DateOnly to = DateOnly.FromDateTime(DateTime.Today);
+@* ═══════════ STYLES ═══════════ *@
+<style>
+/* Filter card */
+.rpt-filter-card  { padding: 16px 20px; }
+.rpt-filter-row   { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
+.rpt-quick-btns   { display: flex; flex-wrap: wrap; gap: 6px; flex: 1 1 auto; }
+.rpt-quick        { padding: 6px 12px; border: 1px solid var(--clr-border); border-radius: var(--radius-full); background: var(--clr-surface-2); color: var(--clr-text-muted); font-size: 12px; font-weight: 600; cursor: pointer; transition: all .15s; }
+.rpt-quick:hover  { border-color: var(--clr-primary); color: var(--clr-primary); }
+.rpt-quick--on    { background: var(--clr-primary); border-color: var(--clr-primary); color: #fff; }
+.rpt-date-inputs  { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; }
+.rpt-field        { display: flex; flex-direction: column; gap: 4px; }
+.rpt-field-label  { font-size: 11px; font-weight: 700; color: var(--clr-text-muted); text-transform: uppercase; letter-spacing: .05em; }
+.rpt-date-input   { padding: 8px 12px; border: 1px solid var(--clr-border); border-radius: var(--radius-sm); background: var(--clr-surface-2); color: var(--clr-text); font-size: 0.9rem; outline: none; }
+.rpt-date-input:focus { border-color: var(--clr-primary); box-shadow: 0 0 0 3px var(--clr-primary-glow); }
+.rpt-date-sep     { color: var(--clr-text-muted); font-size: 1.1rem; padding-bottom: 8px; }
+.rpt-load-btn     { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 
-    private string _tab = "summary";
-    private bool _loading;
+/* Employee filter */
+.rpt-emp-filter-row    { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--clr-border); align-items: center; }
+.rpt-emp-field         { flex: 1; max-width: 360px; position: relative; }
+.rpt-emp-search-wrap   { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid var(--clr-border); border-radius: var(--radius-sm); background: var(--clr-surface-2); transition: all .15s; }
+.rpt-emp-search-wrap:focus-within,
+.rpt-emp-search-wrap--open { border-color: var(--clr-primary); box-shadow: 0 0 0 3px var(--clr-primary-glow); }
+.rpt-emp-search-input  { flex: 1; border: 0; background: transparent; color: var(--clr-text); font-size: 13px; outline: none; min-width: 0; }
+.rpt-emp-search-input::placeholder { color: var(--clr-text-hint); }
+.rpt-emp-clear         { background: none; border: none; color: var(--clr-text-muted); cursor: pointer; padding: 2px; display: flex; align-items: center; border-radius: 4px; transition: color .1s; }
+.rpt-emp-clear:hover   { color: var(--clr-danger); }
+.rpt-emp-dropdown      { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 100; background: var(--clr-surface); border: 1px solid var(--clr-border); border-radius: var(--radius-sm); box-shadow: 0 8px 24px rgba(0,0,0,.12); overflow: hidden; }
+.rpt-emp-option        { display: flex; align-items: center; gap: 10px; padding: 10px 14px; cursor: pointer; transition: background .1s; }
+.rpt-emp-option:hover  { background: var(--clr-surface-2); }
+.rpt-emp-option-name   { font-weight: 600; font-size: 13px; }
+.rpt-emp-option-dept   { font-size: 11px; color: var(--clr-text-muted); margin-top: 1px; }
+.rpt-emp-avatar--sm    { width: 28px !important; height: 28px !important; font-size: 10px !important; }
+.rpt-selected-emp-chip { display: flex; align-items: center; gap: 10px; padding: 8px 14px; background: var(--clr-primary-light); border: 1px solid var(--clr-primary); border-radius: var(--radius-sm); flex-shrink: 0; }
+
+/* Employee report summary card */
+.rpt-emp-report-card   { border-left: 4px solid var(--clr-primary) !important; }
+.rpt-emp-stats-row     { display: flex; gap: 8px; flex-wrap: wrap; }
+.rpt-emp-stat          { display: flex; flex-direction: column; align-items: center; padding: 10px 16px; border-radius: var(--radius-sm); min-width: 70px; }
+.rpt-emp-stat-val      { font-size: 20px; font-weight: 800; line-height: 1; }
+.rpt-emp-stat-lbl      { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; margin-top: 3px; opacity: .8; }
+.rpt-emp-stat--present { background: var(--clr-success-light); color: var(--clr-success); }
+.rpt-emp-stat--late    { background: var(--clr-warning-light); color: var(--clr-warning); }
+.rpt-emp-stat--absent  { background: var(--clr-danger-light);  color: var(--clr-danger);  }
+.rpt-emp-stat--ot      { background: var(--clr-primary-light); color: var(--clr-primary); }
+.rpt-emp-stat--rate    { background: var(--clr-info-light);    color: var(--clr-info);    }
+
+/* Progress bar */
+.rpt-progress       { height: 3px; border-radius: 99px; background: var(--clr-border); margin-top: 12px; overflow: hidden; }
+.rpt-progress-inner { display: block; height: 100%; width: 40%; border-radius: 99px; background: linear-gradient(135deg, var(--clr-primary), #8B5CF6); animation: rpt-scan 1.4s ease-in-out infinite; }
+@@keyframes rpt-scan { 0% { transform: translateX(-150%); } 100% { transform: translateX(360%); } }
+.rpt-spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.4); border-top-color: white; border-radius: 50%; animation: rpt-spin .7s linear infinite; }
+@@keyframes rpt-spin { to { transform: rotate(360deg); } }
+
+/* Error */
+.rpt-error { border-color: var(--clr-danger) !important; color: var(--clr-danger); display: flex; align-items: center; gap: 10px; font-weight: 600; }
+
+/* KPI strip */
+.rpt-kpi-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; }
+.rpt-kpi { background: var(--clr-surface); border: 1px solid var(--clr-border); border-radius: var(--radius-lg); padding: 16px 18px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-sm); position: relative; overflow: hidden; }
+.rpt-kpi::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
+.rpt-kpi--present::before { background: var(--clr-success); }
+.rpt-kpi--late::before    { background: var(--clr-warning); }
+.rpt-kpi--absent::before  { background: var(--clr-danger);  }
+.rpt-kpi--ot::before      { background: var(--clr-primary); }
+.rpt-kpi--rate::before    { background: var(--clr-info);    }
+.rpt-kpi--avg::before     { background: #8B5CF6;            }
+.rpt-kpi-icon { font-size: 18px; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0; font-weight: 800; }
+.rpt-kpi--present .rpt-kpi-icon { background: var(--clr-success-light); color: var(--clr-success); }
+.rpt-kpi--late    .rpt-kpi-icon { background: var(--clr-warning-light); color: var(--clr-warning); }
+.rpt-kpi--absent  .rpt-kpi-icon { background: var(--clr-danger-light);  color: var(--clr-danger);  }
+.rpt-kpi--ot      .rpt-kpi-icon { background: var(--clr-primary-light); color: var(--clr-primary); }
+.rpt-kpi--rate    .rpt-kpi-icon { background: var(--clr-info-light);    color: var(--clr-info);    }
+.rpt-kpi--avg     .rpt-kpi-icon { background: #ede9fe;                  color: #7c3aed;            }
+.rpt-kpi-val { font-size: 22px; font-weight: 800; line-height: 1; letter-spacing: -.02em; }
+.rpt-kpi-lbl { font-size: 11px; color: var(--clr-text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; margin-top: 3px; }
+
+/* Tabs */
+.rpt-tabs { display: flex; gap: 4px; background: var(--clr-surface); border: 1px solid var(--clr-border); border-radius: var(--radius-lg); padding: 6px; box-shadow: var(--shadow-sm); }
+.rpt-tab  { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 14px; border: 0; background: transparent; color: var(--clr-text-muted); font-size: 13px; font-weight: 600; border-radius: var(--radius-sm); cursor: pointer; transition: all .15s; white-space: nowrap; }
+.rpt-tab:hover   { background: var(--clr-surface-2); color: var(--clr-text); }
+.rpt-tab--active { background: var(--clr-primary); color: #fff; box-shadow: 0 4px 12px var(--clr-primary-glow); }
+
+/* Card & table */
+.rpt-card { padding: 0; overflow: hidden; }
+.rpt-card-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 20px; border-bottom: 1px solid var(--clr-border); flex-wrap: wrap; }
+.rpt-card-title-group { display: flex; align-items: center; gap: 10px; }
+.rpt-card-title { margin: 0; font-size: 16px; font-weight: 700; }
+.rpt-badge { background: var(--clr-primary-light); color: var(--clr-primary); font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: var(--radius-full); }
+.rpt-card-actions { display: flex; align-items: center; gap: 8px; }
+.rpt-table { margin: 0; }
+.rpt-table thead th { padding: 12px 16px; }
+.rpt-table tbody td { padding: 12px 16px; }
+.rpt-table-wrap { overflow-x: auto; }
+.rpt-row { cursor: default; transition: background .1s; }
+.rpt-row:hover { background: var(--clr-surface-2) !important; }
+.rpt-th-sort { cursor: pointer; user-select: none; white-space: nowrap; }
+.rpt-th-sort:hover { color: var(--clr-primary); }
+.rpt-th-active { color: var(--clr-primary) !important; }
+
+/* Search / select mini */
+.rpt-search-mini { padding: 7px 10px; border: 1px solid var(--clr-border); border-radius: var(--radius-sm); background: var(--clr-surface-2); color: var(--clr-text); font-size: 13px; outline: none; width: 180px; }
+.rpt-search-mini:focus { border-color: var(--clr-primary); box-shadow: 0 0 0 3px var(--clr-primary-glow); }
+.rpt-select-mini { padding: 7px 10px; border: 1px solid var(--clr-border); border-radius: var(--radius-sm); background: var(--clr-surface-2); color: var(--clr-text); font-size: 13px; outline: none; cursor: pointer; }
+
+/* Progress bar in table */
+.rpt-bar-cell { display: flex; align-items: center; gap: 8px; }
+.rpt-bar-wrap { flex: 1; height: 8px; border-radius: 99px; background: var(--clr-border); overflow: hidden; min-width: 80px; }
+.rpt-bar { height: 100%; border-radius: 99px; transition: width .4s ease; }
+.rpt-bar-pct { font-size: 12px; color: var(--clr-text-muted); font-weight: 600; min-width: 32px; text-align: right; }
+
+/* Chart */
+.rpt-chart-scroll { overflow-x: auto; padding: 16px 20px 20px; }
+.rpt-bar-chart { width: 100%; min-width: 300px; height: 220px; }
+
+/* Employee cell */
+.rpt-emp-cell { display: flex; align-items: center; gap: 10px; }
+.rpt-emp-avatar { width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(135deg, var(--clr-primary), #8B5CF6); color: #fff; font-size: 11px; font-weight: 800; display: grid; place-items: center; flex-shrink: 0; }
+
+/* Time cells */
+.rpt-time { font-weight: 600; font-size: 0.88rem; }
+.rpt-time--in  { color: var(--clr-success); }
+.rpt-time--out { color: var(--clr-text-muted); }
+.rpt-date-cell  { color: var(--clr-text-muted); font-size: 0.87rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rpt-muted-cell { color: var(--clr-text-muted); font-size: 0.87rem; }
+.rpt-nil { color: var(--clr-text-hint); }
+.rpt-chip-late { background: var(--clr-warning-light); color: #92400E; border-radius: 6px; padding: 3px 7px; font-size: 11px; font-weight: 700; }
+.rpt-chip-ot   { background: var(--clr-primary-light); color: var(--clr-primary); border-radius: 6px; padding: 3px 7px; font-size: 11px; font-weight: 700; }
+
+/* Overtime cards */
+.rpt-ot-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.rpt-ot-card { border-radius: var(--radius-lg); padding: 24px 20px; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; box-shadow: var(--shadow); }
+.rpt-ot-card--primary { background: linear-gradient(135deg, var(--clr-primary), #8B5CF6); color: #fff; }
+.rpt-ot-card--info    { background: linear-gradient(135deg, var(--clr-info), #60A5FA); color: #fff; }
+.rpt-ot-card--warning { background: linear-gradient(135deg, var(--clr-warning), #FCD34D); color: #fff; }
+.rpt-ot-card--success { background: linear-gradient(135deg, var(--clr-success), #34D399); color: #fff; }
+.rpt-ot-icon { font-size: 22px; }
+.rpt-ot-val  { font-size: 32px; font-weight: 800; line-height: 1; letter-spacing: -.03em; }
+.rpt-ot-lbl  { font-size: 13px; font-weight: 600; opacity: .9; }
+.rpt-ot-sub  { font-size: 11px; opacity: .75; }
+
+/* Pagination */
+.rpt-pagination { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 14px 18px; border-top: 1px solid var(--clr-border); }
+.rpt-page-info  { font-size: 13px; color: var(--clr-text-muted); }
+.rpt-page-btns  { display: flex; gap: 4px; }
+.rpt-page-btn   { width: 32px; height: 32px; border: 1px solid var(--clr-border); border-radius: var(--radius-sm); background: var(--clr-surface); color: var(--clr-text); cursor: pointer; font-size: 14px; font-weight: 600; transition: all .15s; }
+.rpt-page-btn:hover:not(:disabled) { border-color: var(--clr-primary); color: var(--clr-primary); }
+.rpt-page-btn--on { background: var(--clr-primary); border-color: var(--clr-primary); color: #fff !important; }
+.rpt-page-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+/* Empty state */
+.rpt-empty { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 48px 16px; color: var(--clr-text-muted); }
+.rpt-empty-icon { font-size: 40px; opacity: .4; }
+
+/* Export btn */
+.rpt-export-group { display: flex; gap: 6px; }
+.rpt-export-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border: 1px solid var(--clr-border); border-radius: var(--radius-sm); background: var(--clr-surface); color: var(--clr-text-muted); font-size: 12px; font-weight: 700; cursor: pointer; transition: all .15s; }
+.rpt-export-btn:hover:not(:disabled) { border-color: var(--clr-primary); color: var(--clr-primary); }
+.rpt-export-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Responsive */
+@@media (max-width: 1100px) { .rpt-kpi-row { grid-template-columns: repeat(3, 1fr); } }
+@@media (max-width: 768px)  { .rpt-kpi-row { grid-template-columns: repeat(2, 1fr); } .rpt-ot-grid { grid-template-columns: 1fr 1fr; } .rpt-tabs { flex-wrap: wrap; } .rpt-date-inputs { flex-direction: column; align-items: stretch; } .rpt-search-mini { width: 100%; } .rpt-emp-field { max-width: 100%; } .rpt-emp-stats-row { gap: 6px; } }
+@@media (max-width: 500px)  { .rpt-kpi-row { grid-template-columns: 1fr 1fr; } .rpt-ot-grid { grid-template-columns: 1fr; } }
+</style>
+
+@code {
+    // ─── Date range ────────────────────────────────────────────────────────
+    private DateOnly from = new(DateTime.Today.Year, DateTime.Today.Month, 1);
+    private DateOnly to   = DateOnly.FromDateTime(DateTime.Today);
+    private string _quick = "month";
+
+    // ─── UI state ──────────────────────────────────────────────────────────
+    private string _tab     = "summary";
+    private bool   _loading;
     private string? error;
 
-    private IReadOnlyList<DepartmentSummaryDto> summaries = [];
-    private List<Dictionary<string, object?>> attendanceRows = [];
+    // ─── Data ──────────────────────────────────────────────────────────────
+    private IReadOnlyList<DepartmentSummaryDto> summaries     = [];
+    private List<Dictionary<string, object?>>   attendanceRows = [];
+    private List<Dictionary<string, object?>>   employeeRows   = [];
     private int _attendanceTotal;
     private int _attendancePage = 1;
+    private int _empTotal;
+    private int _empPage = 1;
+    private bool _employeesLoaded;
     private OvertimeSummaryDto? overtimeSummary;
 
+    // ─── Employee filter ───────────────────────────────────────────────────
+    private string _empFilterSearch  = string.Empty;
+    private List<EmpSuggestion> _empSuggestions = [];
+    private EmpSuggestion? _selectedEmployee;
+    private bool _empDropdownOpen;
+    private EmpStats _empStats = new();
+    private CancellationTokenSource? _searchCts;
+
+    private sealed record EmpSuggestion(Guid Id, string FullName, string Department);
+    private sealed record EmpStats(int Present = 0, int Late = 0, int Absent = 0,
+        decimal OvertimeHours = 0, int AttendanceRate = 0);
+
+    // ─── Filters / search / sort ───────────────────────────────────────────
+    private string _summarySearch   = string.Empty;
+    private string _attSearch       = string.Empty;
+    private string _attStatusFilter = string.Empty;
+    private string _empSearch       = string.Empty;
+
+    private string _sortGroup = string.Empty;
+    private string _sortField = string.Empty;
+    private bool   _sortAsc   = true;
+
+    private const int AttPageSize = 20;
+    private int _attPage = 1;
+
+    // ─── Computed KPIs ─────────────────────────────────────────────────────
+    private int totalPresent => _selectedEmployee is not null
+        ? _empStats.Present
+        : summaries.Sum(s => s.Present);
+    private int totalLate => _selectedEmployee is not null
+        ? _empStats.Late
+        : summaries.Sum(s => s.Late);
+    private int totalAbsent => _selectedEmployee is not null
+        ? _empStats.Absent
+        : summaries.Sum(s => s.Leave);
+    private int AttendanceRate
+    {
+        get
+        {
+            if (_selectedEmployee is not null) return _empStats.AttendanceRate;
+            var total = totalPresent + totalAbsent;
+            return total == 0 ? 0 : (int)Math.Round(totalPresent * 100.0 / total);
+        }
+    }
+
+    // ─── Filtered / sorted lists ───────────────────────────────────────────
+    private List<DepartmentSummaryDto> FilteredSummaries
+    {
+        get
+        {
+            var q = _summarySearch.Trim().ToLowerInvariant();
+            var list = summaries
+                .Where(s => string.IsNullOrEmpty(q) || s.DepartmentName.ToLowerInvariant().Contains(q))
+                .ToList();
+            return (_sortGroup == "dept" ? _sortField : "name") switch
+            {
+                "name"    => _sortAsc ? list.OrderBy(s => s.DepartmentName).ToList() : list.OrderByDescending(s => s.DepartmentName).ToList(),
+                "present" => _sortAsc ? list.OrderBy(s => s.Present).ToList()        : list.OrderByDescending(s => s.Present).ToList(),
+                "late"    => _sortAsc ? list.OrderBy(s => s.Late).ToList()           : list.OrderByDescending(s => s.Late).ToList(),
+                "leave"   => _sortAsc ? list.OrderBy(s => s.Leave).ToList()          : list.OrderByDescending(s => s.Leave).ToList(),
+                _         => list
+            };
+        }
+    }
+
+    private List<Dictionary<string, object?>> FilteredAttendance
+    {
+        get
+        {
+            var q  = _attSearch.Trim().ToLowerInvariant();
+            var sf = _attStatusFilter;
+            var list = attendanceRows
+                .Where(r =>
+                    (string.IsNullOrEmpty(q)  || Val(r, "Employee").ToLowerInvariant().Contains(q)) &&
+                    (string.IsNullOrEmpty(sf) || Val(r, "Status") == sf))
+                .ToList();
+            list = (_sortGroup == "att" ? _sortField : "date") switch
+            {
+                "date"     => _sortAsc ? list.OrderBy(r => Val(r,"Date")).ToList()     : list.OrderByDescending(r => Val(r,"Date")).ToList(),
+                "employee" => _sortAsc ? list.OrderBy(r => Val(r,"Employee")).ToList() : list.OrderByDescending(r => Val(r,"Employee")).ToList(),
+                "late"     => _sortAsc
+                    ? list.OrderBy(r    => decimal.TryParse(Val(r,"LateMinutes"),  out var v) ? v : 0).ToList()
+                    : list.OrderByDescending(r => decimal.TryParse(Val(r,"LateMinutes"),  out var v) ? v : 0).ToList(),
+                "overtime" => _sortAsc
+                    ? list.OrderBy(r    => decimal.TryParse(Val(r,"OvertimeHours"), out var v) ? v : 0).ToList()
+                    : list.OrderByDescending(r => decimal.TryParse(Val(r,"OvertimeHours"), out var v) ? v : 0).ToList(),
+                _ => list
+            };
+            return list;
+        }
+    }
+
+    private IEnumerable<Dictionary<string, object?>> PagedAttendance =>
+        FilteredAttendance.Skip((_attPage - 1) * AttPageSize).Take(AttPageSize);
+    private int AttTotalPages =>
+        Math.Max(1, (int)Math.Ceiling((double)FilteredAttendance.Count / AttPageSize));
+
+    private List<Dictionary<string, object?>> FilteredEmployees
+    {
+        get
+        {
+            var q = _empSearch.Trim().ToLowerInvariant();
+            var list = employeeRows
+                .Where(r => string.IsNullOrEmpty(q) ||
+                    Val(r, "FullName").ToLowerInvariant().Contains(q) ||
+                    Val(r, "Department").ToLowerInvariant().Contains(q))
+                .ToList();
+            return (_sortGroup == "emp" ? _sortField : "name") switch
+            {
+                "code" => _sortAsc ? list.OrderBy(r => Val(r,"EmployeeCode")).ToList() : list.OrderByDescending(r => Val(r,"EmployeeCode")).ToList(),
+                "name" => _sortAsc ? list.OrderBy(r => Val(r,"FullName")).ToList()     : list.OrderByDescending(r => Val(r,"FullName")).ToList(),
+                "dept" => _sortAsc ? list.OrderBy(r => Val(r,"Department")).ToList()   : list.OrderByDescending(r => Val(r,"Department")).ToList(),
+                "hire" => _sortAsc ? list.OrderBy(r => Val(r,"HireDate")).ToList()     : list.OrderByDescending(r => Val(r,"HireDate")).ToList(),
+                _ => list
+            };
+        }
+    }
+
+    // ─── Lifecycle ─────────────────────────────────────────────────────────
     protected override Task OnInitializedAsync() => LoadAsync();
 
+    // ─── Load ──────────────────────────────────────────────────────────────
     private async Task LoadAsync()
     {
         _loading = true;
-        error = null;
+        error    = null;
         _attendancePage = 1;
-        attendanceRows = [];
+        _attPage = 1;
+        attendanceRows  = [];
         StateHasChanged();
         try
         {
-            var summaryTask = Api.GetAsync<IReadOnlyList<DepartmentSummaryDto>>(
+            var summaryTask  = Api.GetAsync<IReadOnlyList<DepartmentSummaryDto>>(
                 $"api/reports/summary?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}");
             var overtimeTask = Api.GetOvertimeSummaryAsync(from, to);
-            var attendanceTask = Api.GetAsync<PagedResponse<Dictionary<string, object?>>>(
-                $"api/reports/attendance?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}&pageNumber=1&pageSize=50");
 
+            // ажилтан сонгосон бол employeeId filter нэмнэ
+            var attUrl = _selectedEmployee is not null
+                ? $"api/reports/attendance?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}&employeeId={_selectedEmployee.Id}&pageNumber=1&pageSize=200"
+                : $"api/reports/attendance?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}&pageNumber=1&pageSize=50";
+
+            var attendanceTask = Api.GetAsync<PagedResponse<Dictionary<string, object?>>>(attUrl);
             await Task.WhenAll(summaryTask, overtimeTask, attendanceTask);
 
-            summaries = summaryTask.Result ?? [];
-            overtimeSummary = overtimeTask.Result;
-            var attendanceResult = attendanceTask.Result;
-            attendanceRows = attendanceResult?.Items?.ToList() ?? [];
-            _attendanceTotal = attendanceResult?.TotalCount ?? 0;
+            summaries        = summaryTask.Result  ?? [];
+            overtimeSummary  = overtimeTask.Result;
+            var ar           = attendanceTask.Result;
+            attendanceRows   = ar?.Items?.ToList() ?? [];
+            _attendanceTotal = ar?.TotalCount ?? 0;
+
+            if (_selectedEmployee is not null)
+                RecalcEmpStats();
         }
-        catch (Exception ex)
+        catch (Exception ex) { error = ex.Message; }
+        finally { _loading = false; }
+    }
+
+    private async Task SwitchEmployeesTab()
+    {
+        _tab = "employees";
+        if (_employeesLoaded) return;
+        _loading = true;
+        StateHasChanged();
+        try
         {
-            error = ex.Message;
+            var r = await Api.GetAsync<PagedResponse<Dictionary<string, object?>>>(
+                "api/reports/employees?pageNumber=1&pageSize=100");
+            employeeRows     = r?.Items?.ToList() ?? [];
+            _empTotal        = r?.TotalCount ?? 0;
+            _employeesLoaded = true;
         }
-        finally
-        {
-            _loading = false;
-        }
+        catch (Exception ex) { error = ex.Message; }
+        finally { _loading = false; }
     }
 
     private async Task LoadMoreAttendance()
@@ -224,48 +921,188 @@
         _attendancePage++;
         try
         {
-            var result = await Api.GetAsync<PagedResponse<Dictionary<string, object?>>>(
-                $"api/reports/attendance?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}&pageNumber={_attendancePage}&pageSize=50");
-            if (result?.Items is not null)
-                attendanceRows.AddRange(result.Items);
+            var empParam = _selectedEmployee is not null ? $"&employeeId={_selectedEmployee.Id}" : "";
+            var r = await Api.GetAsync<PagedResponse<Dictionary<string, object?>>>(
+                $"api/reports/attendance?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}{empParam}&pageNumber={_attendancePage}&pageSize=50");
+            if (r?.Items is not null) attendanceRows.AddRange(r.Items);
+            if (_selectedEmployee is not null) RecalcEmpStats();
         }
         catch (Exception ex) { error = ex.Message; }
     }
 
-    private async Task ExportAsync(string type)
+    private async Task LoadMoreEmployees()
+    {
+        _empPage++;
+        try
+        {
+            var r = await Api.GetAsync<PagedResponse<Dictionary<string, object?>>>(
+                $"api/reports/employees?pageNumber={_empPage}&pageSize=100");
+            if (r?.Items is not null) employeeRows.AddRange(r.Items);
+        }
+        catch (Exception ex) { error = ex.Message; }
+    }
+
+    // ─── Employee filter ───────────────────────────────────────────────────
+    private async Task OnEmpSearchInput(ChangeEventArgs e)
+    {
+        _empFilterSearch = e.Value?.ToString() ?? string.Empty;
+        _empSuggestions  = [];
+        _empDropdownOpen = false;
+
+        if (_empFilterSearch.Length < 2) { StateHasChanged(); return; }
+
+        _searchCts?.Cancel();
+        _searchCts = new CancellationTokenSource();
+        try
+        {
+            await Task.Delay(300, _searchCts.Token);
+            var result = await Api.GetAsync<PagedResponse<Dictionary<string, object?>>>(
+                $"api/reports/employees?search={Uri.EscapeDataString(_empFilterSearch)}&pageNumber=1&pageSize=8");
+
+            _empSuggestions = result?.Items?
+                .Select(r => new EmpSuggestion(
+                    Guid.TryParse(Val(r, "Id"), out var id) ? id : Guid.Empty,
+                    Val(r, "FullName"),
+                    Val(r, "Department")))
+                .Where(s => s.Id != Guid.Empty)
+                .ToList() ?? [];
+
+            _empDropdownOpen = _empSuggestions.Count > 0;
+        }
+        catch (TaskCanceledException) { }
+        catch (Exception ex) { error = ex.Message; }
+        StateHasChanged();
+    }
+
+    private async Task SelectEmployee(EmpSuggestion emp)
+    {
+        _selectedEmployee = emp;
+        _empFilterSearch  = emp.FullName;
+        _empSuggestions   = [];
+        _empDropdownOpen  = false;
+        _tab = "attendance";
+        await LoadAsync();
+    }
+
+    private void ClearEmployeeFilter()
+    {
+        _selectedEmployee = null;
+        _empFilterSearch  = string.Empty;
+        _empSuggestions   = [];
+        _empDropdownOpen  = false;
+        _empStats         = new();
+        _ = LoadAsync();
+    }
+
+    private void RecalcEmpStats()
+    {
+        var present  = attendanceRows.Count(r => Val(r, "Status") == "Present");
+        var late     = attendanceRows.Count(r => Val(r, "Status") == "Late");
+        var absent   = attendanceRows.Count(r => Val(r, "Status") == "Absent");
+        var ot       = attendanceRows
+            .Where(r => decimal.TryParse(Val(r, "OvertimeHours"), out _))
+            .Sum(r   => decimal.Parse(Val(r, "OvertimeHours")));
+        var total    = present + late + absent;
+        var rate     = total == 0 ? 0 : (int)Math.Round((present + late) * 100.0 / total);
+        _empStats    = new EmpStats(present, late, absent, ot, rate);
+    }
+
+    // ─── Quick date presets ────────────────────────────────────────────────
+    private void SetQuick(string key)
+    {
+        _quick = key;
+        var today = DateTime.Today;
+        (from, to) = key switch
+        {
+            "today" => (DateOnly.FromDateTime(today), DateOnly.FromDateTime(today)),
+            "week"  => (DateOnly.FromDateTime(today.AddDays(-6)), DateOnly.FromDateTime(today)),
+            "month" => (new DateOnly(today.Year, today.Month, 1), DateOnly.FromDateTime(today)),
+            "last"  => (new DateOnly(today.Year, today.Month, 1).AddMonths(-1),
+                        new DateOnly(today.Year, today.Month, 1).AddDays(-1)),
+            "q1"    => (new DateOnly(today.Year, 1,  1),  new DateOnly(today.Year, 3,  31)),
+            "q2"    => (new DateOnly(today.Year, 4,  1),  new DateOnly(today.Year, 6,  30)),
+            "q3"    => (new DateOnly(today.Year, 7,  1),  new DateOnly(today.Year, 9,  30)),
+            "q4"    => (new DateOnly(today.Year, 10, 1),  new DateOnly(today.Year, 12, 31)),
+            "year"  => (new DateOnly(today.Year, 1,  1),  new DateOnly(today.Year, 12, 31)),
+            _       => (from, to)
+        };
+    }
+    private bool IsQuick(string key) => _quick == key;
+
+    // ─── Sort helpers ──────────────────────────────────────────────────────
+    private void SetSummarySort(string f) { if (_sortGroup == "dept" && _sortField == f) _sortAsc = !_sortAsc; else { _sortGroup = "dept"; _sortField = f; _sortAsc = true; } }
+    private void SetAttSort(string f)     { _attPage = 1; if (_sortGroup == "att"  && _sortField == f) _sortAsc = !_sortAsc; else { _sortGroup = "att";  _sortField = f; _sortAsc = true; } }
+    private void SetEmpSort(string f)     { if (_sortGroup == "emp"  && _sortField == f) _sortAsc = !_sortAsc; else { _sortGroup = "emp";  _sortField = f; _sortAsc = true; } }
+
+    private string SortCls(string g, string f)   => _sortGroup == g && _sortField == f ? "rpt-th-active" : "";
+    private string SortArrow(string g, string f)  => _sortGroup != g || _sortField != f ? "⇅" : _sortAsc ? "↑" : "↓";
+
+    // ─── Export ────────────────────────────────────────────────────────────
+    private async Task ExportCsvAsync(string type)
     {
         try
         {
-            var url = $"api/reports/{type}/export/excel?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}";
-            await Api.GetAsync<object>(url);
+            var empParam = _selectedEmployee is not null ? $"&employeeId={_selectedEmployee.Id}" : "";
+            await JS.InvokeVoidAsync("open",
+                $"/api/reports/{type}/export/excel?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}{empParam}", "_blank");
         }
-        catch { }
+        catch (Exception ex) { error = ex.Message; }
     }
 
-    private static string Val(Dictionary<string, object?> row, string key)
-        => row.TryGetValue(key, out var v) && v is not null ? v.ToString()! : "—";
+    // ─── Helpers ───────────────────────────────────────────────────────────
+    private static string Val(Dictionary<string, object?> r, string k)
+        => r.TryGetValue(k, out var v) && v is not null ? v.ToString()! : "—";
 
-    private static string FormatDate(Dictionary<string, object?> row, string key)
+    private static string FormatDate(Dictionary<string, object?> r, string k)
     {
-        if (!row.TryGetValue(key, out var v) || v is null) return "—";
-        return v is DateOnly d ? d.ToString("yyyy-MM-dd")
-             : DateTime.TryParse(v.ToString(), out var dt) ? dt.ToString("yyyy-MM-dd") : v.ToString()!;
+        if (!r.TryGetValue(k, out var v) || v is null) return "—";
+        if (v is DateOnly d) return d.ToString("yyyy-MM-dd");
+        return DateTime.TryParse(v.ToString(), out var dt) ? dt.ToString("yyyy-MM-dd") : v.ToString()!;
     }
 
-    private static string FormatTime(Dictionary<string, object?> row, string key)
+    private static string FormatDateObj(Dictionary<string, object?> r, string k)
     {
-        if (!row.TryGetValue(key, out var v) || v is null) return "—";
-        return TimeSpan.TryParse(v.ToString(), out var t) ? t.ToString(@"HH\:mm") : v.ToString()!;
+        if (!r.TryGetValue(k, out var v) || v is null) return "—";
+        if (v is DateOnly d) return d.ToString("yyyy-MM-dd");
+        return DateTime.TryParse(v.ToString(), out var dt) ? dt.ToString("yyyy-MM-dd") : v.ToString()!;
     }
 
-    private static string StatusBadge(string? status) => status switch
+    private static string FormatTime(Dictionary<string, object?> r, string k)
     {
-        "Present"  => "badge-present",
-        "Late"     => "badge-late",
-        "Absent"   => "badge-absent",
-        "OnLeave"  => "badge-leave",
-        _          => ""
+        if (!r.TryGetValue(k, out var v) || v is null) return "—";
+        var s = v.ToString();
+        if (DateTime.TryParse(s, out var dt)) return dt.ToString("HH:mm");
+        if (TimeSpan.TryParse(s, out var ts)) return ts.ToString(@"hh\:mm");
+        return s ?? "—";
+    }
+
+    private static string StatusBadge(string? s) => s switch
+    {
+        "Present" => "badge-present",
+        "Late"    => "badge-late",
+        "Absent"  => "badge-absent",
+        "OnLeave" => "badge-leave",
+        _         => ""
     };
+
+    private static string StatusLabel(string? s) => s switch
+    {
+        "Present" => "Ирсэн",
+        "Late"    => "Хоцорсон",
+        "Absent"  => "Ирээгүй",
+        "OnLeave" => "Чөлөөтэй",
+        _         => s ?? "—"
+    };
+
+    private static string Initials(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "?";
+        var p = name.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return p.Length >= 2 ? $"{p[0][0]}{p[1][0]}".ToUpper() : name[..Math.Min(2, name.Length)].ToUpper();
+    }
+
+    private static string Truncate(string s, int max) =>
+        s.Length <= max ? s : s[..max] + "…";
 
     private sealed record DepartmentSummaryDto(Guid DepartmentId, string DepartmentName, int Present, int Late, int Leave);
 }
