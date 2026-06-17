@@ -46,9 +46,9 @@ public class DefaultAiProvider : IAiProvider
             {
                 model       = model,
                 messages    = chatMessages,
-                temperature = 0.35,   // ↓ Бодит дата дээр тулгуурласан хариултанд тогтвортой байдал чухал тул бууруулсан
+                temperature = 0.45,   // ↑ Дата лавлагаанаас гадна HR зөвлөгөө/тооцоолол хариулдаг тул бага зэрэг уян хатан
                 top_p       = 0.9,
-                max_tokens  = 900,
+                max_tokens  = 12000,
                 stream      = false
             };
 
@@ -61,7 +61,7 @@ public class DefaultAiProvider : IAiProvider
 
             // ✅ Timeout — гадны API маш удаашрахаас хамгаалах
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(100));
+            cts.CancelAfter(TimeSpan.FromSeconds(200)); // 25 секундийн timeout, шаардлагатай бол тохируулна уу
 
             var response = await _httpClient.SendAsync(httpRequest, cts.Token);
 
@@ -128,6 +128,12 @@ public class DefaultAiProvider : IAiProvider
 
         if (lower.Contains("цалин") || lower.Contains("salary"))
             return "Цалингийн мэдээллийн талаар дэлгэрэнгүй мэдэхийн тулд HR хэлтэстэй шууд холбогдоорой." + note;
+
+        if (lower.Contains("хууль") || lower.Contains("эрх зүй") || lower.Contains("журам") || lower.Contains("бодлого"))
+            return "Хөдөлмөрийн эрх зүй болон компанийн бодлогын тодорхой асуултад одоогоор хариулах боломжгүй байна. HR хэлтэс эсвэл компанийн дотоод журмын баримтаас шалгаарай." + note;
+
+        if (lower.Contains("илүү цаг") || lower.Contains("overtime") || lower.Contains("тооцоо"))
+            return "Илүү цаг, цалингийн тооцооллын дэлгэрэнгүйг одоогоор гаргаж чадахгүй байна. HR хэлтэстэй холбогдож нарийвчилсан тооцооллыг авна уу." + note;
 
         return $"Таны асуултыг хүлээн авлаа: \"{lastUserMessage}\". Одоогоор AI үйлчилгээ боломжгүй байна — HR-тэй холбогдож тодруулга авахыг зөвлөж байна." + note;
     }
