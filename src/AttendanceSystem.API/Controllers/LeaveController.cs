@@ -22,6 +22,7 @@ namespace AttendanceSystem.API.Controllers
         }
 
         [HttpPost("requests")]
+        [Authorize(Roles = "Employee,SuperAdmin,HRManager,DepartmentHead")]
         public async Task<IActionResult> CreateLeave([FromBody] LeaveRequestDto request)
         {
             if (request == null)
@@ -64,6 +65,7 @@ namespace AttendanceSystem.API.Controllers
         }
 
         [HttpGet("requests")]
+        [Authorize(Roles = "SuperAdmin,HRManager,DepartmentHead")]
         public async Task<IActionResult> List(
             [FromQuery] string? status,
             [FromQuery] int pageNumber = 1,
@@ -112,6 +114,7 @@ namespace AttendanceSystem.API.Controllers
         }
 
         [HttpGet("history")]
+        [Authorize(Roles = "Employee,SuperAdmin,HRManager,DepartmentHead")]
         public async Task<IActionResult> History(CancellationToken cancellationToken)
         {
             var employeeId = GetEmployeeId();
@@ -153,6 +156,7 @@ namespace AttendanceSystem.API.Controllers
         }
 
         [HttpGet("statistics")]
+        [Authorize(Roles = "Employee,SuperAdmin,HRManager,DepartmentHead")]
         public async Task<IActionResult> Statistics(CancellationToken cancellationToken)
         {
             var employeeId = GetEmployeeId();
@@ -169,13 +173,14 @@ namespace AttendanceSystem.API.Controllers
             return Ok(new LeaveStatisticsApiDto(used, pending));
         }
 
+        /// <summary>
+        /// Чөлөөний хүсэлтийг зөвшөөрнө.
+        /// Admin/HR (employee_id claim-гүй) ч Employee (claim-той) ч ажиллана.
+        /// </summary>
         [HttpPost("requests/{id:guid}/approve")]
+        [Authorize(Roles = "SuperAdmin,HRManager,DepartmentHead")]
         public async Task<IActionResult> Approve(Guid id, CancellationToken cancellationToken)
         {
-            var employeeId = GetEmployeeId();
-            if (employeeId is null)
-                return Unauthorized(new { error = "Employee profile not linked to user." });
-
             var request = await _context.LeaveRequests.FirstOrDefaultAsync(l => l.Id == id, cancellationToken);
             if (request is null)
                 return NotFound(new { error = "Leave request not found." });
@@ -183,18 +188,23 @@ namespace AttendanceSystem.API.Controllers
             if (request.Status != RequestStatus.Pending)
                 return BadRequest(new { error = "Only pending leave requests can be approved." });
 
-            request.Approve(employeeId.Value);
+            // employee_id claim байвал ашиглана (DepartmentHead зэрэг хувийн профайлтай админ),
+            // байхгүй бол Guid.Empty (SuperAdmin/HRManager-ийн системийн зөвшөөрөл).
+            var approverId = GetEmployeeId() ?? Guid.Empty;
+
+            request.Approve(approverId);
             await _context.SaveChangesAsync(cancellationToken);
             return Ok(new { message = "Leave request approved." });
         }
 
+        /// <summary>
+        /// Чөлөөний хүсэлтийг татгалзана.
+        /// Admin/HR (employee_id claim-гүй) ч Employee (claim-той) ч ажиллана.
+        /// </summary>
         [HttpPost("requests/{id:guid}/reject")]
+        [Authorize(Roles = "SuperAdmin,HRManager,DepartmentHead")]
         public async Task<IActionResult> Reject(Guid id, CancellationToken cancellationToken)
         {
-            var employeeId = GetEmployeeId();
-            if (employeeId is null)
-                return Unauthorized(new { error = "Employee profile not linked to user." });
-
             var request = await _context.LeaveRequests.FirstOrDefaultAsync(l => l.Id == id, cancellationToken);
             if (request is null)
                 return NotFound(new { error = "Leave request not found." });
@@ -202,7 +212,9 @@ namespace AttendanceSystem.API.Controllers
             if (request.Status != RequestStatus.Pending)
                 return BadRequest(new { error = "Only pending leave requests can be rejected." });
 
-            request.Reject(employeeId.Value);
+            var approverId = GetEmployeeId() ?? Guid.Empty;
+
+            request.Reject(approverId);
             await _context.SaveChangesAsync(cancellationToken);
             return Ok(new { message = "Leave request rejected." });
         }

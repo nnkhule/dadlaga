@@ -1,17 +1,27 @@
 @page "/admin/employees"
 @layout AdminLayout
-@attribute [Authorize(Roles = "Admin,SuperAdmin,HRManager")] 
+@attribute [Authorize(Roles = "SuperAdmin,HRManager,DepartmentHead")]
 @inject ApiClient Api
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 
-<PageHeader Title="Employees" Subtitle="Employee records loaded from the database" Icon="☷">
-    <Actions><button class="btn-primary" @onclick="CreateEmployee">Add</button></Actions>
+<PageHeader Title="Ажилтнууд" Subtitle="Мэдээллийн сангаас ачааллагдсан ажилтны бүртгэл" Icon="☷">
+    <Actions><button class="btn-primary" @onclick="CreateEmployee">+ Нэмэх</button></Actions>
 </PageHeader>
 
-<div class="page-stack">
-    <div class="card filter-bar">
-        <input class="form-control" placeholder="Search employees" @bind="search" @bind:event="oninput" />
-        <button class="btn btn-ghost" @onclick="LoadAsync">Search</button>
+<div class="page-stack" @onclick="CloseAllMenus">
+    <div class="card filter-bar" style="display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
+        <input class="form-control"
+               style="flex:1; min-width:200px"
+               placeholder="Ажилтан хайх..."
+               value="@search"
+               @oninput="OnSearchInput" />
+
+        <select class="form-control" style="max-width:160px" value="@statusFilter" @onchange="OnStatusChanged">
+            <option value="all">Бүх төлөв</option>
+            <option value="active">Идэвхтэй</option>
+            <option value="inactive">Идэвхгүй</option>
+        </select>
     </div>
 
     @if (!string.IsNullOrWhiteSpace(error))
@@ -19,10 +29,19 @@
         <div class="card" style="border-color:var(--clr-danger);color:var(--clr-danger)">@error</div>
     }
 
+    @if (!string.IsNullOrWhiteSpace(statusMessage))
+    {
+        <div class="card" style="border-color:var(--clr-success);color:var(--clr-success)">@statusMessage</div>
+    }
+
     <div class="card">
-        @if (employees.Count == 0)
+        @if (isLoading)
         {
-            <div class="empty-state">No employees found.</div>
+            <div class="empty-state">Ачааллаж байна...</div>
+        }
+        else if (employees.Count == 0)
+        {
+            <div class="empty-state">Ажилтан олдсонгүй.</div>
         }
         else
         {
@@ -30,64 +49,392 @@
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th>Code</th>
-                            <th>Name</th>
-                            <th>Email</th>
-                            <th>Department</th>
-                            <th>Hire Date</th>
-                            <th>Status</th>
-                            <th>Actions</th>
+                            <th>Код</th>
+                            <th>Нэр</th>
+                            <th>Имэйл</th>
+                            <th>Хэлтэс</th>
+                            <th>Огноо</th>
+                            <th>Төлөв</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var employee in employees)
+                        @foreach (var emp in employees)
                         {
-                            <tr>
-                                <td>@employee.EmployeeCode</td>
-                                <td>@employee.FullName</td>
-                                <td>@employee.Email</td>
-                                <td>@Display(employee.Department ?? employee.DepartmentName)</td>
-                                <td>@employee.HireDate.ToString("yyyy-MM-dd")</td>
-                                <td><span class="badge @(employee.IsActive ? "badge-present" : "badge-absent")">@Display(employee.Status ?? (employee.IsActive ? "Active" : "Inactive"))</span></td>
+                            <tr class="emp-row">
+                                <td>@emp.EmployeeCode</td>
                                 <td>
-                                    <button class="btn btn-ghost" @onclick="() => ViewEmployee(employee.Id)">View</button>
-                                    <button class="btn btn-primary" @onclick="() => EditEmployee(employee.Id)">Edit</button>
+                                    <div style="display:flex;align-items:center;gap:8px">
+                                        <div class="emp-row-avatar">@Initials(emp.FullName)</div>
+                                        @emp.FullName
+                                    </div>
+                                </td>
+                                <td>@emp.Email</td>
+                                <td>@Display(emp.Department ?? emp.DepartmentName)</td>
+                                <td>@emp.HireDate.ToString("yyyy-MM-dd")</td>
+                                <td>
+                                    <span class="badge @(emp.IsActive ? "badge-present" : "badge-absent")">
+                                        @Display(emp.Status ?? (emp.IsActive ? "Идэвхтэй" : "Идэвхгүй"))
+                                    </span>
+                                </td>
+                                <td @onclick:stopPropagation="true" style="text-align:right">
+                                    <div class="ctx-menu-wrap">
+                                        <button class="ctx-trigger" @onclick="() => ToggleMenu(emp.Id)" title="Үйлдэл">
+                                            <span></span><span></span><span></span>
+                                        </button>
+
+                                        @if (openMenuId == emp.Id)
+                                        {
+                                            <div class="ctx-menu">
+                                                <button class="ctx-menu-item" @onclick="() => OpenModal(emp.Id)">
+                                                    <span class="ctx-icon">ℹ</span> Дэлгэрэнгүй
+                                                </button>
+                                    
+                                            </div>
+                                        }
+                                    </div>
                                 </td>
                             </tr>
                         }
                     </tbody>
                 </table>
             </div>
+
+            @* ── Pagination ── *@
+            @if (totalCount > pageSize)
+            {
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:16px 0; gap:12px; flex-wrap:wrap;">
+                    <span class="muted">
+                        Нийт @totalCount ажилтнаас @(((pageNumber - 1) * pageSize) + 1)–@Math.Min(pageNumber * pageSize, totalCount)
+                    </span>
+                    <div style="display:flex; gap:8px;">
+                        <button class="btn btn-ghost" disabled="@(pageNumber <= 1)" @onclick="() => GoToPage(pageNumber - 1)">‹ Өмнөх</button>
+                        <span class="muted" style="align-self:center">@pageNumber / @TotalPages</span>
+                        <button class="btn btn-ghost" disabled="@(pageNumber >= TotalPages)" @onclick="() => GoToPage(pageNumber + 1)">Дараах ›</button>
+                    </div>
+                </div>
+            }
         }
     </div>
 </div>
 
+@* ── Employee Detail Modal ── *@
+@if (_modalOpen)
+{
+    <div class="emd-overlay" @onclick="CloseModal">
+        <div class="emd-card" @onclick:stopPropagation="true">
+
+            <div class="emd-header">
+                <h3 class="emd-title">Ажилтны мэдээлэл</h3>
+                <button class="emd-close" @onclick="CloseModal">✕</button>
+            </div>
+
+            @if (_detailLoading)
+            {
+                <div class="emp-modal-loading" style="padding:40px">
+                    <div class="emp-spinner"></div>
+                    <span>Уншиж байна...</span>
+                </div>
+            }
+            else if (!string.IsNullOrWhiteSpace(_detailError))
+            {
+                <div style="padding:24px;color:var(--clr-danger)">@_detailError</div>
+            }
+            else if (_detail is not null)
+            {
+                <div class="emd-profile">
+                    <div class="emd-avatar">@Initials(_detail.FullName)</div>
+                    <div>
+                        <div class="emd-name">@_detail.FullName</div>
+                        <div class="emd-sub">@(_detail.Position ?? "—") · @(_detail.Department ?? _detail.DepartmentName ?? "—")</div>
+                        <span class="badge @(_detail.IsActive ? "badge-present" : "badge-absent")" style="margin-top:6px;display:inline-flex">
+                            @(_detail.Status ?? (_detail.IsActive ? "Идэвхтэй" : "Идэвхгүй"))
+                        </span>
+                    </div>
+                </div>
+
+                <div class="emd-divider"></div>
+
+                <div class="emd-body">
+                    <div class="emd-field">
+                        <label>Ажилтны код</label>
+                        <div class="emd-field-value">@_detail.EmployeeCode</div>
+                    </div>
+                    <div class="emd-field">
+                        <label>Имэйл</label>
+                        <div class="emd-field-value">@_detail.Email</div>
+                    </div>
+                    <div class="emd-field">
+                        <label>Утас</label>
+                        <div class="emd-field-value">@(_detail.Phone ?? "—")</div>
+                    </div>
+                    <div class="emd-field">
+                        <label>Хэлтэс</label>
+                        <div class="emd-field-value">@(_detail.Department ?? _detail.DepartmentName ?? "—")</div>
+                    </div>
+                    <div class="emd-field">
+                        <label>Албан тушаал</label>
+                        <div class="emd-field-value">@(_detail.Position ?? "—")</div>
+                    </div>
+                    <div class="emd-field">
+                        <label>Ажилд орсон огноо</label>
+                        <div class="emd-field-value">@_detail.HireDate.ToString("yyyy-MM-dd")</div>
+                    </div>
+                </div>
+
+                <div class="emd-divider"></div>
+
+                <div class="emd-footer" style="display:flex; justify-content:flex-end; gap:8px;">
+                    <button class="btn btn-ghost" @onclick="CloseModal" disabled="@_actionInProgress">Гарах</button>
+
+                    <div class="ctx-menu-wrap">
+                        <button class="btn btn-primary" @onclick="ToggleModalActionsMenu" @onclick:stopPropagation="true" disabled="@_actionInProgress">
+                            @(_actionInProgress ? "Боловсруулж байна..." : "⋮ Үйлдэл")
+                        </button>
+
+                        @if (_modalActionsOpen)
+                        {
+                            <div class="ctx-menu" style="bottom: calc(100% + 4px); top: auto; right: 0;" @onclick:stopPropagation="true">
+                                <button class="ctx-menu-item" @onclick="() => EditEmployee(_detail.Id)">
+                                    <span class="ctx-icon">✏</span> Засах
+                                </button>
+
+                                
+                                @if (_detail.IsActive)
+                                {
+                                    <button class="ctx-menu-item danger" @onclick="() => DeactivateEmployee(_detail.Id)">
+                                        <span class="ctx-icon">🚫</span> Идэвхгүй болгох
+                                    </button>
+                                }
+                                else
+                                {
+                                    <button class="ctx-menu-item success" @onclick="() => ReactivateEmployee(_detail.Id)">
+                                        <span class="ctx-icon">✓</span> Идэвхжүүлэх
+                                    </button>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+}
+
 @code {
     private IReadOnlyList<EmployeeDto> employees = [];
     private string? search;
+    private string statusFilter = "all";
     private string? error;
+    private string? statusMessage;
+    private bool isLoading;
+
+    private int pageNumber = 1;
+    private const int pageSize = 20;
+    private int totalCount;
+    private int TotalPages => Math.Max(1, (int)Math.Ceiling(totalCount / (double)pageSize));
+
+    private Guid? openMenuId;
+
+    private bool _modalOpen;
+    private bool _modalActionsOpen;
+    private EmployeeDto? _detail;
+    private bool _detailLoading;
+    private string? _detailError;
+    private bool _actionInProgress;
+    private CancellationTokenSource? _searchCts;
 
     protected override Task OnInitializedAsync() => LoadAsync();
 
+    private void ToggleMenu(Guid id)
+    {
+        openMenuId = openMenuId == id ? null : id;
+    }
+
+    private void CloseAllMenus()
+    {
+        if (openMenuId is not null)
+            openMenuId = null;
+    }
+
+    private async Task OnSearchInput(ChangeEventArgs e)
+    {
+        search = e.Value?.ToString();
+        pageNumber = 1;
+        openMenuId = null;
+        _searchCts?.Cancel();
+        _searchCts = new CancellationTokenSource();
+        try
+        {
+            await Task.Delay(300, _searchCts.Token);
+            await LoadAsync();
+        }
+        catch (TaskCanceledException) { }
+    }
+
+    private Task OnStatusChanged(ChangeEventArgs e)
+    {
+        statusFilter = e.Value?.ToString() ?? "all";
+        pageNumber = 1;
+        openMenuId = null;
+        return LoadAsync();
+    }
+
+    private Task GoToPage(int page)
+    {
+        pageNumber = Math.Clamp(page, 1, TotalPages);
+        openMenuId = null;
+        return LoadAsync();
+    }
+
     private async Task LoadAsync()
     {
+        isLoading = true;
+        statusMessage = null;
+        StateHasChanged();
+
         try
         {
             error = null;
-            var result = await Api.GetAsync<PagedResponse<EmployeeDto>>($"api/employees?pageNumber=1&pageSize=100&search={Uri.EscapeDataString(search ?? string.Empty)}");
+
+            var query = $"api/employees?pageNumber={pageNumber}&pageSize={pageSize}" +
+                        $"&search={Uri.EscapeDataString(search ?? string.Empty)}";
+
+            if (statusFilter == "active")
+                query += "&isActive=true";
+            else if (statusFilter == "inactive")
+                query += "&isActive=false";
+
+            var result = await Api.GetAsync<PagedResponse<EmployeeDto>>(query);
             employees = result?.Items ?? [];
+            totalCount = result?.TotalCount ?? employees.Count;
         }
         catch (Exception ex)
         {
             error = ex.Message;
             employees = [];
+            totalCount = 0;
+        }
+        finally
+        {
+            isLoading = false;
         }
     }
 
-    private void CreateEmployee() => Nav.NavigateTo("/employees/create");
+    private async Task OpenModal(Guid id)
+    {
+        openMenuId = null;
+        _modalOpen = true;
+        _modalActionsOpen = false;
+        _detail = null;
+        _detailError = null;
+        _detailLoading = true;
+        StateHasChanged();
+        try
+        {
+            _detail = await Api.GetAsync<EmployeeDto>($"api/employees/{id}");
+        }
+        catch (Exception ex)
+        {
+            _detailError = ex.Message;
+        }
+        finally
+        {
+            _detailLoading = false;
+        }
+    }
 
-    private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "--" : value;
+    private void ToggleModalActionsMenu()
+    {
+        _modalActionsOpen = !_modalActionsOpen;
+    }
 
-    private void EditEmployee(Guid id) => Nav.NavigateTo($"/employees/{id}/edit");
-    private void ViewEmployee(Guid id) => Nav.NavigateTo($"/employees/{id}");
+    private void CloseModal()
+    {
+        _modalOpen = false;
+        _modalActionsOpen = false;
+        _detail = null;
+        _detailError = null;
+    }
+
+    private void CreateEmployee() => Nav.NavigateTo("/admin/employees/create");
+
+    private void EditEmployee(Guid id)
+    {
+        openMenuId = null;
+        CloseModal();
+        Nav.NavigateTo($"/admin/employees/{id}/edit");
+    }
+
+    private async Task DeactivateEmployee(Guid id)
+    {
+        openMenuId = null;
+        var confirmed = await JS.InvokeAsync<bool>("confirm",
+            "Та энэ ажилтныг идэвхгүй болгохдоо итгэлтэй байна уу? Энэ үйлдлийг буцаах боломжтой.");
+        if (!confirmed) return;
+
+        _actionInProgress = true;
+        StateHasChanged();
+        try
+        {
+            var response = await Api.DeactivateEmployeeAsync(id);
+            if (response.IsSuccessStatusCode)
+            {
+                statusMessage = "Ажилтныг идэвхгүй болгосон.";
+                CloseModal();
+                await LoadAsync();
+            }
+            else
+            {
+                error = $"Идэвхгүй болгоход алдаа гарлаа ({(int)response.StatusCode}).";
+            }
+        }
+        catch (Exception ex)
+        {
+            error = $"Алдаа гарлаа: {ex.Message}";
+        }
+        finally
+        {
+            _actionInProgress = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ReactivateEmployee(Guid id)
+    {
+        openMenuId = null;
+        _actionInProgress = true;
+        StateHasChanged();
+        try
+        {
+            var response = await Api.ReactivateEmployeeAsync(id);
+            if (response.IsSuccessStatusCode)
+            {
+                statusMessage = "Ажилтныг идэвхжүүллээ.";
+                CloseModal();
+                await LoadAsync();
+            }
+            else
+            {
+                error = $"Идэвхжүүлэхэд алдаа гарлаа ({(int)response.StatusCode}).";
+            }
+        }
+        catch (Exception ex)
+        {
+            error = $"Алдаа гарлаа: {ex.Message}";
+        }
+        finally
+        {
+            _actionInProgress = false;
+            StateHasChanged();
+        }
+    }
+
+    private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "—" : value;
+
+    private static string Initials(string name)
+    {
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return string.Concat(parts.Take(2).Select(p => p[0])).ToUpperInvariant();
+    }
 }

@@ -1,60 +1,159 @@
 @page "/admin/dashboard"
 @layout AdminLayout
-
-
 @attribute [Authorize(Roles = "Admin,SuperAdmin,HRManager,HR,Manager")]
 @inject ApiClient Api
 @inject IJSRuntime JS
 
-<PageHeader Title="Admin Dashboard" Subtitle="Live attendance metrics from SQL Server" Icon="▦" />
+<PageHeader Title="Хянах самбар" Subtitle="@DateTime.Today.ToString("yyyy оны MM сарын dd")" Icon="▦" />
 
 <div class="page-stack">
-    <div class="card">
-        <div class="section-title">
-            <div>
-                <h2>Today</h2>
-                <div class="muted">@DateOnly.FromDateTime(DateTime.Today).ToString("yyyy-MM-dd")</div>
+
+    @if (!string.IsNullOrWhiteSpace(error))
+    {
+        <div class="card" style="border-color:var(--clr-danger);color:var(--clr-danger);padding:14px 18px">⚠ @error</div>
+    }
+
+    @* ── Stat cards ── *@
+    <div class="dash-stats">
+        <div class="dash-stat dash-stat--success">
+            <div class="dash-stat-icon">✓</div>
+            <div class="dash-stat-body">
+                <div class="dash-stat-value">@(summary?.PresentToday ?? 0)</div>
+                <div class="dash-stat-label">Ирсэн</div>
+            </div>
+            <div class="dash-stat-rate">
+                @if (summary is not null && summary.ActiveEmployees > 0)
+                {
+                    <span>@($"{summary.PresentToday * 100 / summary.ActiveEmployees}%")</span>
+                }
+            </div>
+        </div>
+        <div class="dash-stat dash-stat--warning">
+            <div class="dash-stat-icon">!</div>
+            <div class="dash-stat-body">
+                <div class="dash-stat-value">@(summary?.LateEmployees ?? 0)</div>
+                <div class="dash-stat-label">Хоцорсон</div>
+            </div>
+        </div>
+        <div class="dash-stat dash-stat--danger">
+            <div class="dash-stat-icon">×</div>
+            <div class="dash-stat-body">
+                <div class="dash-stat-value">@(summary?.AbsentToday ?? 0)</div>
+                <div class="dash-stat-label">Ирээгүй</div>
+            </div>
+        </div>
+        <div class="dash-stat dash-stat--info">
+            <div class="dash-stat-icon">□</div>
+            <div class="dash-stat-body">
+                <div class="dash-stat-value">@(summary?.OnLeaveEmployees ?? 0)</div>
+                <div class="dash-stat-label">Чөлөөтэй</div>
+            </div>
+        </div>
+        <div class="dash-stat dash-stat--primary">
+            <div class="dash-stat-icon">◈</div>
+            <div class="dash-stat-body">
+                <div class="dash-stat-value">@($"{summary?.AttendanceRate ?? 0:0.#}%")</div>
+                <div class="dash-stat-label">Ирцийн хувь</div>
+            </div>
+        </div>
+        <div class="dash-stat dash-stat--neutral">
+            <div class="dash-stat-icon">⏱</div>
+            <div class="dash-stat-body">
+                <div class="dash-stat-value">@($"{summary?.TotalOvertimeHours ?? 0:0.#}ц")</div>
+                <div class="dash-stat-label">Илүү цаг</div>
+            </div>
+        </div>
+    </div>
+
+    @* ── Chart + Today table ── *@
+    <div class="dash-grid">
+        <div class="card" style="flex:1.4">
+            <div class="rpt-card-header">
+                <h2 class="rpt-card-title">Ирцийн хандлага</h2>
+                <span class="rpt-badge">Сүүлийн @trends.Count өдөр</span>
+            </div>
+            <div style="position:relative;height:260px">
+                <canvas id="attendanceChart"></canvas>
             </div>
         </div>
 
-        <div class="row g-3">
-            <div class="col-12 col-md-3"><StatCard Title="Present today" Value="@(summary?.PresentToday.ToString() ?? "0")" Icon="✓" Color="Success" /></div>
-            <div class="col-12 col-md-3"><StatCard Title="Late today" Value="@(summary?.LateEmployees.ToString() ?? "0")" Icon="!" Color="Warning" /></div>
-            <div class="col-12 col-md-3"><StatCard Title="Absent today" Value="@(summary?.AbsentToday.ToString() ?? "0")" Icon="×" Color="Danger" /></div>
-            <div class="col-12 col-md-3"><StatCard Title="On leave" Value="@(summary?.OnLeaveEmployees.ToString() ?? "0")" Icon="□" Color="Info" /></div>
+        <div class="card" style="flex:1">
+            <div class="rpt-card-header">
+                <h2 class="rpt-card-title">Нийт ажилтан</h2>
+            </div>
+            <div class="dash-donut-wrap">
+                <canvas id="donutChart" width="180" height="180"></canvas>
+                <div class="dash-donut-legend">
+                    <div class="dash-legend-item"><span style="background:#22c55e"></span>Ирсэн — @(summary?.PresentToday ?? 0)</div>
+                    <div class="dash-legend-item"><span style="background:#f59e0b"></span>Хоцорсон — @(summary?.LateEmployees ?? 0)</div>
+                    <div class="dash-legend-item"><span style="background:#ef4444"></span>Ирээгүй — @(summary?.AbsentToday ?? 0)</div>
+                    <div class="dash-legend-item"><span style="background:#6366f1"></span>Чөлөөтэй — @(summary?.OnLeaveEmployees ?? 0)</div>
+                </div>
+            </div>
         </div>
     </div>
 
+    @* ── Today's attendance table ── *@
     <div class="card">
-        <div class="section-title"><h2>Attendance trend</h2></div>
-        <div class="chart-box"><canvas id="attendanceChart"></canvas></div>
+        <div class="rpt-card-header">
+            <h2 class="rpt-card-title">Өнөөдрийн ирц</h2>
+            <div style="display:flex;gap:8px;align-items:center">
+                <span class="rpt-badge">@records.Count бүртгэл</span>
+                <input class="form-control" style="width:200px;height:34px;font-size:13px"
+                       placeholder="Хайх..."
+                       value="@_tableSearch"
+                       @oninput="e => _tableSearch = e.Value?.ToString()" />
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Ажилтан</th>
+                        <th>Ирсэн цаг</th>
+                        <th>Явсан цаг</th>
+                        <th>Ажилласан</th>
+                        <th>Илүү цаг</th>
+                        <th>Төлөв</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @{
+                        var filtered = string.IsNullOrWhiteSpace(_tableSearch)
+                            ? records
+                            : records.Where(r => (r.EmployeeName ?? "").Contains(_tableSearch, StringComparison.OrdinalIgnoreCase)).ToList();
+                    }
+                    @if (!filtered.Any())
+                    {
+                        <tr><td colspan="6" class="muted" style="text-align:center;padding:24px">Өнөөдрийн бүртгэл олдсонгүй.</td></tr>
+                    }
+                    else
+                    {
+                        @foreach (var row in filtered)
+                        {
+                            <tr>
+                                <td>
+                                    <div style="display:flex;align-items:center;gap:8px">
+                                        <div class="emp-row-avatar">@Initials(row.EmployeeName)</div>
+                                        @(row.EmployeeName ?? "—")
+                                    </div>
+                                </td>
+                                <td>@(row.CheckInTime?.ToString("HH:mm") ?? "—")</td>
+                                <td>@(row.CheckOutTime?.ToString("HH:mm") ?? "—")</td>
+                                <td>@(row.WorkHours > 0 ? $"{row.WorkHours:0.#}ц" : "—")</td>
+                                <td>@(row.OvertimeHours > 0 ? $"{row.OvertimeHours:0.##}ц" : "—")</td>
+                                <td>
+                                    @{ var st = row.Status ?? row.AttendanceStatus; }
+                                    <span class="badge @StatusBadge(st)">@TranslateStatus(st)</span>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
     </div>
 
-    <div class="card">
-        <div class="section-title"><h2>Today's attendance</h2></div>
-        <table class="data-table">
-            <thead><tr><th>Employee</th><th>Check-in</th><th>Check-out</th><th>Overtime</th><th>Status</th></tr></thead>
-            <tbody>
-                @if (records.Count == 0)
-                {
-                    <tr><td colspan="5" class="muted">No attendance records found.</td></tr>
-                }
-                else
-                {
-                    @foreach (var row in records)
-                    {
-                        <tr>
-                            <td>@Display(row.EmployeeName)</td>
-                            <td>@(row.CheckInTime?.ToString("HH:mm") ?? "--")</td>
-                            <td>@(row.CheckOutTime?.ToString("HH:mm") ?? "--")</td>
-                            <td>@($"{row.OvertimeHours:0.##}h")</td>
-                            <td><StatusBadge Status="@(row.Status ?? row.AttendanceStatus ?? string.Empty)" /></td>
-                        </tr>
-                    }
-                }
-            </tbody>
-        </table>
-    </div>
 </div>
 
 @code {
@@ -62,38 +161,72 @@
     private IReadOnlyList<AttendanceDto> records = [];
     private IReadOnlyList<AttendanceTrendDto> trends = [];
     private string? error;
-    private bool chartRendered;
+    private string? _tableSearch;
+    private bool _chartDrawn;
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            summary = await Api.GetDashboardSummaryAsync();
-            trends = await Api.GetAttendanceTrendsAsync() ?? [];
-            var today = DateOnly.FromDateTime(DateTime.Today);
-            var page = await Api.GetAsync<PagedResponse<AttendanceDto>>($"api/attendance/records?from={today:yyyy-MM-dd}&to={today:yyyy-MM-dd}&pageSize=20");
-            records = page?.Items ?? [];
+            var today = DateTime.Today.ToString("yyyy-MM-dd");
+            var t1 = Api.GetDashboardSummaryAsync();
+            var t2 = Api.GetAttendanceTrendsAsync();
+            var t3 = Api.GetAsync<PagedResponse<AttendanceDto>>(
+                $"api/attendance/records?from={today}&to={today}&pageSize=100");
+
+            await Task.WhenAll(t1, t2, t3);
+
+            summary = t1.Result;
+            trends  = t2.Result ?? [];
+            records = t3.Result?.Items ?? [];
         }
-        catch (Exception ex)
-        {
-            error = ex.Message;
-        }
+        catch (Exception ex) { error = ex.Message; }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (chartRendered || trends.Count == 0)
-            return;
+        if (_chartDrawn || trends.Count == 0) return;
+        _chartDrawn = true;
+        try
+        {
+            await JS.InvokeVoidAsync("renderAttendanceChart",
+                "attendanceChart",
+                trends.Select(t => t.Date.ToString("MM-dd")).ToArray(),
+                trends.Select(t => t.Present).ToArray(),
+                trends.Select(t => t.Absent).ToArray(),
+                trends.Select(t => t.Late).ToArray());
 
-        chartRendered = true;
-        await JS.InvokeVoidAsync(
-            "renderAttendanceChart",
-            "attendanceChart",
-            trends.Select(t => t.Date.ToString("MM-dd")).ToArray(),
-            trends.Select(t => t.Present).ToArray(),
-            trends.Select(t => t.Absent).ToArray(),
-            trends.Select(t => t.Late).ToArray());
+            if (summary is not null)
+                await JS.InvokeVoidAsync("renderDonutChart",
+                    "donutChart",
+                    new[] { summary.PresentToday, summary.LateEmployees, summary.AbsentToday, summary.OnLeaveEmployees },
+                    new[] { "#22c55e", "#f59e0b", "#ef4444", "#6366f1" });
+        }
+        catch { }
     }
 
-    private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "--" : value;
+    private static string TranslateStatus(string? s) => s?.ToLower() switch
+    {
+        "present"           => "Ирсэн",
+        "absent"            => "Ирээгүй",
+        "late"              => "Хоцорсон",
+        "leave" or "onleave"=> "Чөлөөтэй",
+        _                   => s ?? "—"
+    };
+
+    private static string StatusBadge(string? s) => s?.ToLower() switch
+    {
+        "present"            => "badge-present",
+        "late"               => "badge-late",
+        "absent"             => "badge-absent",
+        "leave" or "onleave" => "badge-leave",
+        _                    => ""
+    };
+
+    private static string Initials(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "?";
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return string.Concat(parts.Take(2).Select(p => p[0])).ToUpperInvariant();
+    }
 }

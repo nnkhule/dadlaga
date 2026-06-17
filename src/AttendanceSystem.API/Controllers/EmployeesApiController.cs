@@ -17,17 +17,24 @@ public sealed class EmployeesApiController : ControllerBase
 
     public EmployeesApiController(ApplicationDbContext db) => _db = db;
 
+    /// <summary>
+    /// Жагсаалт — хайлт, хэлтэс, төлөв (active/inactive), pagination дэмждэг.
+    /// </summary>
     [HttpGet]
+    [Authorize(Roles = "SuperAdmin,HRManager,DepartmentHead")]
     public async Task<ActionResult<PagedResponseDto<EmployeeApiDto>>> List(
         [FromQuery] int pageNumber = 1,
         [FromQuery] int pageSize = 20,
         [FromQuery] string? search = null,
+        [FromQuery] Guid? departmentId = null,
+        [FromQuery] bool? isActive = null,   // ← ШИНЭ: status filter (true/false/null = бүгд)
         CancellationToken cancellationToken = default)
     {
         pageNumber = Math.Max(1, pageNumber);
         pageSize = Math.Clamp(pageSize, 1, 100);
 
         var query = _db.Employees.AsNoTracking().Include(e => e.Department).AsQueryable();
+
         if (!string.IsNullOrWhiteSpace(search))
         {
             var term = search.Trim();
@@ -37,6 +44,12 @@ public sealed class EmployeesApiController : ControllerBase
                 e.Email.Contains(term) ||
                 (e.Department != null && e.Department.Name.Contains(term)));
         }
+
+        if (departmentId.HasValue)
+            query = query.Where(e => e.DepartmentId == departmentId.Value);
+
+        if (isActive.HasValue)
+            query = query.Where(e => e.IsActive == isActive.Value);
 
         var total = await query.CountAsync(cancellationToken);
         var items = await query
@@ -62,6 +75,7 @@ public sealed class EmployeesApiController : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
+    [Authorize(Roles = "SuperAdmin,HRManager,DepartmentHead")]
     public async Task<ActionResult<EmployeeApiDto>> Details(Guid id, CancellationToken cancellationToken)
     {
         var employee = await _db.Employees
@@ -76,18 +90,31 @@ public sealed class EmployeesApiController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "SuperAdmin,HRManager")]
     public async Task<ActionResult<EmployeeApiDto>> Create([FromBody] EmployeeFormApiDto request, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.EmployeeCode) || string.IsNullOrWhiteSpace(request.FullName) || string.IsNullOrWhiteSpace(request.Email))
-            return BadRequest(new { message = "Employee code, full name, and email are required." });
+            return BadRequest(new { message = "Ажилтны код, нэр, имэйл заавал шаардлагатай." });
 
         if (!request.DepartmentId.HasValue)
-            return BadRequest(new { message = "Department is required." });
+            return BadRequest(new { message = "Хэлтэс сонгох шаардлагатай." });
+
+        // Код давхардал шалгах
+        var codeExists = await _db.Employees.AsNoTracking()
+            .AnyAsync(e => e.EmployeeCode == request.EmployeeCode.Trim(), cancellationToken);
+        if (codeExists)
+            return BadRequest(new { message = $"'{request.EmployeeCode}' код бүхий ажилтан аль хэдийн бүртгэлтэй байна." });
+
+        // Имэйл давхардал шалгах
+        var emailExists = await _db.Employees.AsNoTracking()
+            .AnyAsync(e => e.Email == request.Email.Trim(), cancellationToken);
+        if (emailExists)
+            return BadRequest(new { message = $"'{request.Email}' имэйл хаягаар бүртгэлтэй ажилтан байна." });
 
         var scheduleId = await _db.WorkSchedules.AsNoTracking().OrderBy(w => w.Name).Select(w => w.Id).FirstOrDefaultAsync(cancellationToken);
         var officeId = await _db.OfficeLocations.AsNoTracking().OrderBy(o => o.Name).Select(o => o.Id).FirstOrDefaultAsync(cancellationToken);
         if (scheduleId == Guid.Empty || officeId == Guid.Empty)
-            return BadRequest(new { message = "Work schedule and office location must exist before creating employees." });
+            return BadRequest(new { message = "Эхлээд ажлын хуваарь болон оффисын байршил үүсгэх шаардлагатай." });
 
         var employee = Employee.Create(
             request.EmployeeCode.Trim(),
@@ -107,11 +134,21 @@ public sealed class EmployeesApiController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Roles = "SuperAdmin,HRManager")]
     public async Task<ActionResult<EmployeeApiDto>> Update(Guid id, [FromBody] EmployeeFormApiDto request, CancellationToken cancellationToken)
     {
         var employee = await _db.Employees.FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
         if (employee is null)
             return NotFound();
+
+        // Имэйл давхардал шалгах (өөрөөсөө бусад ажилтантай)
+        if (!string.IsNullOrWhiteSpace(request.Email))
+        {
+            var emailTaken = await _db.Employees.AsNoTracking()
+                .AnyAsync(e => e.Id != id && e.Email == request.Email.Trim(), cancellationToken);
+            if (emailTaken)
+                return BadRequest(new { message = $"'{request.Email}' имэйл хаягаар бүртгэлтэй өөр ажилтан байна." });
+        }
 
         employee.Update(
             string.IsNullOrWhiteSpace(request.FullName) ? employee.FullName : request.FullName.Trim(),
@@ -124,6 +161,44 @@ public sealed class EmployeesApiController : ControllerBase
 
         await _db.SaveChangesAsync(cancellationToken);
         return Ok(await BuildEmployeeDto(id, cancellationToken));
+    }
+
+    /// <summary>
+    /// Soft delete — ажилтныг идэвхгүй болгоно (IsActive = false).
+    /// AttendanceRecords / LeaveRequests-тэй FK холбоотой тул физикийн устгал хийхгүй.
+    /// </summary>
+    [HttpDelete("{id:guid}")]
+    [Authorize(Roles = "SuperAdmin,HRManager")]
+    public async Task<IActionResult> Deactivate(Guid id, CancellationToken cancellationToken)
+    {
+        var employee = await _db.Employees.FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
+        if (employee is null)
+            return NotFound(new { message = "Ажилтан олдсонгүй." });
+
+        if (!employee.IsActive)
+            return Ok(new { message = "Ажилтан өмнө нь идэвхгүй болсон байна." });
+
+        employee.Deactivate();
+        await _db.SaveChangesAsync(cancellationToken);
+
+        return Ok(new { message = "Ажилтныг идэвхгүй болгосон." });
+    }
+
+    /// <summary>
+    /// Идэвхгүй болгосон ажилтныг дахин идэвхжүүлэх.
+    /// </summary>
+    [HttpPost("{id:guid}/reactivate")]
+    [Authorize(Roles = "SuperAdmin,HRManager")]
+    public async Task<IActionResult> Reactivate(Guid id, CancellationToken cancellationToken)
+    {
+        var employee = await _db.Employees.FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
+        if (employee is null)
+            return NotFound(new { message = "Ажилтан олдсонгүй." });
+
+        employee.Reactivate();
+        await _db.SaveChangesAsync(cancellationToken);
+
+        return Ok(new { message = "Ажилтныг идэвхжүүллээ." });
     }
 
     [HttpGet("me")]

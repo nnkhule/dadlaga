@@ -1,15 +1,15 @@
 @page "/admin/leave"
 @layout AdminLayout
-@attribute [Authorize(Roles = "Admin,SuperAdmin,HRManager")] 
+@attribute [Authorize(Roles = "SuperAdmin,HRManager,DepartmentHead")]
 @inject ApiClient Api
 
-<PageHeader Title="Leave requests" Subtitle="Leave requests loaded from SQL Server" Icon="☑" />
+<PageHeader Title="Чөлөөний хүсэлтүүд" Subtitle="SQL Server-ээс ачааллагдсан чөлөөний хүсэлтүүд" Icon="☑" />
 
 <div class="page-stack">
     <div class="tabs">
         @foreach (var tab in tabs)
         {
-            <button class="tab @(activeStatus == tab ? "active" : "")" @onclick="() => ChangeTab(tab)">@tab</button>
+            <button class="tab @(activeStatus == tab.Key ? "active" : "")" @onclick="() => ChangeTab(tab.Key)">@tab.Value</button>
         }
     </div>
 
@@ -18,9 +18,13 @@
         <div class="card" style="border-color:var(--clr-danger);color:var(--clr-danger)">@error</div>
     }
 
-    @if (requests.Count == 0)
+    @if (isLoading)
     {
-        <div class="card muted">No leave requests found.</div>
+        <div class="card muted">Ачааллаж байна...</div>
+    }
+    else if (requests.Count == 0)
+    {
+        <div class="card muted">Чөлөөний хүсэлт олдсонгүй.</div>
     }
     else
     {
@@ -30,8 +34,8 @@
                 <div class="section-title">
                     <div>
                         <strong>@Display(request.EmployeeName)</strong>
-                        <span class="badge badge-leave">@request.LeaveType</span>
-                        <div class="muted">@request.StartDate.ToString("yyyy-MM-dd") - @request.EndDate.ToString("yyyy-MM-dd") • @request.TotalDays days</div>
+                        <span class="badge badge-leave">@TranslateLeaveType(request.LeaveType)</span>
+                        <div class="muted">@request.StartDate.ToString("yyyy-MM-dd") - @request.EndDate.ToString("yyyy-MM-dd") • @request.TotalDays өдөр</div>
                         <div>@Display(request.Reason)</div>
                     </div>
                     <StatusBadge Status="@(request.Status ?? request.ApprovalStatus ?? string.Empty)" />
@@ -39,8 +43,12 @@
                 @if (string.Equals(request.Status, "Pending", StringComparison.OrdinalIgnoreCase))
                 {
                     <div class="action-row" style="justify-content:flex-end; gap: 8px;">
-                        <button class="btn btn-danger" @onclick="() => RejectAsync(request.Id)">Reject</button>
-                        <button class="btn btn-success" @onclick="() => ApproveAsync(request.Id)">Approve</button>
+                        <button class="btn btn-danger" @onclick="() => RejectAsync(request.Id)" disabled="@isProcessing">
+                            @(isProcessing ? "Боловсруулж байна..." : "Татгалзах")
+                        </button>
+                        <button class="btn btn-success" @onclick="() => ApproveAsync(request.Id)" disabled="@isProcessing">
+                            @(isProcessing ? "Боловсруулж байна..." : "Зөвшөөрөх")
+                        </button>
                     </div>
                 }
             </div>
@@ -49,16 +57,26 @@
 </div>
 
 @code {
-    private readonly string[] tabs = ["Pending", "Approved", "Rejected"];
+    // Key = API-д явуулах статус нэр, Value = дэлгэцэн дээр харагдах Монгол нэр
+    private readonly Dictionary<string, string> tabs = new()
+    {
+        ["Pending"]  = "Хүлээгдэж буй",
+        ["Approved"] = "Зөвшөөрсөн",
+        ["Rejected"] = "Татгалзсан"
+    };
+
     private string activeStatus = "Pending";
     private IReadOnlyList<LeaveDto> requests = [];
     private string? error;
     private bool isProcessing;
+    private bool isLoading;
 
     protected override Task OnInitializedAsync() => LoadAsync();
 
     private async Task LoadAsync()
     {
+        isLoading = true;
+        StateHasChanged();
         try
         {
             error = null;
@@ -70,6 +88,10 @@
             error = ex.Message;
             requests = [];
         }
+        finally
+        {
+            isLoading = false;
+        }
     }
 
     private async Task ChangeTab(string status)
@@ -80,11 +102,21 @@
 
     private async Task ApproveAsync(Guid id)
     {
+        if (isProcessing) return;
+
         try
         {
             error = null;
             isProcessing = true;
-            await Api.ApproveLeaveRequestAsync(id);
+            StateHasChanged();
+
+            var response = await Api.ApproveLeaveRequestAsync(id);
+            if (!response.IsSuccessStatusCode)
+            {
+                error = $"Зөвшөөрөхөд алдаа гарлаа ({(int)response.StatusCode}).";
+                return;
+            }
+
             await LoadAsync();
         }
         catch (Exception ex)
@@ -94,16 +126,27 @@
         finally
         {
             isProcessing = false;
+            StateHasChanged();
         }
     }
 
     private async Task RejectAsync(Guid id)
     {
+        if (isProcessing) return;
+
         try
         {
             error = null;
             isProcessing = true;
-            await Api.RejectLeaveRequestAsync(id);
+            StateHasChanged();
+
+            var response = await Api.RejectLeaveRequestAsync(id);
+            if (!response.IsSuccessStatusCode)
+            {
+                error = $"Татгалзахад алдаа гарлаа ({(int)response.StatusCode}).";
+                return;
+            }
+
             await LoadAsync();
         }
         catch (Exception ex)
@@ -113,8 +156,20 @@
         finally
         {
             isProcessing = false;
+            StateHasChanged();
         }
     }
 
-    private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "--" : value;
+    private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "—" : value;
+
+    private static string TranslateLeaveType(string type) => type switch
+    {
+        "Annual"    => "Жилийн ээлжийн",
+        "Sick"      => "Өвчтэй",
+        "Unpaid"    => "Цалингүй",
+        "Birthday"  => "Төрсөн өдөр",
+        "Maternity" => "Жирэмсний",
+        "Other"     => "Бусад",
+        _           => type
+    };
 }

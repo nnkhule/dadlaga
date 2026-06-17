@@ -1,88 +1,645 @@
-
 @page "/admin/attendance"
 @layout AdminLayout
-@attribute [Authorize(Roles = "Admin,SuperAdmin,HRManager")] 
+@attribute [Authorize(Roles = "Admin,SuperAdmin,HRManager,HR")]
 @inject ApiClient Api
+@inject IJSRuntime JS
 
-<PageHeader Title="Attendance records" Subtitle="Attendance loaded from SQL Server" Icon="◇" />
+<PageHeader Title="Ирцийн бүртгэл" Subtitle="Бодит цагийн ирц — SQL Server-ээс шууд" Icon="◈">
+    <Actions>
+        <button class="btn-ghost att-action-btn" @onclick="ExportCsvAsync" disabled="@(records.Count == 0)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            CSV татах
+        </button>
+    </Actions>
+</PageHeader>
 
 <div class="page-stack">
-    <div class="card filter-bar">
-        <InputDate @bind-Value="date" />
-        <select @bind="departmentId">
-            <option value="">All departments</option>
-            @foreach (var department in departments)
-            {
-                <option value="@department.Id">@department.Name</option>
-            }
-        </select>
-        <button class="btn-ghost" @onclick="LoadAsync">Load</button>
+
+    @* ─── KPI strip ─── *@
+    <div class="att-kpi-row">
+        <div class="att-kpi att-kpi--present">
+            <span class="att-kpi-value">@kpi.Present</span>
+            <span class="att-kpi-label">Ирсэн</span>
+        </div>
+        <div class="att-kpi att-kpi--late">
+            <span class="att-kpi-value">@kpi.Late</span>
+            <span class="att-kpi-label">Хоцорсон</span>
+        </div>
+        <div class="att-kpi att-kpi--absent">
+            <span class="att-kpi-value">@kpi.Absent</span>
+            <span class="att-kpi-label">Ирээгүй</span>
+        </div>
+        <div class="att-kpi att-kpi--leave">
+            <span class="att-kpi-value">@kpi.OnLeave</span>
+            <span class="att-kpi-label">Чөлөөтэй</span>
+        </div>
+        <div class="att-kpi att-kpi--hours">
+            <span class="att-kpi-value">@kpi.TotalOvertimeH.ToString("0.#")h</span>
+            <span class="att-kpi-label">Нийт илүү цаг</span>
+        </div>
     </div>
 
+    @* ─── Filter bar ─── *@
+    <div class="card att-filter-card">
+        <div class="att-filter-grid">
+
+            @* Search *@
+            <div class="att-search-wrap">
+                <svg class="att-search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+                <input class="att-search-input" type="search"
+                       placeholder="Ажилтны нэрээр хайх…"
+                       value="@searchQuery"
+                       @oninput="OnSearchInput" />
+                @if (!string.IsNullOrEmpty(searchQuery))
+                {
+                    <button class="att-search-clear" @onclick="ClearSearch" title="Арилгах">✕</button>
+                }
+            </div>
+
+            @* Date *@
+            <div class="att-field-wrap">
+                <label class="att-field-label">Огноо</label>
+                <InputDate class="att-select" @bind-Value="date" @bind-Value:after="OnFilterChanged" />
+            </div>
+
+            @* Department *@
+            <div class="att-field-wrap">
+                <label class="att-field-label">Хэлтэс</label>
+                <select class="att-select" @bind="departmentId" @bind:after="OnFilterChanged">
+                    <option value="">Бүгд</option>
+                    @foreach (var d in departments)
+                    {
+                        <option value="@d.Id">@d.Name</option>
+                    }
+                </select>
+            </div>
+
+            @* Status filter *@
+            <div class="att-field-wrap">
+                <label class="att-field-label">Төлөв</label>
+                <select class="att-select" @bind="statusFilter" @bind:after="ApplyFilters">
+                    <option value="">Бүгд</option>
+                    <option value="Present">Ирсэн</option>
+                    <option value="Late">Хоцорсон</option>
+                    <option value="Absent">Ирээгүй</option>
+                    <option value="OnLeave">Чөлөөтэй</option>
+                </select>
+            </div>
+
+        </div>
+
+        @if (isLoading)
+        {
+            <div class="att-loading-bar"><span class="att-loading-inner"></span></div>
+        }
+    </div>
+
+    @* ─── Error ─── *@
     @if (!string.IsNullOrWhiteSpace(error))
     {
-        <div class="card" style="border-color:var(--clr-danger);color:var(--clr-danger)">@error</div>
+        <div class="card att-error-banner">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            @error
+        </div>
     }
 
-    <div class="card">
-        <table class="data-table">
-            <thead><tr><th>Employee</th><th>Date</th><th>Check-in/out</th><th>Late</th><th>Overtime</th><th>Status</th></tr></thead>
-            <tbody>
-                @if (records.Count == 0)
-                {
-                    <tr><td colspan="6" class="muted">No attendance records found.</td></tr>
-                }
-                else
-                {
-                    @foreach (var record in records)
+    @* ─── Table ─── *@
+    <div class="card att-table-card">
+
+        @if (isLoading && records.Count == 0)
+        {
+            @* Skeleton rows *@
+            <div class="att-skeleton-rows">
+                @for (var i = 0; i < 7; i++) { <div class="att-skeleton-row"><div class="skeleton att-skel-name"></div><div class="skeleton att-skel-date"></div><div class="skeleton att-skel-time"></div><div class="skeleton att-skel-badge"></div></div> }
+            </div>
+        }
+        else
+        {
+            <table class="data-table att-table">
+                <thead>
+                    <tr>
+                        <th @onclick='() => SetSort("name")' class="att-th-sortable @SortClass("name")">
+                            Ажилтан <span class="att-sort-arrow">@SortArrow("name")</span>
+                        </th>
+                        <th @onclick='() => SetSort("date")' class="att-th-sortable @SortClass("date")">
+                            Огноо <span class="att-sort-arrow">@SortArrow("date")</span>
+                        </th>
+                        <th>Ирэх / Явах</th>
+                        <th @onclick='() => SetSort("late")' class="att-th-sortable @SortClass("late")">
+                            Хоцролт <span class="att-sort-arrow">@SortArrow("late")</span>
+                        </th>
+                        <th @onclick='() => SetSort("overtime")' class="att-th-sortable @SortClass("overtime")">
+                            Илүү цаг <span class="att-sort-arrow">@SortArrow("overtime")</span>
+                        </th>
+                        <th>Баталгаажуулалт</th>
+                        <th>Төлөв</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (displayed.Count == 0)
                     {
                         <tr>
-                            <td>@Display(record.EmployeeName)</td>
-                            <td>@record.Date.ToString("yyyy-MM-dd")</td>
-                            <td>@(record.CheckInTime?.ToString("HH:mm") ?? "--") / @(record.CheckOutTime?.ToString("HH:mm") ?? "--")</td>
-                            <td>@record.LateMinutes</td>
-                            <td>@($"{record.OvertimeHours:0.##}h")</td>
-                            <td><StatusBadge Status="@(record.Status ?? record.AttendanceStatus ?? string.Empty)" /></td>
+                            <td colspan="7" class="att-empty">
+                                <div class="att-empty-inner">
+                                    <div class="att-empty-icon">📋</div>
+                                    <div class="att-empty-text">
+                                        @if (!string.IsNullOrEmpty(searchQuery) || !string.IsNullOrEmpty(statusFilter))
+                                        { <span>Хайлтын үр дүн олдсонгүй.</span> }
+                                        else
+                                        { <span>Энэ өдрийн ирцийн бүртгэл байхгүй байна.</span> }
+                                    </div>
+                                </div>
+                            </td>
                         </tr>
                     }
-                }
-            </tbody>
-        </table>
+                    else
+                    {
+                        @foreach (var r in PagedDisplayed)
+                        {
+                            <tr class="att-row" @onclick="() => OpenDetail(r)">
+                                <td>
+                                    <div class="att-employee-cell">
+                                        <div class="att-avatar">@Initials(r.EmployeeName)</div>
+                                        <span class="att-employee-name">@Display(r.EmployeeName)</span>
+                                    </div>
+                                </td>
+                                <td class="att-date-cell">@r.Date.ToString("yyyy-MM-dd")</td>
+                                <td>
+                                    <div class="att-time-pair">
+                                        <span class="att-time att-time--in">@(r.CheckInTime?.ToString("HH:mm") ?? "--")</span>
+                                        <span class="att-time-sep">→</span>
+                                        <span class="att-time att-time--out">@(r.CheckOutTime?.ToString("HH:mm") ?? "--")</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    @if (r.LateMinutes > 0)
+                                    {
+                                        <span class="att-late-chip">+@r.LateMinutes мин</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="att-ok-dash">—</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (r.OvertimeHours > 0)
+                                    {
+                                        <span class="att-ot-chip">@($"{r.OvertimeHours:0.#}h")</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="att-ok-dash">—</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (!string.IsNullOrWhiteSpace(r.VerificationMethod))
+                                    {
+                                        <span class="att-verify-chip">@VerifyLabel(r.VerificationMethod)</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="att-ok-dash">—</span>
+                                    }
+                                </td>
+                                <td><StatusBadge Status="@(r.Status ?? r.AttendanceStatus ?? string.Empty)" /></td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+
+            @* ─── Pagination ─── *@
+            @if (TotalPages > 1)
+            {
+                <div class="att-pagination">
+                    <span class="att-pagination-info">@displayed.Count-н @((currentPage - 1) * PageSize + 1)–@Math.Min(currentPage * PageSize, displayed.Count) харуулж байна</span>
+                    <div class="att-pagination-btns">
+                        <button class="att-page-btn" disabled="@(currentPage == 1)" @onclick="() => currentPage--">‹</button>
+                        @for (var p = 1; p <= TotalPages; p++)
+                        {
+                            var pg = p;
+                            <button class="att-page-btn @(pg == currentPage ? "att-page-btn--active" : "")" @onclick="() => currentPage = pg">@p</button>
+                        }
+                        <button class="att-page-btn" disabled="@(currentPage == TotalPages)" @onclick="() => currentPage++">›</button>
+                    </div>
+                </div>
+            }
+        }
     </div>
 </div>
 
+@* ─── Detail drawer ─── *@
+@if (detailRecord != null)
+{
+    <div class="att-drawer-backdrop" @onclick="CloseDetail"></div>
+    <div class="att-drawer">
+        <div class="att-drawer-header">
+            <div class="att-drawer-avatar">@Initials(detailRecord.EmployeeName)</div>
+            <div>
+                <div class="att-drawer-name">@Display(detailRecord.EmployeeName)</div>
+                <div class="att-drawer-date">@detailRecord.Date.ToString("yyyy-MM-dd dddd")</div>
+            </div>
+            <button class="att-drawer-close" @onclick="CloseDetail">✕</button>
+        </div>
+        <div class="att-drawer-body">
+            <div class="att-detail-grid">
+                <div class="att-detail-item">
+                    <span class="att-detail-label">Ирсэн цаг</span>
+                    <span class="att-detail-value att-detail-in">@(detailRecord.CheckInTime?.ToString("HH:mm:ss") ?? "—")</span>
+                </div>
+                <div class="att-detail-item">
+                    <span class="att-detail-label">Явсан цаг</span>
+                    <span class="att-detail-value att-detail-out">@(detailRecord.CheckOutTime?.ToString("HH:mm:ss") ?? "—")</span>
+                </div>
+                <div class="att-detail-item">
+                    <span class="att-detail-label">Ажилласан цаг</span>
+                    <span class="att-detail-value">@($"{detailRecord.WorkHours:0.##} цаг")</span>
+                </div>
+                <div class="att-detail-item">
+                    <span class="att-detail-label">Хоцролт</span>
+                    <span class="att-detail-value @(detailRecord.LateMinutes > 0 ? "att-detail-late" : "")">
+                        @(detailRecord.LateMinutes > 0 ? $"{detailRecord.LateMinutes} мин" : "—")
+                    </span>
+                </div>
+                <div class="att-detail-item">
+                    <span class="att-detail-label">Илүү цаг</span>
+                    <span class="att-detail-value att-detail-ot">@($"{detailRecord.OvertimeHours:0.##} цаг")</span>
+                </div>
+                <div class="att-detail-item">
+                    <span class="att-detail-label">Баталгаажуулалт</span>
+                    <span class="att-detail-value">@VerifyLabel(detailRecord.VerificationMethod)</span>
+                </div>
+                <div class="att-detail-item att-detail-item--full">
+                    <span class="att-detail-label">Төлөв</span>
+                    <span><StatusBadge Status="@(detailRecord.Status ?? detailRecord.AttendanceStatus ?? string.Empty)" /></span>
+                </div>
+            </div>
+
+            @* Work-hours timeline bar *@
+            @{
+                var pct = Math.Min((double)detailRecord.WorkHours / 8.0 * 100, 100);
+            }
+            <div class="att-detail-section">
+                <div class="att-detail-section-title">Ажлын цагийн хувь (8 цагт)</div>
+                <div class="progress">
+                    <div class="progress-bar" style="width:@($"{pct:0}%")"></div>
+                </div>
+                <div class="att-detail-pct">@($"{pct:0.#}%") · @($"{detailRecord.WorkHours:0.##}h / 8h")</div>
+            </div>
+        </div>
+    </div>
+}
+
+@* ─── Scoped styles ─── *@
+<style>
+/* KPI strip */
+.att-kpi-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
+.att-kpi { background: var(--clr-surface); border: 1px solid var(--clr-border); border-radius: var(--radius-lg); padding: 18px 20px; display: flex; flex-direction: column; gap: 4px; position: relative; overflow: hidden; box-shadow: var(--shadow-sm); }
+.att-kpi::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; border-radius: 99px 0 0 99px; }
+.att-kpi--present::before { background: var(--clr-success); }
+.att-kpi--late::before { background: var(--clr-warning); }
+.att-kpi--absent::before { background: var(--clr-danger); }
+.att-kpi--leave::before { background: var(--clr-info); }
+.att-kpi--hours::before { background: var(--clr-primary); }
+.att-kpi-value { font-size: 28px; font-weight: 800; line-height: 1; letter-spacing: -.02em; }
+.att-kpi--present .att-kpi-value { color: var(--clr-success); }
+.att-kpi--late .att-kpi-value { color: var(--clr-warning); }
+.att-kpi--absent .att-kpi-value { color: var(--clr-danger); }
+.att-kpi--leave .att-kpi-value { color: var(--clr-info); }
+.att-kpi--hours .att-kpi-value { color: var(--clr-primary); }
+.att-kpi-label { font-size: 12px; color: var(--clr-text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+
+/* Filter card */
+.att-filter-card { padding: 16px 20px; }
+.att-filter-grid { display: grid; grid-template-columns: 1fr auto auto auto; gap: 12px; align-items: end; }
+.att-search-wrap { position: relative; display: flex; align-items: center; }
+.att-search-icon { position: absolute; left: 12px; color: var(--clr-text-muted); pointer-events: none; flex-shrink: 0; }
+.att-search-input { width: 100%; padding: 9px 36px 9px 36px; border: 1px solid var(--clr-border); border-radius: var(--radius-sm); background: var(--clr-surface-2); color: var(--clr-text); font-size: 0.9rem; outline: none; transition: border-color .15s, box-shadow .15s; }
+.att-search-input:focus { border-color: var(--clr-primary); box-shadow: 0 0 0 3px var(--clr-primary-glow); background: var(--clr-surface); }
+.att-search-clear { position: absolute; right: 10px; background: none; border: none; cursor: pointer; color: var(--clr-text-muted); padding: 2px 4px; border-radius: 4px; font-size: 12px; }
+.att-search-clear:hover { color: var(--clr-danger); }
+.att-field-wrap { display: flex; flex-direction: column; gap: 4px; min-width: 140px; }
+.att-field-label { font-size: 11px; font-weight: 700; color: var(--clr-text-muted); text-transform: uppercase; letter-spacing: .05em; }
+.att-select { padding: 9px 12px; border: 1px solid var(--clr-border); border-radius: var(--radius-sm); background: var(--clr-surface-2); color: var(--clr-text); font-size: 0.9rem; outline: none; cursor: pointer; transition: border-color .15s; }
+.att-select:focus { border-color: var(--clr-primary); box-shadow: 0 0 0 3px var(--clr-primary-glow); }
+
+/* Loading bar */
+.att-loading-bar { height: 3px; border-radius: 99px; background: var(--clr-border); margin-top: 12px; overflow: hidden; }
+.att-loading-inner { display: block; height: 100%; width: 40%; border-radius: 99px; background: linear-gradient(135deg, var(--clr-primary), #8B5CF6); animation: att-scan 1.4s ease-in-out infinite; }
+@@keyframes att-scan { 0% { transform: translateX(-150%); } 100% { transform: translateX(360%); } }
+
+/* Error */
+.att-error-banner { border-color: var(--clr-danger); color: var(--clr-danger); display: flex; align-items: center; gap: 10px; font-weight: 600; }
+
+/* Table card */
+.att-table-card { padding: 0; overflow: hidden; }
+.att-table { margin: 0; }
+.att-table thead th { padding: 14px 18px; }
+.att-table tbody td { padding: 13px 18px; }
+
+/* Sortable headers */
+.att-th-sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+.att-th-sortable:hover { color: var(--clr-primary); }
+.att-th-active { color: var(--clr-primary) !important; }
+.att-sort-arrow { font-size: 10px; margin-left: 4px; opacity: .5; }
+.att-th-active .att-sort-arrow { opacity: 1; }
+
+/* Rows */
+.att-row { cursor: pointer; transition: background .1s; }
+.att-row:hover { background: var(--clr-primary-light) !important; }
+
+/* Employee cell */
+.att-employee-cell { display: flex; align-items: center; gap: 10px; }
+.att-avatar { width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg, var(--clr-primary), #8B5CF6); color: #fff; font-size: 12px; font-weight: 800; display: grid; place-items: center; flex-shrink: 0; }
+.att-employee-name { font-weight: 600; }
+
+/* Times */
+.att-date-cell { color: var(--clr-text-muted); font-variant-numeric: tabular-nums; font-size: 0.88rem; }
+.att-time-pair { display: flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
+.att-time { font-weight: 600; font-size: 0.9rem; }
+.att-time--in { color: var(--clr-success); }
+.att-time--out { color: var(--clr-text-muted); }
+.att-time-sep { color: var(--clr-text-hint); font-size: 0.8rem; }
+
+/* Chips */
+.att-late-chip { background: var(--clr-warning-light); color: #92400E; border-radius: 6px; padding: 3px 8px; font-size: 12px; font-weight: 700; }
+.att-ot-chip { background: var(--clr-primary-light); color: var(--clr-primary); border-radius: 6px; padding: 3px 8px; font-size: 12px; font-weight: 700; }
+.att-verify-chip { background: var(--clr-surface-2); border: 1px solid var(--clr-border); color: var(--clr-text-muted); border-radius: 6px; padding: 3px 8px; font-size: 11px; font-weight: 600; }
+.att-ok-dash { color: var(--clr-text-hint); }
+
+/* Empty state */
+.att-empty { padding: 52px 16px !important; }
+.att-empty-inner { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.att-empty-icon { font-size: 40px; opacity: .4; }
+.att-empty-text { color: var(--clr-text-muted); font-size: 0.95rem; }
+
+/* Skeleton */
+.att-skeleton-rows { display: grid; gap: 0; }
+.att-skeleton-row { display: grid; grid-template-columns: 200px 110px 160px 80px; gap: 16px; padding: 16px 18px; border-bottom: 1px solid var(--clr-border); align-items: center; }
+.att-skel-name { height: 16px; width: 160px; }
+.att-skel-date { height: 14px; width: 90px; }
+.att-skel-time { height: 14px; width: 130px; }
+.att-skel-badge { height: 22px; width: 70px; border-radius: 99px; }
+
+/* Pagination */
+.att-pagination { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-top: 1px solid var(--clr-border); }
+.att-pagination-info { font-size: 13px; color: var(--clr-text-muted); }
+.att-pagination-btns { display: flex; gap: 4px; }
+.att-page-btn { width: 34px; height: 34px; border: 1px solid var(--clr-border); border-radius: var(--radius-sm); background: var(--clr-surface); color: var(--clr-text); cursor: pointer; font-size: 14px; font-weight: 600; transition: all .15s; }
+.att-page-btn:hover:not(:disabled) { border-color: var(--clr-primary); color: var(--clr-primary); }
+.att-page-btn--active { background: var(--clr-primary); border-color: var(--clr-primary); color: #fff !important; }
+.att-page-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+/* Detail drawer */
+.att-drawer-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.35); backdrop-filter: blur(2px); z-index: 79; animation: att-fade .2s ease; }
+.att-drawer { position: fixed; right: 0; top: 0; width: min(440px, 96vw); height: 100vh; background: var(--clr-surface); border-left: 1px solid var(--clr-border); box-shadow: var(--shadow-xl); z-index: 80; display: flex; flex-direction: column; animation: att-slide-in .22s ease; }
+@@keyframes att-slide-in { from { transform: translateX(100%); } to { transform: translateX(0); } }
+@@keyframes att-fade { from { opacity: 0; } to { opacity: 1; } }
+.att-drawer-header { display: flex; align-items: center; gap: 14px; padding: 22px 24px; border-bottom: 1px solid var(--clr-border); }
+.att-drawer-avatar { width: 48px; height: 48px; border-radius: 50%; background: linear-gradient(135deg, var(--clr-primary), #8B5CF6); color: #fff; font-size: 16px; font-weight: 800; display: grid; place-items: center; flex-shrink: 0; }
+.att-drawer-name { font-size: 17px; font-weight: 800; }
+.att-drawer-date { font-size: 13px; color: var(--clr-text-muted); margin-top: 2px; }
+.att-drawer-close { margin-left: auto; width: 34px; height: 34px; border: 1px solid var(--clr-border); background: var(--clr-surface-2); border-radius: var(--radius-sm); cursor: pointer; color: var(--clr-text-muted); font-size: 14px; }
+.att-drawer-close:hover { color: var(--clr-danger); border-color: var(--clr-danger); }
+.att-drawer-body { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 20px; }
+.att-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.att-detail-item { background: var(--clr-surface-2); border: 1px solid var(--clr-border); border-radius: var(--radius-sm); padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
+.att-detail-item--full { grid-column: 1 / -1; }
+.att-detail-label { font-size: 11px; font-weight: 700; color: var(--clr-text-muted); text-transform: uppercase; letter-spacing: .05em; }
+.att-detail-value { font-size: 18px; font-weight: 800; }
+.att-detail-in { color: var(--clr-success); }
+.att-detail-out { color: var(--clr-text-muted); }
+.att-detail-late { color: var(--clr-warning); }
+.att-detail-ot { color: var(--clr-primary); }
+.att-detail-section { display: flex; flex-direction: column; gap: 8px; }
+.att-detail-section-title { font-size: 12px; font-weight: 700; color: var(--clr-text-muted); text-transform: uppercase; letter-spacing: .05em; }
+.att-detail-pct { font-size: 12px; color: var(--clr-text-muted); font-weight: 600; }
+
+/* Action btn */
+.att-action-btn { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+
+/* Responsive */
+@@media (max-width: 900px) {
+    .att-kpi-row { grid-template-columns: repeat(3, 1fr); }
+    .att-kpi--hours { grid-column: 1 / -1; }
+    .att-filter-grid { grid-template-columns: 1fr 1fr; }
+    .att-search-wrap { grid-column: 1 / -1; }
+}
+@@media (max-width: 600px) {
+    .att-kpi-row { grid-template-columns: repeat(2, 1fr); }
+    .att-filter-grid { grid-template-columns: 1fr; }
+    .att-detail-grid { grid-template-columns: 1fr; }
+    .att-detail-item--full { grid-column: 1; }
+}
+</style>
+
 @code {
+    // ── State ──────────────────────────────────────────────────────────────
     private DateOnly date = DateOnly.FromDateTime(DateTime.Today);
     private string? departmentId;
-    private IReadOnlyList<DepartmentDto> departments = [];
-    private IReadOnlyList<AttendanceDto> records = [];
-    private string? error;
+    private string searchQuery = string.Empty;
+    private string statusFilter = string.Empty;
+    private string sortField = "name";
+    private bool sortAsc = true;
+    private int currentPage = 1;
+    private const int PageSize = 15;
 
+    private IReadOnlyList<DepartmentDto> departments = [];
+    private List<AttendanceDto> records = [];
+    private List<AttendanceDto> displayed = [];
+    private AttendanceDto? detailRecord;
+    private string? error;
+    private bool isLoading;
+
+    // Debounce timer for search
+    private System.Threading.Timer? _debounce;
+
+    // ── KPI ────────────────────────────────────────────────────────────────
+    private KpiSnapshot kpi = new();
+
+    private sealed class KpiSnapshot
+    {
+        public int Present;
+        public int Late;
+        public int Absent;
+        public int OnLeave;
+        public decimal TotalOvertimeH;
+    }
+
+    // ── Lifecycle ──────────────────────────────────────────────────────────
     protected override async Task OnInitializedAsync()
     {
-        var departmentResult = await Api.GetAsync<PagedResponse<DepartmentDto>>("api/departments?pageNumber=1&pageSize=1000");
-        departments = departmentResult?.Items ?? [];
+        var deptResult = await Api.GetAsync<PagedResponse<DepartmentDto>>("api/departments?pageNumber=1&pageSize=1000");
+        departments = deptResult?.Items ?? [];
         await LoadAsync();
     }
 
+    // ── Load from API ──────────────────────────────────────────────────────
     private async Task LoadAsync()
     {
+        isLoading = true;
+        error = null;
+        StateHasChanged();
+
         try
         {
-            error = null;
-            var query = $"api/attendance/records?from={date:yyyy-MM-dd}&to={date:yyyy-MM-dd}&pageSize=100";
-            if (Guid.TryParse(departmentId, out var parsed))
-                query += $"&departmentId={parsed}";
+            var query = $"api/attendance/records?from={date:yyyy-MM-dd}&to={date:yyyy-MM-dd}&pageSize=300";
+            if (Guid.TryParse(departmentId, out var deptGuid))
+                query += $"&departmentId={deptGuid}";
 
             var result = await Api.GetAsync<PagedResponse<AttendanceDto>>(query);
-            records = result?.Items ?? [];
+            records = result?.Items?.ToList() ?? [];
         }
         catch (Exception ex)
         {
             error = ex.Message;
             records = [];
         }
+
+        ComputeKpi();
+        ApplyFilters();
+        isLoading = false;
+        StateHasChanged();
     }
 
-    private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "--" : value;
+    // ── Filters & sort ─────────────────────────────────────────────────────
+    private void ApplyFilters()
+    {
+        currentPage = 1;
+        var q = searchQuery.Trim().ToLowerInvariant();
+
+        displayed = records
+            .Where(r =>
+                (string.IsNullOrEmpty(q) || (r.EmployeeName ?? "").ToLowerInvariant().Contains(q)) &&
+                (string.IsNullOrEmpty(statusFilter) || StatusKey(r) == statusFilter.ToLowerInvariant()))
+            .ToList();
+
+        displayed = sortField switch
+        {
+            "name" => sortAsc
+                ? displayed.OrderBy(r => r.EmployeeName).ToList()
+                : displayed.OrderByDescending(r => r.EmployeeName).ToList(),
+            "date" => sortAsc
+                ? displayed.OrderBy(r => r.Date).ToList()
+                : displayed.OrderByDescending(r => r.Date).ToList(),
+            "late" => sortAsc
+                ? displayed.OrderBy(r => r.LateMinutes).ToList()
+                : displayed.OrderByDescending(r => r.LateMinutes).ToList(),
+            "overtime" => sortAsc
+                ? displayed.OrderBy(r => r.OvertimeHours).ToList()
+                : displayed.OrderByDescending(r => r.OvertimeHours).ToList(),
+            _ => displayed
+        };
+
+        StateHasChanged();
+    }
+
+    private void SetSort(string field)
+    {
+        if (sortField == field) sortAsc = !sortAsc;
+        else { sortField = field; sortAsc = true; }
+        ApplyFilters();
+    }
+
+    private string SortClass(string field) => sortField == field ? "att-th-active" : "";
+    private string SortArrow(string field)
+    {
+        if (sortField != field) return "⇅";
+        return sortAsc ? "↑" : "↓";
+    }
+
+    // ── Search debounce ────────────────────────────────────────────────────
+    private void OnSearchInput(ChangeEventArgs e)
+    {
+        searchQuery = e.Value?.ToString() ?? string.Empty;
+        _debounce?.Dispose();
+        _debounce = new System.Threading.Timer(_ => InvokeAsync(ApplyFilters), null, 280, Timeout.Infinite);
+    }
+
+    private void ClearSearch() { searchQuery = string.Empty; ApplyFilters(); }
+
+    private async Task OnFilterChanged() => await LoadAsync();
+
+    // ── Pagination ─────────────────────────────────────────────────────────
+    private int TotalPages => (int)Math.Ceiling((double)displayed.Count / PageSize);
+    private IEnumerable<AttendanceDto> PagedDisplayed => displayed.Skip((currentPage - 1) * PageSize).Take(PageSize);
+
+    // ── KPI ────────────────────────────────────────────────────────────────
+    private void ComputeKpi()
+    {
+        var k = new KpiSnapshot();
+        foreach (var r in records)
+        {
+            var key = StatusKey(r);
+            if (key is "present") k.Present++;
+            else if (key is "late") k.Late++;
+            else if (key is "absent") k.Absent++;
+            else if (key is "onleave") k.OnLeave++;
+            k.TotalOvertimeH += r.OvertimeHours;
+        }
+        kpi = k;
+    }
+
+    // ── Detail drawer ──────────────────────────────────────────────────────
+    private void OpenDetail(AttendanceDto r) => detailRecord = r;
+    private void CloseDetail() => detailRecord = null;
+
+    // ── CSV export ─────────────────────────────────────────────────────────
+    private async Task ExportCsvAsync()
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("Ажилтан,Огноо,Ирсэн цаг,Явсан цаг,Хоцролт (мин),Илүү цаг,Баталгаажуулалт,Төлөв");
+        foreach (var r in displayed)
+        {
+            sb.AppendLine(string.Join(",",
+                CsvEscape(r.EmployeeName ?? "—"),
+                r.Date.ToString("yyyy-MM-dd"),
+                r.CheckInTime?.ToString("HH:mm") ?? "—",
+                r.CheckOutTime?.ToString("HH:mm") ?? "—",
+                r.LateMinutes,
+                $"{r.OvertimeHours:0.##}",
+                CsvEscape(r.VerificationMethod ?? "—"),
+                CsvEscape(r.Status ?? r.AttendanceStatus ?? "—")));
+        }
+
+        var bytes = System.Text.Encoding.UTF8.GetPreamble()
+            .Concat(System.Text.Encoding.UTF8.GetBytes(sb.ToString()))
+            .ToArray();
+        var b64 = Convert.ToBase64String(bytes);
+        var fileName = $"attendance_{date:yyyy-MM-dd}.csv";
+
+        await JS.InvokeVoidAsync("eval",
+            $"const a=document.createElement('a');a.href='data:text/csv;base64,{b64}';a.download='{fileName}';a.click()");
+    }
+
+    // ── Helpers ────────────────────────────────────────────────────────────
+    private static string Display(string? v) => string.IsNullOrWhiteSpace(v) ? "--" : v;
+
+    private static string Initials(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "?";
+        var parts = name.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length >= 2
+            ? $"{parts[0][0]}{parts[1][0]}".ToUpper()
+            : name[..Math.Min(2, name.Length)].ToUpper();
+    }
+
+    private static string StatusKey(AttendanceDto r) =>
+        (r.Status ?? r.AttendanceStatus ?? string.Empty).Replace(" ", "").ToLowerInvariant();
+
+    private static string VerifyLabel(string? v) => v?.ToLowerInvariant() switch
+    {
+        "face" or "facerecognition" => "Царайгаар",
+        "gps" or "geofence" => "GPS",
+        "manual" => "Гараар",
+        "qr" => "QR код",
+        _ => string.IsNullOrWhiteSpace(v) ? "—" : v
+    };
+
+    private static string CsvEscape(string v) =>
+        v.Contains(',') || v.Contains('"') || v.Contains('\n') ? $"\"{v.Replace("\"", "\"\"")}\"" : v;
 }

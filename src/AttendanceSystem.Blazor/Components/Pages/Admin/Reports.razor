@@ -1,76 +1,271 @@
 @page "/admin/reports"
 @layout AdminLayout
-@attribute [Authorize(Roles = "Admin,SuperAdmin,HRManager")] 
+@attribute [Authorize(Roles = "Admin,SuperAdmin,HRManager")]
 @inject ApiClient Api
+@inject NavigationManager Nav
 
-<PageHeader Title="Reports" Subtitle="Report values loaded from SQL Server" Icon="▤" />
+<PageHeader Title="Тайлан" Subtitle="SQL Server-ээс ачааллагдсан тайлангийн мэдээлэл" Icon="▤" />
 
 <div class="page-stack">
+
+    @* ── Filter bar ── *@
     <div class="card filter-bar">
-        <InputDate @bind-Value="from" />
-        <InputDate @bind-Value="to" />
-        <button class="btn-ghost" @onclick="LoadAsync">Load</button>
+        <div style="display:flex;align-items:center;gap:8px;flex:1">
+            <label style="font-size:13px;color:var(--clr-text-muted);white-space:nowrap">Эхлэх огноо</label>
+            <InputDate class="form-control" @bind-Value="from" />
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex:1">
+            <label style="font-size:13px;color:var(--clr-text-muted);white-space:nowrap">Дуусах огноо</label>
+            <InputDate class="form-control" @bind-Value="to" />
+        </div>
+        <button class="btn btn-primary" @onclick="LoadAsync" disabled="@_loading">
+            @if (_loading) { <span>Уншиж байна...</span> } else { <span>🔍 Харах</span> }
+        </button>
+        <div style="display:flex;gap:6px">
+            <button class="btn btn-ghost" @onclick='() => ExportAsync("attendance")' title="Excel татах">⬇ Excel</button>
+        </div>
     </div>
 
     @if (!string.IsNullOrWhiteSpace(error))
     {
-        <div class="card" style="border-color:var(--clr-danger);color:var(--clr-danger)">@error</div>
+        <div class="card" style="border-color:var(--clr-danger);color:var(--clr-danger);padding:14px 18px">⚠ @error</div>
     }
 
-    <div class="card">
-        <h2>Department summary</h2>
-        <table class="data-table">
-            <thead><tr><th>Department</th><th>Present</th><th>Late</th><th>Leave</th></tr></thead>
-            <tbody>
-                @if (summaries.Count == 0)
-                {
-                    <tr><td colspan="4" class="muted">No report data found.</td></tr>
-                }
-                else
-                {
-                    @foreach (var row in summaries)
-                    {
-                        <tr><td>@row.DepartmentName</td><td>@row.Present</td><td>@row.Late</td><td>@row.Leave</td></tr>
-                    }
-                }
-            </tbody>
-        </table>
+    @* ── Tab switcher ── *@
+    <div class="rpt-tabs">
+        <button class="rpt-tab @(_tab == "summary" ? "rpt-tab--active" : "")" @onclick='() => _tab = "summary"'>▦ Хэлтсийн дүн</button>
+        <button class="rpt-tab @(_tab == "attendance" ? "rpt-tab--active" : "")" @onclick='() => _tab = "attendance"'>◷ Ирцийн бүртгэл</button>
+        <button class="rpt-tab @(_tab == "overtime" ? "rpt-tab--active" : "")" @onclick='() => _tab = "overtime"'>↑ Илүү цаг</button>
     </div>
 
-    <div class="card">
-        <h2>Overtime</h2>
-        <div class="row g-3">
-            <div class="col-md-4"><StatCard Title="Total overtime" Value="@($"{overtimeSummary?.TotalOvertimeHours ?? 0:0.##}h")" Icon="+" Color="Warning" /></div>
-            <div class="col-md-4"><StatCard Title="Average" Value="@($"{overtimeSummary?.AverageOvertimeHours ?? 0:0.##}h")" Icon="◇" Color="Info" /></div>
-            <div class="col-md-4"><StatCard Title="Highest" Value="@($"{overtimeSummary?.HighestOvertimeHours ?? 0:0.##}h")" Icon="↑" Color="Danger" /></div>
+    @* ── Department summary ── *@
+    @if (_tab == "summary")
+    {
+        <div class="card">
+            <div class="rpt-card-header">
+                <h2 class="rpt-card-title">Хэлтсийн дүн</h2>
+                <span class="rpt-badge">@summaries.Count хэлтэс</span>
+            </div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Хэлтэс</th>
+                        <th>Ирсэн</th>
+                        <th>Хоцорсон</th>
+                        <th>Чөлөөтэй</th>
+                        <th>Нийт %</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (summaries.Count == 0)
+                    {
+                        <tr><td colspan="5" class="muted" style="text-align:center;padding:24px">Мэдээлэл олдсонгүй.</td></tr>
+                    }
+                    else
+                    {
+                        @foreach (var row in summaries)
+                        {
+                            var total = row.Present + row.Leave;
+                            var pct = total == 0 ? 0 : (int)Math.Round(row.Present * 100.0 / total);
+                            <tr>
+                                <td><strong>@row.DepartmentName</strong></td>
+                                <td><span class="badge badge-present">@row.Present</span></td>
+                                <td><span class="badge badge-late">@row.Late</span></td>
+                                <td><span class="badge badge-absent">@row.Leave</span></td>
+                                <td>
+                                    <div style="display:flex;align-items:center;gap:8px">
+                                        <div class="rpt-bar-wrap">
+                                            <div class="rpt-bar" style="width:@(pct)%"></div>
+                                        </div>
+                                        <span style="font-size:12px;color:var(--clr-text-muted)">@pct%</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
         </div>
-    </div>
+    }
+
+    @* ── Attendance records ── *@
+    @if (_tab == "attendance")
+    {
+        <div class="card">
+            <div class="rpt-card-header">
+                <h2 class="rpt-card-title">Ирцийн бүртгэл</h2>
+                <span class="rpt-badge">@_attendanceTotal нийт</span>
+            </div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Огноо</th>
+                        <th>Ажилтан</th>
+                        <th>Хэлтэс</th>
+                        <th>Ирсэн цаг</th>
+                        <th>Явсан цаг</th>
+                        <th>Төлөв</th>
+                        <th>Хоцролт</th>
+                        <th>Илүү цаг</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (attendanceRows.Count == 0)
+                    {
+                        <tr><td colspan="8" class="muted" style="text-align:center;padding:24px">Мэдээлэл олдсонгүй.</td></tr>
+                    }
+                    else
+                    {
+                        @foreach (var row in attendanceRows)
+                        {
+                            var status = row.TryGetValue("Status", out var s) ? s?.ToString() : null;
+                            <tr>
+                                <td>@FormatDate(row, "Date")</td>
+                                <td><strong>@Val(row, "Employee")</strong></td>
+                                <td>@Val(row, "Department")</td>
+                                <td>@FormatTime(row, "CheckInTime")</td>
+                                <td>@FormatTime(row, "CheckOutTime")</td>
+                                <td><span class="badge @StatusBadge(status)">@(status ?? "—")</span></td>
+                                <td>@(Val(row, "LateMinutes") is "0" or "" or "—" ? "—" : Val(row, "LateMinutes") + " мин")</td>
+                                <td>@(Val(row, "OvertimeHours") is "0" or "0.0" or "0.00" or "" or "—" ? "—" : Val(row, "OvertimeHours") + "ц")</td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+            @if (_attendanceTotal > attendanceRows.Count)
+            {
+                <div style="padding:12px 16px;text-align:center">
+                    <button class="btn btn-ghost" @onclick="LoadMoreAttendance">+ Дэлгэрэнгүй (@attendanceRows.Count / @_attendanceTotal)</button>
+                </div>
+            }
+        </div>
+    }
+
+    @* ── Overtime ── *@
+    @if (_tab == "overtime")
+    {
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px">
+            <div class="rpt-stat-card rpt-stat-warning">
+                <div class="rpt-stat-icon">⏱</div>
+                <div class="rpt-stat-value">@($"{overtimeSummary?.TotalOvertimeHours ?? 0:0.##}")ц</div>
+                <div class="rpt-stat-label">Нийт илүү цаг</div>
+            </div>
+            <div class="rpt-stat-card rpt-stat-info">
+                <div class="rpt-stat-icon">◇</div>
+                <div class="rpt-stat-value">@($"{overtimeSummary?.AverageOvertimeHours ?? 0:0.##}")ц</div>
+                <div class="rpt-stat-label">Дундаж илүү цаг</div>
+            </div>
+            <div class="rpt-stat-card rpt-stat-danger">
+                <div class="rpt-stat-icon">↑</div>
+                <div class="rpt-stat-value">@($"{overtimeSummary?.HighestOvertimeHours ?? 0:0.##}")ц</div>
+                <div class="rpt-stat-label">Хамгийн их</div>
+            </div>
+            <div class="rpt-stat-card rpt-stat-success">
+                <div class="rpt-stat-icon">📋</div>
+                <div class="rpt-stat-value">@(overtimeSummary?.RecordCount ?? 0)</div>
+                <div class="rpt-stat-label">Нийт бүртгэл</div>
+            </div>
+        </div>
+    }
 </div>
 
 @code {
     private DateOnly from = new(DateTime.Today.Year, DateTime.Today.Month, 1);
     private DateOnly to = DateOnly.FromDateTime(DateTime.Today);
-    private IReadOnlyList<DepartmentSummary> summaries = [];
-    private OvertimeSummaryDto? overtimeSummary;
+
+    private string _tab = "summary";
+    private bool _loading;
     private string? error;
+
+    private IReadOnlyList<DepartmentSummaryDto> summaries = [];
+    private List<Dictionary<string, object?>> attendanceRows = [];
+    private int _attendanceTotal;
+    private int _attendancePage = 1;
+    private OvertimeSummaryDto? overtimeSummary;
 
     protected override Task OnInitializedAsync() => LoadAsync();
 
     private async Task LoadAsync()
     {
+        _loading = true;
+        error = null;
+        _attendancePage = 1;
+        attendanceRows = [];
+        StateHasChanged();
         try
         {
-            error = null;
-            summaries = await Api.GetAsync<IReadOnlyList<DepartmentSummary>>($"api/reports/summary?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}") ?? [];
-            overtimeSummary = await Api.GetOvertimeSummaryAsync(from, to);
+            var summaryTask = Api.GetAsync<IReadOnlyList<DepartmentSummaryDto>>(
+                $"api/reports/summary?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}");
+            var overtimeTask = Api.GetOvertimeSummaryAsync(from, to);
+            var attendanceTask = Api.GetAsync<PagedResponse<Dictionary<string, object?>>>(
+                $"api/reports/attendance?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}&pageNumber=1&pageSize=50");
+
+            await Task.WhenAll(summaryTask, overtimeTask, attendanceTask);
+
+            summaries = summaryTask.Result ?? [];
+            overtimeSummary = overtimeTask.Result;
+            var attendanceResult = attendanceTask.Result;
+            attendanceRows = attendanceResult?.Items?.ToList() ?? [];
+            _attendanceTotal = attendanceResult?.TotalCount ?? 0;
         }
         catch (Exception ex)
         {
             error = ex.Message;
-            summaries = [];
-            overtimeSummary = null;
+        }
+        finally
+        {
+            _loading = false;
         }
     }
 
-    private sealed record DepartmentSummary(Guid DepartmentId, string DepartmentName, int Present, int Late, int Leave);
+    private async Task LoadMoreAttendance()
+    {
+        _attendancePage++;
+        try
+        {
+            var result = await Api.GetAsync<PagedResponse<Dictionary<string, object?>>>(
+                $"api/reports/attendance?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}&pageNumber={_attendancePage}&pageSize=50");
+            if (result?.Items is not null)
+                attendanceRows.AddRange(result.Items);
+        }
+        catch (Exception ex) { error = ex.Message; }
+    }
+
+    private async Task ExportAsync(string type)
+    {
+        try
+        {
+            var url = $"api/reports/{type}/export/excel?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}";
+            await Api.GetAsync<object>(url);
+        }
+        catch { }
+    }
+
+    private static string Val(Dictionary<string, object?> row, string key)
+        => row.TryGetValue(key, out var v) && v is not null ? v.ToString()! : "—";
+
+    private static string FormatDate(Dictionary<string, object?> row, string key)
+    {
+        if (!row.TryGetValue(key, out var v) || v is null) return "—";
+        return v is DateOnly d ? d.ToString("yyyy-MM-dd")
+             : DateTime.TryParse(v.ToString(), out var dt) ? dt.ToString("yyyy-MM-dd") : v.ToString()!;
+    }
+
+    private static string FormatTime(Dictionary<string, object?> row, string key)
+    {
+        if (!row.TryGetValue(key, out var v) || v is null) return "—";
+        return TimeSpan.TryParse(v.ToString(), out var t) ? t.ToString(@"HH\:mm") : v.ToString()!;
+    }
+
+    private static string StatusBadge(string? status) => status switch
+    {
+        "Present"  => "badge-present",
+        "Late"     => "badge-late",
+        "Absent"   => "badge-absent",
+        "OnLeave"  => "badge-leave",
+        _          => ""
+    };
+
+    private sealed record DepartmentSummaryDto(Guid DepartmentId, string DepartmentName, int Present, int Late, int Leave);
 }

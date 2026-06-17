@@ -113,3 +113,4 @@ public class AuthController : ControllerBase
 
 /// <summary>Refresh token request body.</summary>
 public record RefreshTokenRequest(string RefreshToken);
+public record AdminResetPasswordDto(string Email, string Password);

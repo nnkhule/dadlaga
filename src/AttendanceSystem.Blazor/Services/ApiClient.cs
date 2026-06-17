@@ -36,6 +36,11 @@ public sealed class ApiClient
         return await SendWithRefreshAsync(() => _http.PutAsJsonAsync(url, body, cancellationToken));
     }
 
+    public async Task<HttpResponseMessage> DeleteAsync(string url, CancellationToken cancellationToken = default)
+    {
+        return await SendWithRefreshAsync(() => _http.DeleteAsync(url, cancellationToken));
+    }
+
     public Task<DashboardSummaryDto?> GetDashboardSummaryAsync()
         => GetAsync<DashboardSummaryDto>("api/dashboard/summary");
 
@@ -109,6 +114,12 @@ public sealed class ApiClient
 
     public Task<HttpResponseMessage> RejectLeaveRequestAsync(Guid id)
         => PostAsync($"api/leave/requests/{id}/reject", new { });
+
+    public Task<HttpResponseMessage> DeactivateEmployeeAsync(Guid id)
+        => DeleteAsync($"api/employees/{id}");
+
+    public Task<HttpResponseMessage> ReactivateEmployeeAsync(Guid id)
+        => PostAsync($"api/employees/{id}/reactivate", new { });
 
     public async Task<ChatResponseDto?> PostChatAsync(ChatRequestDto request, CancellationToken cancellationToken = default)
     {

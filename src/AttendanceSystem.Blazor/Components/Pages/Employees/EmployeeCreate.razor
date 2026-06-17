@@ -1,91 +1,424 @@
-@page "/employees/create"
-@page "/employees/{Id:guid}/edit"
+@page "/admin/employees/create"
+@page "/admin/employees/{Id:guid}/edit"
+@layout AdminLayout
 @inject ApiClient Api
 @inject NavigationManager Navigation
 
-<h3 class="mb-4">@(Id.HasValue ? "Edit Employee" : "Create Employee")</h3>
+<div class="form-container">
+    <h3 class="form-title">@(Id.HasValue ? "Ажилтны мэдээлэл засах" : "Шинэ ажилтан бүртгэх")</h3>
 
-<section class="panel form-narrow">
-    @if (!string.IsNullOrWhiteSpace(error)) { <div class="alert alert-danger">@error</div> }
-    <input class="form-control mb-3" placeholder="Employee Code" @bind="model.EmployeeCode" />
-    <input class="form-control mb-3" placeholder="Full Name" @bind="model.FullName" />
-    <input class="form-control mb-3" placeholder="Email" @bind="model.Email" />
-    <input class="form-control mb-3" placeholder="Phone" @bind="model.Phone" />
-    <select class="form-select mb-3" @bind="model.DepartmentId">
-        <option value="">Select department</option>
-        @foreach (var department in departments)
+    <section class="form-card">
+        @if (!string.IsNullOrWhiteSpace(error))
         {
-            <option value="@department.Id">@department.Name</option>
+            <div class="alert alert-danger">@error</div>
         }
-    </select>
-    <input class="form-control mb-3" placeholder="Position" @bind="model.Position" />
-    <InputDate class="form-control mb-3" @bind-Value="model.HireDate" />
-    <button class="btn btn-primary" @onclick="SaveAsync" disabled="@isSaving">Save</button>
-</section>
+        @if (!string.IsNullOrWhiteSpace(successMsg))
+        {
+            <div class="alert alert-success">@successMsg</div>
+        }
+
+        <div class="form-section-title">Үндсэн мэдээлэл</div>
+        <div class="form-grid">
+            <div class="form-group">
+                <label>Ажилтны код <span class="form-hint">(автомат)</span></label>
+                <input class="form-control" placeholder="Үүсгэж байна..." @bind="model.EmployeeCode" disabled />
+            </div>
+            <div class="form-group">
+                <label>Бүтэн нэр <span class="form-required">*</span></label>
+                <input class="form-control @(Touched("FullName") && string.IsNullOrWhiteSpace(model.FullName) ? "input-error" : "")"
+                       placeholder="Бүтэн нэр оруулна уу"
+                       @bind="model.FullName" @bind:event="oninput"
+                       @onfocus='() => Touch("FullName")' />
+                @if (Touched("FullName") && string.IsNullOrWhiteSpace(model.FullName))
+                {
+                    <span class="form-error-msg">Нэр заавал байна</span>
+                }
+            </div>
+            <div class="form-group">
+                <label>Имэйл хаяг <span class="form-required">*</span></label>
+                <input class="form-control @(Touched("Email") && string.IsNullOrWhiteSpace(model.Email) ? "input-error" : "")"
+                       placeholder="example@domain.com" type="email"
+                       @bind="model.Email" @bind:event="oninput"
+                       @onfocus='() => Touch("Email")' />
+                @if (Touched("Email") && string.IsNullOrWhiteSpace(model.Email))
+                {
+                    <span class="form-error-msg">Имэйл заавал байна</span>
+                }
+            </div>
+            <div class="form-group">
+                <label>Утасны дугаар</label>
+                <input class="form-control" placeholder="Утасны дугаар оруулна уу"
+                       @bind="model.Phone" @bind:event="oninput" />
+            </div>
+            <div class="form-group">
+                <label>Хэлтэс / Алба <span class="form-required">*</span></label>
+                <select class="form-select @(Touched("DepartmentId") && model.DepartmentId is null ? "input-error" : "")"
+                        @bind="model.DepartmentId"
+                        @onfocus='() => Touch("DepartmentId")'>
+                    <option value="">Хэлтэс сонгоно уу</option>
+                    @foreach (var dept in departments)
+                    {
+                        <option value="@dept.Id">@dept.Name</option>
+                    }
+                </select>
+                @if (Touched("DepartmentId") && model.DepartmentId is null)
+                {
+                    <span class="form-error-msg">Хэлтэс заавал байна</span>
+                }
+            </div>
+            <div class="form-group">
+                <label>Албан тушаал</label>
+                <input class="form-control" placeholder="Албан тушаал оруулна уу"
+                       @bind="model.Position" @bind:event="oninput" />
+            </div>
+            <div class="form-group grid-full-width">
+                <label>Ажилд орсон огноо</label>
+                <InputDate class="form-control" @bind-Value="model.HireDate" />
+            </div>
+        </div>
+
+        @* ── Нууц үг солих (засах үед) ── *@
+        @if (Id.HasValue)
+        {
+            <div class="form-section-divider"></div>
+            <div class="form-section-title">
+                Нууц үг солих
+                <label class="form-toggle" style="margin-left:auto">
+                    <input type="checkbox" @bind="_changePassword" />
+                    <span class="form-toggle-label">@(_changePassword ? "Тийм" : "Үгүй")</span>
+                </label>
+            </div>
+            @if (_changePassword)
+            {
+                <div class="form-account-box">
+                    <div class="form-account-info">
+                        <span>🔐</span>
+                        <span><strong>@model.Email</strong> хаягийн нууц үгийг шинэчлэнэ</span>
+                    </div>
+                    <div class="form-grid" style="margin-top:12px">
+                        <div class="form-group">
+                            <label>Шинэ нууц үг <span class="form-required">*</span></label>
+                            <div class="input-with-icon">
+                                <input class="form-control @(Touched("Password") && !IsValidPassword(_password) ? "input-error" : "")"
+                                       type="@(_showPwd ? "text" : "password")"
+                                       placeholder="Нууц үг (8+ тэмдэгт)"
+                                       value="@_password"
+                                       @oninput="e => _password = e.Value?.ToString() ?? string.Empty"
+                                       @onfocus='() => Touch("Password")' />
+                                <button type="button" class="input-icon-btn" @onclick="() => _showPwd = !_showPwd">
+                                    @(_showPwd ? "🙈" : "👁")
+                                </button>
+                            </div>
+                            @if (Touched("Password") && !string.IsNullOrEmpty(_password) && !IsValidPassword(_password))
+                            {
+                                <span class="form-error-msg">8-аас дээш тэмдэгт байх ёстой</span>
+                            }
+                            @if (!string.IsNullOrEmpty(_password))
+                            {
+                                <div class="pwd-strength">
+                                    <div class="pwd-strength-bar">
+                                        <div class="pwd-strength-fill pwd-@PwdStrengthClass(_password)"
+                                             style="width:@(PwdStrengthPct(_password))%"></div>
+                                    </div>
+                                    <span class="pwd-strength-label">@PwdStrengthLabel(_password)</span>
+                                </div>
+                            }
+                        </div>
+                        <div class="form-group">
+                            <label>Нууц үг давтах <span class="form-required">*</span></label>
+                            <div class="input-with-icon">
+                                <input class="form-control @(Touched("Confirm") && _password != _confirm ? "input-error" : "")"
+                                       type="@(_showConfirm ? "text" : "password")"
+                                       placeholder="Нууц үгийг давтана уу"
+                                       value="@_confirm"
+                                       @oninput="e => _confirm = e.Value?.ToString() ?? string.Empty"
+                                       @onfocus='() => Touch("Confirm")' />
+                                <button type="button" class="input-icon-btn" @onclick="() => _showConfirm = !_showConfirm">
+                                    @(_showConfirm ? "🙈" : "👁")
+                                </button>
+                            </div>
+                            @if (Touched("Confirm") && !string.IsNullOrEmpty(_confirm) && _password != _confirm)
+                            {
+                                <span class="form-error-msg">Нууц үг таарахгүй байна</span>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+
+        @* ── Нэвтрэх эрх (зөвхөн шинэ ажилтанд) ── *@
+        @if (!Id.HasValue)
+        {
+            <div class="form-section-divider"></div>
+            <div class="form-section-title">
+                Нэвтрэх эрх
+                <label class="form-toggle" style="margin-left:auto">
+                    <input type="checkbox" @bind="_createAccount" />
+                    <span class="form-toggle-label">@(_createAccount ? "Тийм" : "Үгүй")</span>
+                </label>
+            </div>
+            @if (_createAccount)
+            {
+                <div class="form-account-box">
+                    <div class="form-account-info">
+                        <span>🔐</span>
+                        <span>Ажилтан системд <strong>@(string.IsNullOrWhiteSpace(model.Email) ? "имэйлээр" : model.Email)</strong> нэвтэрнэ</span>
+                    </div>
+                    <div class="form-grid" style="margin-top:12px">
+                        <div class="form-group">
+                            <label>Нууц үг <span class="form-required">*</span></label>
+                            <div class="input-with-icon">
+                                <input class="form-control @(Touched("Password") && !IsValidPassword(_password) ? "input-error" : "")"
+                                       type="@(_showPwd ? "text" : "password")"
+                                       placeholder="Нууц үг (8+ тэмдэгт)"
+                                       value="@_password"
+                                       @oninput="e => _password = e.Value?.ToString() ?? string.Empty"
+                                       @onfocus='() => Touch("Password")' />
+                                <button type="button" class="input-icon-btn" @onclick="() => _showPwd = !_showPwd">
+                                    @(_showPwd ? "🙈" : "👁")
+                                </button>
+                            </div>
+                            @if (Touched("Password") && !string.IsNullOrEmpty(_password) && !IsValidPassword(_password))
+                            {
+                                <span class="form-error-msg">8-аас дээш тэмдэгт байх ёстой</span>
+                            }
+                            @if (!string.IsNullOrEmpty(_password))
+                            {
+                                <div class="pwd-strength">
+                                    <div class="pwd-strength-bar">
+                                        <div class="pwd-strength-fill pwd-@PwdStrengthClass(_password)"
+                                             style="width:@(PwdStrengthPct(_password))%"></div>
+                                    </div>
+                                    <span class="pwd-strength-label">@PwdStrengthLabel(_password)</span>
+                                </div>
+                            }
+                        </div>
+                        <div class="form-group">
+                            <label>Нууц үг давтах <span class="form-required">*</span></label>
+                            <div class="input-with-icon">
+                                <input class="form-control @(Touched("Confirm") && _password != _confirm ? "input-error" : "")"
+                                       type="@(_showConfirm ? "text" : "password")"
+                                       placeholder="Нууц үгийг давтана уу"
+                                       value="@_confirm"
+                                       @oninput="e => _confirm = e.Value?.ToString() ?? string.Empty"
+                                       @onfocus='() => Touch("Confirm")' />
+                                <button type="button" class="input-icon-btn" @onclick="() => _showConfirm = !_showConfirm">
+                                    @(_showConfirm ? "🙈" : "👁")
+                                </button>
+                            </div>
+                            @if (Touched("Confirm") && !string.IsNullOrEmpty(_confirm) && _password != _confirm)
+                            {
+                                <span class="form-error-msg">Нууц үг таарахгүй байна</span>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+
+        <div class="form-actions">
+            <button class="btn btn-ghost" @onclick="GoBack">Цуцлах</button>
+            <button class="btn btn-primary" @onclick="SaveAsync" disabled="@isSaving">
+                @if (isSaving) { <span>Хадгалж байна...</span> }
+                else { <span>@(Id.HasValue ? "Шинэчлэх" : "Бүртгэх")</span> }
+            </button>
+        </div>
+    </section>
+</div>
 
 @code {
     [Parameter] public Guid? Id { get; set; }
+
     private EmployeeForm model = new();
     private IReadOnlyList<DepartmentDto> departments = [];
     private string? error;
+    private string? successMsg;
     private bool isSaving;
+
+    private bool _createAccount = true;
+    private bool _changePassword = false;
+    private string _password = string.Empty;
+    private string _confirm  = string.Empty;
+    private bool _showPwd, _showConfirm;
+
+    private readonly HashSet<string> _touched = [];
+    private void Touch(string f) => _touched.Add(f);
+    private bool Touched(string f) => _touched.Contains(f);
 
     protected override async Task OnInitializedAsync()
     {
-        var departmentResult = await Api.GetAsync<PagedResponse<DepartmentDto>>("api/departments?pageNumber=1&pageSize=1000");
-        departments = departmentResult?.Items ?? [];
+        try
+        {
+            var deptResult = await Api.GetAsync<PagedResponse<DepartmentDto>>("api/departments?pageNumber=1&pageSize=1000");
+            departments = deptResult?.Items ?? [];
+            if (Id is null) await GenerateEmployeeCode();
+        }
+        catch (Exception ex) { error = $"Өгөгдөл ачаалахад алдаа: {ex.Message}"; }
     }
 
     protected override async Task OnParametersSetAsync()
     {
-        if (Id is null)
-            return;
+        if (Id is null) return;
+        try
+        {
+            var emp = await Api.GetAsync<EmployeeDto>($"api/employees/{Id}");
+            if (emp is null) return;
+            model.EmployeeCode = emp.EmployeeCode;
+            model.FullName     = emp.FullName;
+            model.Email        = emp.Email;
+            model.Phone        = emp.Phone;
+            model.DepartmentId = emp.DepartmentId;
+            model.Position     = emp.Position;
+            model.HireDate     = emp.HireDate;
+        }
+        catch (Exception ex) { error = $"Ажилтны мэдээлэл ачаалахад алдаа: {ex.Message}"; }
+    }
 
-        var employee = await Api.GetAsync<EmployeeDto>($"api/employees/{Id}");
-        if (employee is null)
-            return;
-
-        model.EmployeeCode = employee.EmployeeCode;
-        model.FullName = employee.FullName;
-        model.Email = employee.Email;
-        model.Phone = employee.Phone;
-        model.DepartmentId = employee.DepartmentId;
-        model.Position = employee.Position;
-        model.HireDate = employee.HireDate;
+    private async Task GenerateEmployeeCode()
+    {
+        try
+        {
+            var r = await Api.GetAsync<PagedResponse<EmployeeDto>>("api/employees?pageNumber=1&pageSize=1");
+            model.EmployeeCode = $"EMP-{((r?.TotalCount ?? 0) + 1):D4}";
+        }
+        catch { model.EmployeeCode = $"EMP-{Random.Shared.Next(1000, 9999)}"; }
     }
 
     private async Task SaveAsync()
     {
+        _touched.UnionWith(["FullName", "Email", "DepartmentId"]);
+        if (_createAccount && !Id.HasValue)
+            _touched.UnionWith(["Password", "Confirm"]);
+
+        if (string.IsNullOrWhiteSpace(model.FullName) ||
+            string.IsNullOrWhiteSpace(model.Email)    ||
+            model.DepartmentId is null)
+        {
+            error = "Заавал талбаруудыг бөглөнө үү.";
+            return;
+        }
+
+        if (_createAccount && !Id.HasValue)
+        {
+            if (!IsValidPassword(_password)) { error = "Нууц үг 8-аас дээш тэмдэгт байх ёстой."; return; }
+            if (_password != _confirm)       { error = "Нууц үг таарахгүй байна."; return; }
+        }
+
+        isSaving = true;
+        error = null;
+        successMsg = null;
+
         try
         {
-            isSaving = true;
-            error = null;
-            var response = Id.HasValue
+            var resp = Id.HasValue
                 ? await Api.PutAsync($"api/employees/{Id}", model)
                 : await Api.PostAsync("api/employees", model);
 
-            if (!response.IsSuccessStatusCode)
+            if (!resp.IsSuccessStatusCode)
             {
-                error = await response.Content.ReadAsStringAsync();
+                error = await resp.Content.ReadAsStringAsync();
                 return;
             }
 
-            Navigation.NavigateTo("/employees");
+            // Нууц үг солих (засах үед)
+            if (Id.HasValue && _changePassword)
+            {
+                if (!IsValidPassword(_password)) { error = "Нууц үг 8-аас дээш тэмдэгт байх ёстой."; return; }
+                if (_password != _confirm)       { error = "Нууц үг таарахгүй байна."; return; }
+
+                var pwdResp = await Api.PostAsync("api/auth/setup-employee-account", new
+                {
+                    EmployeeId = Id.ToString(),
+                    Email      = model.Email,
+                    Password   = _password,
+                    FullName   = model.FullName
+                });
+
+                if (!pwdResp.IsSuccessStatusCode)
+                {
+                    var resetResp = await Api.PostAsync("api/auth/admin-reset-password", new
+                    {
+                        Email    = model.Email,
+                        Password = _password
+                    });
+
+                    if (!resetResp.IsSuccessStatusCode)
+                    {
+                        error = "Мэдээлэл хадгалагдлаа. Гэхдээ нууц үг солиход алдаа гарлаа.";
+                        return;
+                    }
+                }
+            }
+
+            // Шинэ ажилтанд нэвтрэх эрх үүсгэх
+            if (!Id.HasValue && _createAccount)
+            {
+                var created = await resp.Content.ReadFromJsonAsync<EmployeeDto>();
+                if (created is not null)
+                {
+                    var accountResp = await Api.PostAsync("api/auth/setup-employee-account", new
+                    {
+                        EmployeeId = created.Id.ToString(),
+                        Email      = model.Email,
+                        Password   = _password,
+                        FullName   = model.FullName
+                    });
+
+                    if (!accountResp.IsSuccessStatusCode)
+                    {
+                        successMsg = "Ажилтан бүртгэгдлээ. Гэхдээ нэвтрэх эрх үүсгэхэд алдаа гарлаа — дараа дахин оролдоно уу.";
+                        await Task.Delay(2000);
+                        Navigation.NavigateTo("/admin/employees");
+                        return;
+                    }
+                }
+            }
+
+            Navigation.NavigateTo("/admin/employees");
         }
-        finally
-        {
-            isSaving = false;
-        }
+        catch (Exception ex) { error = $"Хадгалах үед алдаа: {ex.Message}"; }
+        finally { isSaving = false; }
     }
+
+    private void GoBack() => Navigation.NavigateTo("/admin/employees");
+
+    private static bool IsValidPassword(string p) => p.Length >= 8;
+
+    private static int PwdStrengthPct(string p)
+    {
+        int score = 0;
+        if (p.Length >= 8)  score += 25;
+        if (p.Length >= 12) score += 25;
+        if (p.Any(char.IsUpper) && p.Any(char.IsLower)) score += 25;
+        if (p.Any(char.IsDigit) || p.Any(c => !char.IsLetterOrDigit(c))) score += 25;
+        return score;
+    }
+
+    private static string PwdStrengthClass(string p) => PwdStrengthPct(p) switch
+    {
+        <= 25  => "weak",
+        <= 50  => "fair",
+        <= 75  => "good",
+        _      => "strong"
+    };
+
+    private static string PwdStrengthLabel(string p) => PwdStrengthPct(p) switch
+    {
+        <= 25  => "Сул",
+        <= 50  => "Дунд",
+        <= 75  => "Сайн",
+        _      => "Маш сайн"
+    };
 
     private sealed class EmployeeForm
     {
-        public string EmployeeCode { get; set; } = string.Empty;
-        public string FullName { get; set; } = string.Empty;
-        public string Email { get; set; } = string.Empty;
-        public string? Phone { get; set; }
-        public Guid? DepartmentId { get; set; }
-        public string? Position { get; set; }
-        public DateOnly HireDate { get; set; } = DateOnly.FromDateTime(DateTime.Today);
+        public string   EmployeeCode { get; set; } = string.Empty;
+        public string   FullName     { get; set; } = string.Empty;
+        public string   Email        { get; set; } = string.Empty;
+        public string?  Phone        { get; set; }
+        public Guid?    DepartmentId { get; set; }
+        public string?  Position     { get; set; }
+        public DateOnly HireDate     { get; set; } = DateOnly.FromDateTime(DateTime.Today);
     }
 }

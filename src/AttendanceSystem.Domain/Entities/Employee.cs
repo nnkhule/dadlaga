@@ -74,5 +74,6 @@ public class Employee : BaseEntity
     }
 
     public void Deactivate() { IsActive = false; SetUpdated(); }
+    public void Reactivate() { IsActive = true; SetUpdated(); }
     public void LinkUser(string userId) { UserId = userId; SetUpdated(); }
 }
