@@ -10,7 +10,6 @@ public class AdminAiContextDto
     public int PendingLeaveRequests { get; set; }
     public List<string> DepartmentNames { get; set; } = new();
 
-    // ✅ Шинээр нэмэгдсэн — сарын болон долоо хоногийн чиг хандлага
     public decimal AttendanceRateThisMonth { get; set; }
     public decimal AvgLateMinutesThisMonth { get; set; }
     public decimal TotalOvertimeHoursThisMonth { get; set; }

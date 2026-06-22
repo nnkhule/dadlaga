@@ -47,7 +47,7 @@ public class DefaultAiProvider : IAiProvider
                 model       = model,
                 messages    = chatMessages,
                 temperature = 0.45,   // ↑ Дата лавлагаанаас гадна HR зөвлөгөө/тооцоолол хариулдаг тул бага зэрэг уян хатан
-                top_p       = 0.9,
+                top_p       = 10,
                 max_tokens  = 12000,
                 stream      = false
             };
@@ -61,7 +61,7 @@ public class DefaultAiProvider : IAiProvider
 
             // ✅ Timeout — гадны API маш удаашрахаас хамгаалах
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(200)); // 25 секундийн timeout, шаардлагатай бол тохируулна уу
+            cts.CancelAfter(TimeSpan.FromSeconds(200));
 
             var response = await _httpClient.SendAsync(httpRequest, cts.Token);
 
@@ -90,7 +90,7 @@ public class DefaultAiProvider : IAiProvider
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            _logger.LogWarning("AI API хүсэлт 25 секундийн дотор хариу өгсөнгүй (timeout).");
+            _logger.LogWarning("AI API хүсэлт 200 секундийн дотор хариу өгсөнгүй (timeout).");
             return "Уучлаарай, AI сервер одоо удаашралтай байна. Түр хүлээгээд дахин оролдоно уу.";
         }
         catch (HttpRequestException ex)

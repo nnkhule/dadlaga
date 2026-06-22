@@ -18,6 +18,13 @@ public class LeaveRequest : BaseEntity
     public Guid? ApprovedBy { get; private set; }
     public decimal TotalDays { get; private set; }
 
+    /// <summary>"Daily" (бүтэн өдрөөр) эсвэл "Hourly" (цагаар) чөлөө мөн эсэх.</summary>
+    public string LeaveMode { get; private set; } = "Daily";
+    public TimeOnly? StartTime { get; private set; }
+    public TimeOnly? EndTime { get; private set; }
+    /// <summary>Зөвхөн цагийн чөлөөнд хэрэглэгдэх — нийт хичнээн цаг.</summary>
+    public decimal? Hours { get; private set; }
+
     public Employee? Employee { get; private set; }
 
     private LeaveRequest() { }
@@ -31,7 +38,23 @@ public class LeaveRequest : BaseEntity
             StartDate = start,
             EndDate = end,
             Reason = reason,
-            IsBirthdayLeave = isBirthdayLeave
+            IsBirthdayLeave = isBirthdayLeave,
+            LeaveMode = "Daily"
+        };
+
+    public static LeaveRequest CreateHourly(Guid employeeId, LeaveType type, DateOnly date,
+        TimeOnly startTime, TimeOnly endTime, decimal hours, string? reason)
+        => new()
+        {
+            EmployeeId = employeeId,
+            LeaveType = type,
+            StartDate = date,
+            EndDate = date,
+            Reason = reason,
+            LeaveMode = "Hourly",
+            StartTime = startTime,
+            EndTime = endTime,
+            Hours = hours
         };
 
     public static LeaveRequest CreateApprovedBirthdayLeave(Guid employeeId, DateOnly leaveDate, Guid? systemUserId)

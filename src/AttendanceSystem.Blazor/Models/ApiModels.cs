@@ -113,7 +113,11 @@ public sealed record LeaveDto(
     string? Reason,
     string? ApprovalStatus,
     string? Status,
-    decimal TotalDays);
+    decimal TotalDays,
+    string? LeaveMode = null,
+    TimeOnly? StartTime = null,
+    TimeOnly? EndTime = null,
+    decimal? Hours = null);
 
 public sealed record CreateLeaveDto(DateOnly StartDate, DateOnly EndDate, string LeaveType, string Reason);
 

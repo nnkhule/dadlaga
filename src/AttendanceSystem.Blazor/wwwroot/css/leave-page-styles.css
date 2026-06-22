@@ -1,0 +1,469 @@
+/* ==================== Leave Management Page Styles ==================== */
+
+/* Page Layout */
+.page-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1rem;
+}
+
+.row.g-4 {
+    gap: 1.5rem;
+}
+
+.row.g-3 {
+    gap: 1rem;
+}
+
+.col-6 {
+    flex: 1;
+    min-width: 0;
+}
+
+.col-12 {
+    grid-column: 1 / -1;
+}
+
+/* Responsive */
+@media (min-width: 992px) {
+    .col-lg-5 {
+        grid-column: span 5 / span 12;
+    }
+    
+    .col-lg-7 {
+        grid-column: span 7 / span 12;
+    }
+}
+
+/* Cards */
+.card {
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s ease;
+}
+
+.card:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.card h2 {
+    margin: 0 0 1.5rem 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #333;
+}
+
+/* Form Elements */
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    font-weight: 500;
+    color: #555;
+    font-size: 0.95rem;
+}
+
+.form-control {
+    padding: 0.75rem;
+    border: 1px solid #d0d0d0;
+    border-radius: 6px;
+    font-size: 1rem;
+    font-family: inherit;
+    transition: border-color 0.3s ease;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.form-control:disabled {
+    background-color: #f5f5f5;
+    color: #999;
+    cursor: not-allowed;
+}
+
+/* Toggle Buttons */
+.btn {
+    padding: 0.75rem 1.5rem;
+    border: 2px solid #d0d0d0;
+    border-radius: 6px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: transparent;
+    color: inherit;
+}
+
+.btn:hover {
+    border-color: #007bff;
+    background: rgba(0, 123, 255, 0.05);
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+    border: none;
+    padding: 0.875rem 2rem;
+    font-size: 1rem;
+    font-weight: 600;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    width: 100%;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background: #0056b3;
+    box-shadow: 0 4px 8px rgba(0, 123, 255, 0.3);
+}
+
+.btn-primary:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+/* Status Indicators */
+.muted {
+    color: #666;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 0.4rem 0.8rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.status-badge.pending {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.status-badge.approved {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status-badge.rejected {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+/* Validation Messages */
+.validation-message {
+    color: #dc3545;
+    font-size: 0.85rem;
+    margin-top: 0.25rem;
+}
+
+/* Leave Type Toggle */
+.leave-type-toggle {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.leave-type-btn {
+    padding: 1rem;
+    border: 2px solid #d0d0d0;
+    border-radius: 6px;
+    background: white;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: center;
+}
+
+.leave-type-btn.active {
+    border-color: #007bff;
+    background: #007bff;
+    color: white;
+}
+
+.leave-type-btn:hover {
+    border-color: #007bff;
+}
+
+/* Duration Display */
+.duration-info {
+    padding: 1rem;
+    background: rgba(0, 123, 255, 0.05);
+    border-left: 4px solid #007bff;
+    border-radius: 4px;
+    margin: 1rem 0;
+    font-size: 0.95rem;
+}
+
+.duration-info strong {
+    display: block;
+    margin-bottom: 0.25rem;
+}
+
+.duration-warning {
+    color: #ff6b6b;
+    font-weight: 600;
+    margin-left: 0.5rem;
+}
+
+.duration-error {
+    color: #dc3545;
+    font-weight: 600;
+}
+
+/* Character Counter */
+.char-counter {
+    font-size: 0.8rem;
+    color: #999;
+    margin-top: 0.25rem;
+}
+
+.char-counter.warning {
+    color: #ff6b6b;
+}
+
+/* History Section */
+.history-card {
+    border-left: 4px solid #ddd;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+}
+
+.history-card:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.history-card.approved {
+    border-left-color: #28a745;
+    background: rgba(40, 167, 69, 0.05);
+}
+
+.history-card.rejected {
+    border-left-color: #dc3545;
+    background: rgba(220, 53, 69, 0.05);
+}
+
+.history-card.pending {
+    border-left-color: #ffc107;
+    background: rgba(255, 193, 7, 0.05);
+}
+
+.history-card strong {
+    display: block;
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+    color: #333;
+}
+
+.history-card .date-range {
+    color: #666;
+    font-size: 0.9rem;
+    margin: 0.5rem 0;
+}
+
+.history-card .duration {
+    font-weight: 600;
+    color: #007bff;
+    margin: 0.5rem 0;
+}
+
+.history-card .reason {
+    color: #555;
+    font-size: 0.9rem;
+    margin-top: 0.5rem;
+    line-height: 1.4;
+}
+
+/* Alert Messages */
+.alert {
+    padding: 1rem;
+    border-radius: 6px;
+    margin-bottom: 1.5rem;
+    border-left: 4px solid;
+}
+
+.alert-success {
+    background: #d4edda;
+    color: #155724;
+    border-left-color: #28a745;
+}
+
+.alert-error {
+    background: #f8d7da;
+    color: #721c24;
+    border-left-color: #dc3545;
+}
+
+.alert-warning {
+    background: #fff3cd;
+    color: #856404;
+    border-left-color: #ffc107;
+}
+
+/* Empty State */
+.empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: #999;
+}
+
+.empty-state p {
+    font-size: 1.1rem;
+    margin: 1rem 0 0 0;
+}
+
+/* Loading State */
+.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.spinner {
+    display: inline-block;
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #007bff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-right: 0.5rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Input Time/Date Styles */
+input[type="date"],
+input[type="time"] {
+    padding: 0.75rem;
+    border: 1px solid #d0d0d0;
+    border-radius: 6px;
+    font-size: 1rem;
+    font-family: inherit;
+}
+
+input[type="date"]:focus,
+input[type="time"]:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+/* Textarea */
+textarea {
+    resize: vertical;
+    min-height: 100px;
+    font-family: inherit;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+    .page-stack {
+        gap: 1rem;
+    }
+    
+    .card {
+        padding: 1rem;
+    }
+    
+    .row {
+        grid-template-columns: 1fr;
+    }
+    
+    .col-6 {
+        grid-column: 1 / -1;
+    }
+    
+    .col-lg-5,
+    .col-lg-7 {
+        grid-column: 1 / -1;
+    }
+    
+    .leave-type-toggle {
+        grid-template-columns: 1fr 1fr;
+    }
+    
+    .btn-primary {
+        padding: 0.75rem 1.5rem;
+    }
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+    .card {
+        background: #2a2a2a;
+        border-color: #444;
+        color: #e0e0e0;
+    }
+    
+    .form-control {
+        background: #333;
+        border-color: #555;
+        color: #e0e0e0;
+    }
+    
+    .form-control:focus {
+        border-color: #4a9eff;
+        box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.2);
+    }
+    
+    .card h2 {
+        color: #e0e0e0;
+    }
+    
+    .form-group label {
+        color: #b0b0b0;
+    }
+    
+    .muted {
+        color: #999;
+    }
+    
+    .history-card {
+        background: rgba(255, 255, 255, 0.05);
+    }
+}
+
+/* Print Styles */
+@media print {
+    .btn,
+    .btn-primary {
+        display: none;
+    }
+    
+    .card {
+        page-break-inside: avoid;
+        box-shadow: none;
+        border: 1px solid #ddd;
+    }
+    
+    .history-card {
+        page-break-inside: avoid;
+    }
+}

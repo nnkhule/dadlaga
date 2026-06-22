@@ -17,6 +17,9 @@ public class LeaveRequestConfiguration : IEntityTypeConfiguration<LeaveRequest>
         // computed column; if you apply that migration you can restore the
         // computed mapping below.
         builder.Ignore(x => x.TotalDays);
+        builder.Property(x => x.LeaveMode)
+            .HasMaxLength(20)
+            .HasDefaultValue("Daily");
         builder.HasIndex(x => new { x.EmployeeId, x.Status })
             .HasDatabaseName("IX_Leave_EmployeeId_Status")
             .IncludeProperties(x => new { x.StartDate, x.EndDate, x.LeaveType });

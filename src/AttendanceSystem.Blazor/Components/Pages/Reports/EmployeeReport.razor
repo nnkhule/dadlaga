@@ -1,0 +1,1301 @@
+@page "/admin/reports/employee"
+@page "/admin/reports/employee/{EmployeeId:guid}"
+@page "/admin/employees/{EmployeeId:guid}/report"
+@layout AdminLayout
+@inject HttpClient Http
+@inject AuthService Auth
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+@attribute [Authorize(Roles = "Admin,SuperAdmin,HRManager,HR,Manager")]
+
+<PageTitle>Ажилтны тайлан — AttendIQ</PageTitle>
+
+@if (!_ready)
+{
+    <div class="loading-state">
+        <div class="spinner"></div>
+        <p>Ачааллаж байна...</p>
+    </div>
+}
+else
+{
+    <div class="report-container">
+        <!-- ── Header Section ── -->
+        <div class="report-header">
+            <div class="report-header-top">
+                <button class="btn-back" @onclick="GoBack">
+                    <span>←</span> Буцах
+                </button>
+                <div class="report-header-title">
+                    <h1>Ажилтны хувийн тайлан</h1>
+                    @if (_employee is not null)
+                    {
+                        <p class="subtitle">@_employee.FullName</p>
+                    }
+                </div>
+                @if (_employee is not null && _report is not null)
+                {
+                    <div class="report-header-actions">
+                        <button class="btn btn-primary" @onclick="ExportPdf" disabled="@_exporting">
+                            @if (_exporting)
+                            {
+                                <span class="spinner-small"></span>
+                                <span>Үүсгэж байна...</span>
+                            }
+                            else
+                            {
+                                <span>📄</span>
+                                <span>PDF татах</span>
+                            }
+                        </button>
+                        <button class="btn btn-secondary" @onclick="ExportExcel" disabled="@_exportingExcel">
+                            @if (_exportingExcel)
+                            {
+                                <span class="spinner-small spinner-dark"></span>
+                                <span>Үүсгэж байна...</span>
+                            }
+                            else
+                            {
+                                <span>📊</span>
+                                <span>Excel татах</span>
+                            }
+                        </button>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- ── Error Message ── -->
+        @if (!string.IsNullOrEmpty(_loadError))
+        {
+            <div class="alert alert-error">
+                <span>⚠️</span>
+                <span>@_loadError</span>
+                <button class="alert-close" @onclick='() => _loadError = null'>✕</button>
+            </div>
+        }
+
+        <!-- ── Controls Section ── -->
+        <div class="controls-panel">
+            <div class="control-row">
+                <div class="control-group">
+                    <label>Ажилтан</label>
+                    <select @onchange="OnEmployeeChange" disabled="@_loadingEmployees">
+                        <option value="">— Ажилтан сонгох —</option>
+                        @foreach (var emp in _employees)
+                        {
+                            <option value="@emp.Id" selected="@(EmployeeId == emp.Id)">
+                                @emp.FullName (@emp.EmployeeCode)
+                            </option>
+                        }
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label>Эхлэх огноо</label>
+                    <input type="date" @bind="_from" @bind:after="LoadReport" />
+                </div>
+
+                <div class="control-group">
+                    <label>Дуусах огноо</label>
+                    <input type="date" @bind="_to" @bind:after="LoadReport" />
+                </div>
+            </div>
+
+            <div class="shortcuts">
+                <label>Хурдан сонголт:</label>
+                <button class="shortcut-btn @(_period == "month" ? "active" : "")" @onclick='async () => await SetPeriod("month")'>
+                    Энэ сар
+                </button>
+                <button class="shortcut-btn @(_period == "3month" ? "active" : "")" @onclick='async () => await SetPeriod("3month")'>
+                    3 сар
+                </button>
+                <button class="shortcut-btn @(_period == "6month" ? "active" : "")" @onclick='async () => await SetPeriod("6month")'>
+                    6 сар
+                </button>
+                <button class="shortcut-btn @(_period == "year" ? "active" : "")" @onclick='async () => await SetPeriod("year")'>
+                    Энэ жил
+                </button>
+            </div>
+        </div>
+
+        <!-- ── Empty State ── -->
+        @if (EmployeeId == default)
+        {
+            <div class="empty-state">
+                <div class="empty-icon">📋</div>
+                <p>Тайлан харахын тулд ажилтан сонгоно уу.</p>
+            </div>
+        }
+        <!-- ── Loading State ── -->
+        else if (_loading)
+        {
+            <div class="loading-state">
+                <div class="spinner"></div>
+                <p>Тайлан ачааллаж байна...</p>
+            </div>
+        }
+        <!-- ── Report Content ── -->
+        else if (_report is not null)
+        {
+            <!-- Summary Cards -->
+            <div class="summary-cards">
+                <div class="card card-stat">
+                    <div class="stat-number">@_report.TotalWorkDays</div>
+                    <div class="stat-label">Нийт ажлын өдөр</div>
+                </div>
+                <div class="card card-stat card-success">
+                    <div class="stat-number">@_report.PresentDays</div>
+                    <div class="stat-label">Ирсэн өдөр</div>
+                    <div class="stat-progress">
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: @(Math.Min(_report.AttendanceRate, 100))%"></div>
+                        </div>
+                        <span class="progress-text">@_report.AttendanceRate.ToString("F0")%</span>
+                    </div>
+                </div>
+                <div class="card card-stat card-warning">
+                    <div class="stat-number">@_report.LateDays</div>
+                    <div class="stat-label">Хоцорсон өдөр</div>
+                </div>
+                <div class="card card-stat card-danger">
+                    <div class="stat-number">@_report.AbsentDays</div>
+                    <div class="stat-label">Тасалсан өдөр</div>
+                </div>
+                <div class="card card-stat card-info">
+                    <div class="stat-number">@_report.OvertimeHours.ToString("F1")</div>
+                    <div class="stat-label">Илүү цаг</div>
+                    <div class="stat-sub">цаг</div>
+                </div>
+                <div class="card card-stat">
+                    <div class="stat-number">@_report.LeaveDays</div>
+                    <div class="stat-label">Чөлөө авсан</div>
+                    <div class="stat-sub">@_report.LeaveBalance өдөр үлдсэн</div>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="tabs-container">
+                <div class="tabs">
+                    <button class="tab @(_activeTab == "attendance" ? "active" : "")" @onclick='() => _activeTab = "attendance"'>
+                        📅 Ирцийн түүх
+                    </button>
+                    <button class="tab @(_activeTab == "overtime" ? "active" : "")" @onclick='() => _activeTab = "overtime"'>
+                        ⏱️ Цагийн тооцоо
+                    </button>
+                    <button class="tab @(_activeTab == "leave" ? "active" : "")" @onclick='() => _activeTab = "leave"'>
+                        ✓ Чөлөө
+                    </button>
+                    <button class="tab @(_activeTab == "performance" ? "active" : "")" @onclick='() => _activeTab = "performance"'>
+                        📊 Гүйцэтгэл
+                    </button>
+                </div>
+
+                <!-- Tab: Attendance -->
+                @if (_activeTab == "attendance")
+                {
+                    <div class="tab-content">
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Огноо</th>
+                                        <th>Гараг</th>
+                                        <th>Ирсэн цаг</th>
+                                        <th>Гарсан цаг</th>
+                                        <th>Ажилласан</th>
+                                        <th>Илүү цаг</th>
+                                        <th>Статус</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @if ((_report.AttendanceRecords?.Count ?? 0) == 0)
+                                    {
+                                        <tr class="empty-row">
+                                            <td colspan="7">Ирцийн мэдээлэл олдсонгүй</td>
+                                        </tr>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var record in _report.AttendanceRecords!)
+                                        {
+                                            <tr class="@GetRowClass(record.Status)">
+                                                <td>@record.Date.ToString("yyyy-MM-dd")</td>
+                                                <td class="text-muted">@GetDayName(record.Date)</td>
+                                                <td>@(record.CheckIn?.ToString(@"HH\:mm") ?? "—")</td>
+                                                <td>@(record.CheckOut?.ToString(@"HH\:mm") ?? "—")</td>
+                                                <td>@(record.WorkedHours.HasValue ? record.WorkedHours.Value.ToString("F1") + "ц" : "—")</td>
+                                                <td class="@(record.OvertimeHours.GetValueOrDefault() > 0 ? "text-success" : "")">
+                                                    @(record.OvertimeHours.GetValueOrDefault() > 0 ? "+" + record.OvertimeHours!.Value.ToString("F1") + "ц" : "—")
+                                                </td>
+                                                <td>
+                                                    <span class="badge @GetBadgeClass(record.Status)">@record.Status</span>
+                                                </td>
+                                            </tr>
+                                        }
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                }
+
+                <!-- Tab: Overtime -->
+                @if (_activeTab == "overtime")
+                {
+                    <div class="tab-content">
+                        <div class="overtime-summary">
+                            <div class="ot-card">
+                                <div class="ot-value">@_report.OvertimeHours.ToString("F1")ц</div>
+                                <div class="ot-label">Нийт илүү цаг</div>
+                            </div>
+                            <div class="ot-card">
+                                <div class="ot-value">@(_report.PresentDays > 0 ? (_report.OvertimeHours / _report.PresentDays).ToString("F1") : "0")ц</div>
+                                <div class="ot-label">Дундаж өдөрт</div>
+                            </div>
+                            <div class="ot-card ot-card-danger">
+                                <div class="ot-value">@_report.UndertimeHours.ToString("F1")ц</div>
+                                <div class="ot-label">Дутуу цаг</div>
+                            </div>
+                        </div>
+
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Огноо</th>
+                                        <th>Ажилласан цаг</th>
+                                        <th>Стандарт</th>
+                                        <th>Илүү / дутуу</th>
+                                        <th>Тэмдэглэл</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @{
+                                        var overtimeRecords = (_report.AttendanceRecords ?? [])
+                                            .Where(x => x.OvertimeHours.GetValueOrDefault() != 0 || x.UndertimeHours.GetValueOrDefault() != 0)
+                                            .ToList();
+                                    }
+                                    @if (overtimeRecords.Count == 0)
+                                    {
+                                        <tr class="empty-row">
+                                            <td colspan="5">Цагийн зөрүү олдсонгүй</td>
+                                        </tr>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var record in overtimeRecords)
+                                        {
+                                            <tr>
+                                                <td>@record.Date.ToString("yyyy-MM-dd")</td>
+                                                <td>@(record.WorkedHours?.ToString("F1") ?? "—")ц</td>
+                                                <td>8.0ц</td>
+                                                <td class="@(record.OvertimeHours.GetValueOrDefault() > 0 ? "text-success" : "text-danger")">
+                                                    @if (record.OvertimeHours.GetValueOrDefault() > 0)
+                                                    {
+                                                        <span>+@record.OvertimeHours!.Value.ToString("F1")ц</span>
+                                                    }
+                                                    else if (record.UndertimeHours.GetValueOrDefault() > 0)
+                                                    {
+                                                        <span>-@record.UndertimeHours!.Value.ToString("F1")ц</span>
+                                                    }
+                                                </td>
+                                                <td class="text-muted">@(record.Note ?? "—")</td>
+                                            </tr>
+                                        }
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                }
+
+                <!-- Tab: Leave -->
+                @if (_activeTab == "leave")
+                {
+                    <div class="tab-content">
+                        <div class="leave-balances">
+                            @if ((_report.LeaveBalances?.Count ?? 0) == 0)
+                            {
+                                <p class="text-muted">Чөлөөний баланс олдсонгүй</p>
+                            }
+                            else
+                            {
+                                @foreach (var balance in _report.LeaveBalances!)
+                                {
+                                    <div class="leave-balance-card">
+                                        <div class="balance-header">
+                                            <span class="balance-type">@balance.LeaveType</span>
+                                            <span class="balance-summary">@balance.Used / @balance.Total өдөр</span>
+                                        </div>
+                                        <div class="balance-bar">
+                                            <div class="balance-fill" style="width: @(balance.Total > 0 ? Math.Min(balance.Used * 100 / balance.Total, 100) : 0)%"></div>
+                                        </div>
+                                        <div class="balance-footer">@balance.Remaining өдөр үлдсэн</div>
+                                    </div>
+                                }
+                            }
+                        </div>
+
+                        <div class="table-wrapper" style="margin-top: 20px;">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Хүсэлт огноо</th>
+                                        <th>Төрөл</th>
+                                        <th>Эхлэх</th>
+                                        <th>Дуусах</th>
+                                        <th>Хоног</th>
+                                        <th>Шалтгаан</th>
+                                        <th>Статус</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @if ((_report.LeaveRequests?.Count ?? 0) == 0)
+                                    {
+                                        <tr class="empty-row">
+                                            <td colspan="7">Чөлөөний хүсэлт олдсонгүй</td>
+                                        </tr>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var leave in _report.LeaveRequests!)
+                                        {
+                                            <tr>
+                                                <td>@leave.RequestedAt.ToString("yyyy-MM-dd")</td>
+                                                <td>@leave.LeaveType</td>
+                                                <td>@leave.StartDate.ToString("yyyy-MM-dd")</td>
+                                                <td>@leave.EndDate.ToString("yyyy-MM-dd")</td>
+                                                <td>@leave.Days</td>
+                                                <td class="text-muted">@(leave.Reason ?? "—")</td>
+                                                <td>
+                                                    <span class="badge @GetLeaveStatusBadge(leave.Status)">@leave.Status</span>
+                                                </td>
+                                            </tr>
+                                        }
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                }
+
+                <!-- Tab: Performance -->
+                @if (_activeTab == "performance")
+                {
+                    <div class="tab-content">
+                        <div class="performance-grid">
+                            <div class="perf-card">
+                                <div class="perf-label">Ирцийн хувь</div>
+                                <svg class="perf-circle" viewBox="0 0 100 100">
+                                    <circle cx="50" cy="50" r="45" fill="none" stroke="#E5E7EB" stroke-width="8"/>
+                                    <circle cx="50" cy="50" r="45" fill="none" stroke="#3B82F6" stroke-width="8"
+                                            stroke-dasharray="@(2 * Math.PI * 45 * Math.Min(_report.AttendanceRate, 100) / 100) @(2 * Math.PI * 45)"
+                                            stroke-linecap="round" transform="rotate(-90 50 50)"/>
+                                    <text x="50" y="55" text-anchor="middle" font-size="24" font-weight="bold" fill="#1F2937">
+                                        @_report.AttendanceRate.ToString("F0")%
+                                    </text>
+                                </svg>
+                            </div>
+
+                            <div class="perf-card">
+                                <div class="perf-label">Цагийн нарийвчлал</div>
+                                <svg class="perf-circle" viewBox="0 0 100 100">
+                                    <circle cx="50" cy="50" r="45" fill="none" stroke="#E5E7EB" stroke-width="8"/>
+                                    <circle cx="50" cy="50" r="45" fill="none" stroke="#10B981" stroke-width="8"
+                                            stroke-dasharray="@(2 * Math.PI * 45 * Math.Min(_report.PunctualityRate, 100) / 100) @(2 * Math.PI * 45)"
+                                            stroke-linecap="round" transform="rotate(-90 50 50)"/>
+                                    <text x="50" y="55" text-anchor="middle" font-size="24" font-weight="bold" fill="#1F2937">
+                                        @_report.PunctualityRate.ToString("F0")%
+                                    </text>
+                                </svg>
+                            </div>
+                        </div>
+
+                        <div class="perf-stats">
+                            <div class="stat-row">
+                                <span>Дундаж ирэх цаг</span>
+                                <span class="stat-value">@(_report.AvgCheckIn ?? "—")</span>
+                            </div>
+                            <div class="stat-row">
+                                <span>Дундаж гарах цаг</span>
+                                <span class="stat-value">@(_report.AvgCheckOut ?? "—")</span>
+                            </div>
+                            <div class="stat-row">
+                                <span>Хамгийн их хоцорсон</span>
+                                <span class="stat-value @(_report.MaxLateMinutes > 0 ? "text-warning" : "")">
+                                    @(_report.MaxLateMinutes > 0 ? _report.MaxLateMinutes + " мин" : "—")
+                                </span>
+                            </div>
+                            <div class="stat-row">
+                                <span>Дараалсан ирсэн өдөр</span>
+                                <span class="stat-value text-success">@_report.ConsecutivePresentDays өдөр</span>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        else if (EmployeeId != default && !_loading)
+        {
+            <div class="empty-state">
+                <div class="empty-icon">⚠️</div>
+                <p>Тайлан олдсонгүй. Дахин оролдоно уу.</p>
+            </div>
+        }
+    </div>
+}
+
+<style>
+    :root {
+        --primary: #3B82F6;
+        --primary-light: #EFF6FF;
+        --success: #10B981;
+        --warning: #F59E0B;
+        --danger: #EF4444;
+        --info: #3B82F6;
+        --gray-50: #F9FAFB;
+        --gray-100: #F3F4F6;
+        --gray-200: #E5E7EB;
+        --gray-300: #D1D5DB;
+        --gray-400: #9CA3AF;
+        --gray-500: #6B7280;
+        --gray-600: #4B5563;
+        --gray-700: #374151;
+        --gray-800: #1F2937;
+        --gray-900: #111827;
+    }
+
+    .report-container {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+        max-width: 1200px;
+    }
+
+    /* Header */
+    .report-header {
+        background: white;
+        border-radius: 8px;
+        border: 1px solid var(--gray-200);
+        padding: 1.5rem;
+    }
+
+    .report-header-top {
+        display: flex;
+        align-items: center;
+        gap: 1.5rem;
+        flex-wrap: wrap;
+    }
+
+    .btn-back {
+        padding: 0.5rem 1rem;
+        background: white;
+        border: 1px solid var(--gray-300);
+        border-radius: 6px;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        white-space: nowrap;
+    }
+
+    .btn-back:hover {
+        background: var(--gray-50);
+        border-color: var(--gray-400);
+    }
+
+    .report-header-title {
+        flex: 1;
+    }
+
+    .report-header-title h1 {
+        margin: 0;
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--gray-900);
+    }
+
+    .subtitle {
+        margin: 0.25rem 0 0 0;
+        font-size: 0.9rem;
+        color: var(--gray-500);
+    }
+
+    .report-header-actions {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .btn {
+        padding: 0.625rem 1.25rem;
+        border: none;
+        border-radius: 6px;
+        font-size: 0.9rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        white-space: nowrap;
+    }
+
+    .btn-primary {
+        background: var(--primary);
+        color: white;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+        background: #2563EB;
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    }
+
+    .btn-secondary {
+        background: var(--gray-100);
+        color: var(--gray-700);
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+        background: var(--gray-200);
+    }
+
+    .btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    /* Alert */
+    .alert {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem;
+        border-radius: 8px;
+        border: 1px solid;
+    }
+
+    .alert-error {
+        background: #FEF2F2;
+        border-color: #FECACA;
+        color: #DC2626;
+    }
+
+    .alert-close {
+        margin-left: auto;
+        background: none;
+        border: none;
+        font-size: 1.2rem;
+        cursor: pointer;
+        color: inherit;
+    }
+
+    /* Controls */
+    .controls-panel {
+        background: white;
+        border: 1px solid var(--gray-200);
+        border-radius: 8px;
+        padding: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .control-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+    }
+
+    .control-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .control-group label {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--gray-700);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .control-group select,
+    .control-group input {
+        padding: 0.625rem;
+        border: 1px solid var(--gray-300);
+        border-radius: 6px;
+        font-size: 0.9rem;
+        font-family: inherit;
+        transition: border-color 0.2s;
+    }
+
+    .control-group select:focus,
+    .control-group input:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px var(--primary-light);
+    }
+
+    .shortcuts {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .shortcuts label {
+        font-weight: 600;
+        color: var(--gray-700);
+    }
+
+    .shortcut-btn {
+        padding: 0.5rem 1rem;
+        border: 1px solid var(--gray-300);
+        background: white;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .shortcut-btn:hover {
+        border-color: var(--primary);
+        color: var(--primary);
+    }
+
+    .shortcut-btn.active {
+        background: var(--primary-light);
+        border-color: var(--primary);
+        color: var(--primary);
+        font-weight: 600;
+    }
+
+    /* Empty & Loading */
+    .empty-state,
+    .loading-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1rem;
+        padding: 4rem 2rem;
+        background: white;
+        border: 1px solid var(--gray-200);
+        border-radius: 8px;
+        color: var(--gray-500);
+    }
+
+    .empty-icon {
+        font-size: 3rem;
+        opacity: 0.3;
+    }
+
+    .spinner {
+        width: 40px;
+        height: 40px;
+        border: 4px solid var(--gray-200);
+        border-top-color: var(--primary);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    .spinner-small {
+        display: inline-block;
+        width: 1rem;
+        height: 1rem;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-top-color: white;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+
+    .spinner-small.spinner-dark {
+        border-color: rgba(0, 0, 0, 0.15);
+        border-top-color: var(--gray-700);
+    }
+
+    @@keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    /* Summary Cards */
+    .summary-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1rem;
+    }
+
+    .card {
+        background: white;
+        border: 1px solid var(--gray-200);
+        border-radius: 8px;
+        padding: 1.5rem;
+    }
+
+    .card-stat {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        position: relative;
+    }
+
+    .card-stat.card-success { border-top: 3px solid var(--success); }
+    .card-stat.card-warning { border-top: 3px solid var(--warning); }
+    .card-stat.card-danger  { border-top: 3px solid var(--danger); }
+    .card-stat.card-info    { border-top: 3px solid var(--info); }
+
+    .stat-number {
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--gray-900);
+        line-height: 1;
+    }
+
+    .stat-label {
+        font-size: 0.85rem;
+        color: var(--gray-600);
+        font-weight: 500;
+    }
+
+    .stat-sub {
+        font-size: 0.8rem;
+        color: var(--gray-500);
+    }
+
+    .stat-progress {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+    }
+
+    .progress-bar {
+        flex: 1;
+        height: 6px;
+        background: var(--gray-200);
+        border-radius: 3px;
+        overflow: hidden;
+    }
+
+    .progress-fill {
+        height: 100%;
+        background: var(--success);
+    }
+
+    .progress-text {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--gray-700);
+        min-width: 35px;
+        text-align: right;
+    }
+
+    /* Tabs */
+    .tabs-container {
+        background: white;
+        border: 1px solid var(--gray-200);
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    .tabs {
+        display: flex;
+        border-bottom: 1px solid var(--gray-200);
+        overflow-x: auto;
+    }
+
+    .tab {
+        padding: 1rem;
+        border: none;
+        background: none;
+        font-size: 0.95rem;
+        font-weight: 500;
+        color: var(--gray-600);
+        cursor: pointer;
+        white-space: nowrap;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -1px;
+        transition: all 0.2s;
+    }
+
+    .tab:hover { color: var(--gray-900); }
+
+    .tab.active {
+        color: var(--primary);
+        border-bottom-color: var(--primary);
+    }
+
+    .tab-content { padding: 1.5rem; }
+
+    /* Tables */
+    .table-wrapper { overflow-x: auto; }
+
+    .data-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+    }
+
+    .data-table th {
+        padding: 0.75rem;
+        text-align: left;
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--gray-600);
+        background: var(--gray-50);
+        border-bottom: 1px solid var(--gray-200);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        white-space: nowrap;
+    }
+
+    .data-table td {
+        padding: 0.75rem;
+        border-bottom: 1px solid var(--gray-200);
+        color: var(--gray-900);
+    }
+
+    .data-table tbody tr:hover { background: var(--gray-50); }
+
+    .empty-row td {
+        text-align: center;
+        color: var(--gray-500);
+        padding: 2rem 1rem;
+    }
+
+    .text-muted   { color: var(--gray-500); }
+    .text-success { color: var(--success); font-weight: 600; }
+    .text-danger  { color: var(--danger);  font-weight: 600; }
+    .text-warning { color: var(--warning); font-weight: 600; }
+
+    /* Row highlights */
+    tr.row-absent td { background: #FFF5F5; }
+    tr.row-late   td { background: #FFFBEB; }
+
+    /* Badges */
+    .badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .badge.badge-present  { background: #D1FAE5; color: #065F46; }
+    .badge.badge-late     { background: #FEF3C7; color: #92400E; }
+    .badge.badge-absent   { background: #FEE2E2; color: #7F1D1D; }
+    .badge.badge-approved { background: #D1FAE5; color: #065F46; }
+    .badge.badge-pending  { background: #FEF3C7; color: #92400E; }
+    .badge.badge-rejected { background: #FEE2E2; color: #7F1D1D; }
+
+    /* Overtime Summary */
+    .overtime-summary {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+        margin-bottom: 1.5rem;
+    }
+
+    .ot-card {
+        flex: 1;
+        min-width: 150px;
+        padding: 1rem;
+        background: var(--gray-50);
+        border-radius: 6px;
+        text-align: center;
+    }
+
+    .ot-card-danger { background: #FEE2E2; }
+
+    .ot-value {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: var(--gray-900);
+        margin-bottom: 0.5rem;
+    }
+
+    .ot-label {
+        font-size: 0.85rem;
+        color: var(--gray-600);
+    }
+
+    /* Leave Balances */
+    .leave-balances {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .leave-balance-card {
+        padding: 1rem;
+        border: 1px solid var(--gray-200);
+        border-radius: 6px;
+    }
+
+    .balance-header {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.75rem;
+    }
+
+    .balance-type    { font-weight: 600; color: var(--gray-900); }
+    .balance-summary { font-size: 0.9rem; color: var(--gray-600); }
+
+    .balance-bar {
+        height: 8px;
+        background: var(--gray-200);
+        border-radius: 4px;
+        overflow: hidden;
+        margin-bottom: 0.5rem;
+    }
+
+    .balance-fill { height: 100%; background: var(--primary); }
+
+    .balance-footer {
+        font-size: 0.85rem;
+        color: var(--gray-600);
+        text-align: right;
+    }
+
+    /* Performance */
+    .performance-grid {
+        display: flex;
+        gap: 2rem;
+        justify-content: center;
+        flex-wrap: wrap;
+        margin-bottom: 2rem;
+    }
+
+    .perf-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .perf-label {
+        font-size: 0.9rem;
+        color: var(--gray-600);
+        font-weight: 500;
+    }
+
+    .perf-circle { width: 120px; height: 120px; }
+
+    .perf-stats {
+        display: flex;
+        flex-direction: column;
+        border: 1px solid var(--gray-200);
+        border-radius: 6px;
+        overflow: hidden;
+    }
+
+    .stat-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem;
+        border-bottom: 1px solid var(--gray-200);
+        font-size: 0.9rem;
+    }
+
+    .stat-row:last-child { border-bottom: none; }
+
+    .stat-value { font-weight: 600; color: var(--gray-900); }
+
+    /* Responsive */
+    @@media (max-width: 768px) {
+        .report-header-top {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .report-header-actions { width: 100%; }
+
+        .btn {
+            flex: 1;
+            justify-content: center;
+        }
+
+        .control-row { grid-template-columns: 1fr; }
+
+        .tabs { flex-wrap: wrap; }
+
+        .tab { flex: 1; }
+
+        .summary-cards { grid-template-columns: repeat(2, 1fr); }
+
+        .performance-grid {
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+    }
+</style>
+
+@code {
+    [Parameter] public Guid EmployeeId { get; set; }
+
+    private string _activeTab = "attendance";
+    private string _period = "month";
+    private DateOnly _from = DateOnly.FromDateTime(DateTime.Today.AddDays(-DateTime.Today.Day + 1));
+    private DateOnly _to = DateOnly.FromDateTime(DateTime.Today);
+
+    private bool _ready;
+    private bool _loading;
+    private bool _loadingEmployees;
+    private bool _exporting;
+    private bool _exportingExcel;
+    private bool _initialized;
+    private string? _loadError;
+
+    private EmployeeReportDto? _report;
+    private List<EmployeeListItem> _employees = [];
+    private EmployeeListItem? _employee => _employees.FirstOrDefault(e => e.Id == EmployeeId);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEmployees();
+        if (EmployeeId != default) await LoadReport();
+        _initialized = true;
+        _ready = true;
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_initialized && EmployeeId != default) await LoadReport();
+    }
+
+    private async Task LoadEmployees()
+    {
+        _loadingEmployees = true;
+        try
+        {
+            var token = await Auth.GetTokenAsync();
+            using var req = new HttpRequestMessage(HttpMethod.Get, "api/employees?pageSize=500");
+            req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            var resp = await Http.SendAsync(req);
+            if (resp.IsSuccessStatusCode)
+            {
+                var result = await resp.Content.ReadFromJsonAsync<PagedResult<EmployeeListItem>>();
+                _employees = result?.Items ?? [];
+            }
+        }
+        catch
+        {
+            _loadError = "Ажилтнуудыг ачааллахад алдаа гарлаа";
+        }
+        finally { _loadingEmployees = false; }
+    }
+
+    private async Task LoadReport()
+    {
+        if (EmployeeId == default) return;
+
+        _loading = true;
+        _loadError = null;
+        StateHasChanged();
+
+        try
+        {
+            var token = await Auth.GetTokenAsync();
+            var url = $"api/reports/employee/{EmployeeId}?from={_from:yyyy-MM-dd}&to={_to:yyyy-MM-dd}";
+            using var req = new HttpRequestMessage(HttpMethod.Get, url);
+            req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            var resp = await Http.SendAsync(req);
+
+            if (resp.IsSuccessStatusCode)
+            {
+                _report = await resp.Content.ReadFromJsonAsync<EmployeeReportDto>();
+                // Ensure lists are never null after deserialization
+                if (_report is not null)
+                {
+                    _report.AttendanceRecords ??= [];
+                    _report.LeaveRequests     ??= [];
+                    _report.LeaveBalances     ??= [];
+                }
+            }
+            else
+            {
+                _loadError = "Тайлан ачааллахад алдаа гарлаа. Дахин оролдоно уу.";
+            }
+        }
+        catch
+        {
+            _loadError = "Сервертэй холбогдоход алдаа гарлаа";
+        }
+        finally { _loading = false; }
+    }
+
+    private void OnEmployeeChange(ChangeEventArgs e)
+    {
+        if (Guid.TryParse(e.Value?.ToString(), out var id) && id != default)
+            Nav.NavigateTo($"/admin/reports/employee/{id}");
+    }
+
+    private async Task SetPeriod(string p)
+    {
+        _period = p;
+        var today = DateTime.Today;
+        (_from, _to) = p switch
+        {
+            "month"  => (DateOnly.FromDateTime(new DateTime(today.Year, today.Month, 1)), DateOnly.FromDateTime(today)),
+            "3month" => (DateOnly.FromDateTime(today.AddMonths(-3)), DateOnly.FromDateTime(today)),
+            "6month" => (DateOnly.FromDateTime(today.AddMonths(-6)), DateOnly.FromDateTime(today)),
+            "year"   => (DateOnly.FromDateTime(new DateTime(today.Year, 1, 1)), DateOnly.FromDateTime(today)),
+            _ => (_from, _to)
+        };
+        await LoadReport();
+    }
+
+    private async Task ExportPdf()
+    {
+        if (EmployeeId == default) return;
+        _exporting = true;
+        try
+        {
+            var token = await Auth.GetTokenAsync();
+            var url = $"api/reports/employee/{EmployeeId}/pdf?from={_from:yyyy-MM-dd}&to={_to:yyyy-MM-dd}";
+            using var req = new HttpRequestMessage(HttpMethod.Get, url);
+            req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            var resp = await Http.SendAsync(req);
+
+            if (resp.IsSuccessStatusCode)
+            {
+                var bytes = await resp.Content.ReadAsByteArrayAsync();
+                await DownloadFile(bytes, $"report_{_employee?.EmployeeCode}_{_from:yyyyMM}.pdf", "application/pdf");
+            }
+            else
+                _loadError = "PDF файл үүсгэхэд алдаа гарлаа";
+        }
+        catch { _loadError = "PDF татахад алдаа гарлаа"; }
+        finally { _exporting = false; }
+    }
+
+    private async Task ExportExcel()
+    {
+        if (EmployeeId == default) return;
+        _exportingExcel = true;
+        try
+        {
+            var token = await Auth.GetTokenAsync();
+            var url = $"api/reports/employee/{EmployeeId}/excel?from={_from:yyyy-MM-dd}&to={_to:yyyy-MM-dd}";
+            using var req = new HttpRequestMessage(HttpMethod.Get, url);
+            req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            var resp = await Http.SendAsync(req);
+
+            if (resp.IsSuccessStatusCode)
+            {
+                var bytes = await resp.Content.ReadAsByteArrayAsync();
+                await DownloadFile(bytes, $"report_{_employee?.EmployeeCode}_{_from:yyyyMM}.xlsx",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+            }
+            else
+                _loadError = "Excel файл үүсгэхэд алдаа гарлаа";
+        }
+        catch { _loadError = "Excel татахад алдаа гарлаа"; }
+        finally { _exportingExcel = false; }
+    }
+
+    private async Task DownloadFile(byte[] bytes, string fileName, string mimeType)
+    {
+        var b64 = Convert.ToBase64String(bytes);
+        await JS.InvokeVoidAsync("downloadBase64File", b64, fileName, mimeType);
+    }
+
+    private void GoBack() => Nav.NavigateTo("/admin/reports");
+
+    private static string GetDayName(DateOnly d) => d.DayOfWeek switch
+    {
+        DayOfWeek.Monday    => "Да",
+        DayOfWeek.Tuesday   => "Мя",
+        DayOfWeek.Wednesday => "Лх",
+        DayOfWeek.Thursday  => "Пү",
+        DayOfWeek.Friday    => "Ба",
+        DayOfWeek.Saturday  => "Бя",
+        DayOfWeek.Sunday    => "Ня",
+        _ => ""
+    };
+
+    private static string GetRowClass(string status) => status switch
+    {
+        "Тасалсан" => "row-absent",
+        "Хоцорсон" => "row-late",
+        _ => ""
+    };
+
+    private static string GetBadgeClass(string status) => status switch
+    {
+        "Ирсэн"    => "badge-present",
+        "Хоцорсон" => "badge-late",
+        "Тасалсан" => "badge-absent",
+        _ => "badge-default"
+    };
+
+    private static string GetLeaveStatusBadge(string status) => status switch
+    {
+        "Зөвшөөрсөн"    => "badge-approved",
+        "Хүлээгдэж буй" => "badge-pending",
+        "Татгалзсан"    => "badge-rejected",
+        _ => "badge-default"
+    };
+
+    // ── DTOs ──────────────────────────────────────────────────────────────────
+    private sealed record EmployeeListItem(Guid Id, string EmployeeCode, string FullName, string? Department, string? DepartmentName);
+    private sealed class PagedResult<T> { public List<T> Items { get; set; } = []; }
+
+    private sealed class EmployeeReportDto
+    {
+        public int TotalWorkDays { get; set; }
+        public int PresentDays { get; set; }
+        public int LateDays { get; set; }
+        public int AbsentDays { get; set; }
+        public double OvertimeHours { get; set; }
+        public double UndertimeHours { get; set; }
+        public int LeaveDays { get; set; }
+        public int LeaveBalance { get; set; }
+        public double AttendanceRate { get; set; }
+        public double PunctualityRate { get; set; }
+        public string? AvgCheckIn { get; set; }
+        public string? AvgCheckOut { get; set; }
+        public int MaxLateMinutes { get; set; }
+        public int ConsecutivePresentDays { get; set; }
+        public List<AttendanceRecord> AttendanceRecords { get; set; } = [];
+        public List<LeaveRequest> LeaveRequests { get; set; } = [];
+        public List<LeaveBalance> LeaveBalances { get; set; } = [];
+    }
+
+    private sealed class AttendanceRecord
+    {
+        public DateOnly Date { get; set; }
+        public TimeOnly? CheckIn { get; set; }
+        public TimeOnly? CheckOut { get; set; }
+        public double? WorkedHours { get; set; }
+        public double? OvertimeHours { get; set; }
+        public double? UndertimeHours { get; set; }
+        public string Status { get; set; } = "";
+        public string? Note { get; set; }
+    }
+
+    private sealed class LeaveRequest
+    {
+        public DateTime RequestedAt { get; set; }
+        public string LeaveType { get; set; } = "";
+        public DateOnly StartDate { get; set; }
+        public DateOnly EndDate { get; set; }
+        public int Days { get; set; }
+        public string? Reason { get; set; }
+        public string Status { get; set; } = "";
+    }
+
+    private sealed class LeaveBalance
+    {
+        public string LeaveType { get; set; } = "";
+        public int Total { get; set; }
+        public int Used { get; set; }
+        public int Remaining { get; set; }
+    }
+}

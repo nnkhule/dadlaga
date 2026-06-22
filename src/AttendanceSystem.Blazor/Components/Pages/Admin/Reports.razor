@@ -248,44 +248,6 @@
             }
         </div>
 
-        @if (summaries.Count > 0)
-        {
-            <div class="card rpt-card">
-                <div class="rpt-card-header"><h2 class="rpt-card-title">Харьцааны диаграм</h2></div>
-                <div class="rpt-chart-scroll">
-                    <svg class="rpt-bar-chart" viewBox="0 0 @(Math.Max(summaries.Count * 80, 400)) 220" preserveAspectRatio="xMinYMid meet">
-                        @{
-                            var maxVal = summaries.Max(s => s.Present + s.Leave);
-                            if (maxVal == 0) maxVal = 1;
-                            var chartH = 160; var barW = 22; var grp = 80;
-                        }
-                        @for (var g = 0; g <= 4; g++)
-                        {
-                            var gy = 20 + chartH - (g * chartH / 4);
-                            <line x1="0" y1="@gy" x2="@(summaries.Count * grp)" y2="@gy" stroke="var(--clr-border)" stroke-width="1" stroke-dasharray="4,4" />
-                            <span x="2" y="@(gy - 3)" font-size="9" fill="var(--clr-text-muted)">@(g * maxVal / 4)</span>
-                        }
-                        @for (var i = 0; i < summaries.Count; i++)
-                        {
-                            var s  = summaries[i];
-                            var x  = i * grp + grp / 2 - barW;
-                            var ph = s.Present == 0 ? 0 : (int)((double)s.Present / maxVal * chartH);
-                            var lh = s.Late    == 0 ? 0 : (int)((double)s.Late    / maxVal * chartH);
-                            var py = 20 + chartH - ph;
-                            var ly = 20 + chartH - lh;
-                            <rect x="@x"              y="@py" width="@barW" height="@ph" rx="3" fill="var(--clr-success)" opacity="0.85" />
-                            <rect x="@(x + barW + 4)" y="@ly" width="@barW" height="@lh" rx="3" fill="var(--clr-warning)" opacity="0.85" />
-                            var labelX = i * grp + grp / 2;
-                            <span x="@labelX" y="@(20 + chartH + 16)" font-size="9" text-anchor="middle" fill="var(--clr-text-muted)">@Truncate(s.DepartmentName, 9)</span>
-                        }
-                        <rect x="0"  y="@(20 + chartH + 32)" width="10" height="10" rx="2" fill="var(--clr-success)" />
-                        <text x="14" y="@(20 + chartH + 41)" font-size="10" fill="var(--clr-text-muted)">Ирсэн</text>
-                        <rect x="65" y="@(20 + chartH + 32)" width="10" height="10" rx="2" fill="var(--clr-warning)" />
-                        <text x="79" y="@(20 + chartH + 41)" font-size="10" fill="var(--clr-text-muted)">Хоцорсон</text>
-                    </svg>
-                </div>
-            </div>
-        }
     }
 
     @* ══════════════ TAB 2 — Attendance records ══════════════ *@
@@ -781,8 +743,8 @@
         get
         {
             if (_selectedEmployee is not null) return _empStats.AttendanceRate;
-            var total = totalPresent + totalAbsent;
-            return total == 0 ? 0 : (int)Math.Round(totalPresent * 100.0 / total);
+            var total = totalPresent + totalLate + totalAbsent;
+            return total == 0 ? 0 : (int)Math.Round((totalPresent + totalLate) * 100.0 / total);
         }
     }
 
@@ -996,15 +958,15 @@
 
     private void RecalcEmpStats()
     {
-        var present  = attendanceRows.Count(r => Val(r, "Status") == "Present");
-        var late     = attendanceRows.Count(r => Val(r, "Status") == "Late");
+        var lateOnly     = attendanceRows.Count(r => Val(r, "Status") == "Late");
+        var present  = attendanceRows.Count(r => Val(r, "Status") is "Present" or "Late");
         var absent   = attendanceRows.Count(r => Val(r, "Status") == "Absent");
         var ot       = attendanceRows
             .Where(r => decimal.TryParse(Val(r, "OvertimeHours"), out _))
             .Sum(r   => decimal.Parse(Val(r, "OvertimeHours")));
-        var total    = present + late + absent;
-        var rate     = total == 0 ? 0 : (int)Math.Round((present + late) * 100.0 / total);
-        _empStats    = new EmpStats(present, late, absent, ot, rate);
+        var total    = present + absent;
+        var rate     = total == 0 ? 0 : (int)Math.Round(present * 100.0 / total);
+        _empStats    = new EmpStats(present, lateOnly, absent, ot, rate);
     }
 
     // ─── Quick date presets ────────────────────────────────────────────────

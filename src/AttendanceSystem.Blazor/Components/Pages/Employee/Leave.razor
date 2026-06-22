@@ -1,103 +1,391 @@
 @page "/leave"
 @layout EmployeeLayout
 @inject ApiClient Api
+@using System.ComponentModel.DataAnnotations
 
 <PageHeader Title="Leave" Subtitle="Leave requests from the database" Icon="☑" />
 
 <div class="page-stack">
     @if (!string.IsNullOrWhiteSpace(error))
     {
-        <div class="card" style="border-color:var(--clr-danger);color:var(--clr-danger)">@error</div>
+        <div class="card" style="border-color:var(--clr-danger);color:var(--clr-danger)">
+            <strong>Error:</strong> @error
+        </div>
+    }
+
+    @if (submitSuccess)
+    {
+        <div class="card" style="border-color:var(--clr-success);color:var(--clr-success)">
+            ✓ Leave request submitted successfully!
+        </div>
     }
 
     <div class="row g-4">
         <div class="col-12 col-lg-5">
             <EditForm Model="@request" OnValidSubmit="SubmitAsync">
+                <DataAnnotationsValidator />
                 <div class="card page-stack">
-                    <h2>New request</h2>
+                    <h2>Чөлөөний хүсэлт</h2>
+
+                    <!-- Leave Duration Toggle -->
                     <div class="form-group">
-                        <label>Type</label>
+                        <label>Чөлөөний төрөл</label>
+                        <div style="display:flex;gap:1rem">
+                            <button type="button" class="btn"
+                                    style="flex:1;border:2px solid @(isDailyLeave ? "var(--clr-primary)" : "var(--clr-muted)");background:@(isDailyLeave ? "var(--clr-primary)" : "transparent");color:@(isDailyLeave ? "white" : "inherit")"
+                                    @onclick="() => SetLeaveType(true)">
+                                📅 Өдөр
+                            </button>
+                            <button type="button" class="btn"
+                                    style="flex:1;border:2px solid @(isDailyLeave ? "var(--clr-muted)" : "var(--clr-primary)");background:@(isDailyLeave ? "transparent" : "var(--clr-primary)");color:@(isDailyLeave ? "inherit" : "white")"
+                                    @onclick="() => SetLeaveType(false)">
+                                ⏰ Цаг             
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Leave Type -->
+                    
+                    @if (isDailyLeave)
+                    {
+                        <!-- Daily Leave Section -->
+                        <div class="form-group">
+                        <label>Төрөл</label>
                         <InputSelect class="form-control" @bind-Value="request.Type">
-                            <option value="Annual">Annual</option>
-                            <option value="Sick">Sick</option>
-                            <option value="Unpaid">Unpaid</option>
-                            <option value="Birthday">Birthday</option>
-                            <option value="Maternity">Maternity</option>
-                            <option value="Other">Other</option>
+                            @foreach (var type in LeaveTypes)
+                            {
+                                <option value="@type">@type</option>
+                            }
                         </InputSelect>
+                        <ValidationMessage For="@(() => request.Type)" />
                     </div>
-                    <div class="row g-3">
-                        <div class="col-6 form-group"><label>Start</label><InputDate class="form-control" @bind-Value="request.Start" /></div>
-                        <div class="col-6 form-group"><label>End</label><InputDate class="form-control" @bind-Value="request.End" /></div>
+
+                        <div class="row g-3">
+                            <div class="col-6 form-group">
+                                <label>Эхлэх өдөр</label>
+                                <InputDate class="form-control" @bind-Value="request.Start" />
+                                <ValidationMessage For="@(() => request.Start)" />
+                            </div>
+                            <div class="col-6 form-group">
+                                <label>Дуусах өдөр</label>
+                                <InputDate class="form-control" @bind-Value="request.End" />
+                                <ValidationMessage For="@(() => request.End)" />
+                            </div>
+                        </div>
+
+                        @if (validationError != null)
+                        {
+                            <div style="color:var(--clr-danger);font-size:0.9rem">@validationError</div>
+                        }
+
+                        <div class="muted" style="padding:0.75rem;background:rgba(0,0,0,0.05);border-radius:0.25rem">
+                            <strong>📊 Хэмжээ:</strong> @Days
+                            @if (Days > 10)
+                            {
+                                <span style="color:var(--clr-warning)"> ⚠ Урт хугацааны</span>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <!-- Hourly Leave Section -->
+                        <div class="form-group">
+                            <label>Чөлөө авах өдөр</label>
+                            <InputDate class="form-control" @bind-Value="request.Start" />
+                            <ValidationMessage For="@(() => request.Start)" />
+                        </div>
+
+                        <div class="row g-3">
+                            <div class="col-6 form-group">
+                                <label>Эхлэх цаг</label>
+                                <input type="time" class="form-control" @bind="request.StartTime" />
+                            </div>
+                            <div class="col-6 form-group">
+                                <label>Дуусах цаг</label>
+                                <input type="time" class="form-control" @bind="request.EndTime" />
+                            </div>
+                        </div>
+
+                        @if (validationError != null)
+                        {
+                            <div style="color:var(--clr-danger);font-size:0.9rem">@validationError</div>
+                        }
+
+                        <div class="muted" style="padding:0.75rem;background:rgba(0,0,0,0.05);border-radius:0.25rem">
+                            <strong>⏱️ Duration:</strong> @Hours.ToString("F1") hours
+                            @if (Hours > 8)
+                            {
+                                <span style="color:var(--clr-warning)"> ⚠ 1 өдрөөс илүү хэмжээтэй байна</span>
+                            }
+                            @if (Hours == 0)
+                            {
+                                <span style="color:var(--clr-danger)"> ✗ Буруу хүсэлт</span>
+                            }
+                        </div>
+                    }
+
+                    <!-- Reason -->
+                    <div class="form-group">
+                        <label>Шалтгаан</label>
+                        <InputTextArea class="form-control" @bind-Value="request.Reason" rows="4" />
+                        <ValidationMessage For="@(() => request.Reason)" />
+                        <small class="muted">@request.Reason?.Length  / 500 characters</small>
                     </div>
-                    <div class="muted">Days: @Days</div>
-                    <div class="form-group"><label>Reason</label><InputTextArea class="form-control" @bind-Value="request.Reason" /></div>
-                    <button class="btn-primary" type="submit" disabled="@saving">Submit</button>
+
+                    <button class="btn-primary" type="submit" disabled="@(saving || !IsFormValid)">
+                        @(saving ? "Submitting..." : "Submit")
+                    </button>
                 </div>
             </EditForm>
         </div>
 
         <div class="col-12 col-lg-7">
             <div class="card page-stack">
-                <h2>History</h2>
-                @if (history.Count == 0)
+                <h2>Чөлөөний түүх</h2>
+
+                @if (loadingHistory)
                 {
-                    <div class="muted">No leave requests found.</div>
+                    <div class="muted">Loading leave requests...</div>
+                }
+                else if (history.Count == 0)
+                {
+                    <div class="muted">Хүсэлт байхгүй байна.</div>
                 }
                 else
                 {
+                    <div
+                        style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;font-size:0.9rem;color:var(--clr-muted)">
+                        <span>Нийт: @history.Count Хүсэлт</span>
+                        <span></span>
+                    </div>
+
                     @foreach (var item in history)
                     {
-                        <div class="card">
-                            <strong>@item.LeaveType</strong>
-                            <div class="muted">@item.StartDate.ToString("yyyy-MM-dd") - @item.EndDate.ToString("yyyy-MM-dd")</div>
-                            <div>@Display(item.Reason)</div>
-                            <StatusBadge Status="@(item.Status ?? item.ApprovalStatus ?? string.Empty)" />
+                        var isDailyRecord = item.StartTime == null && item.EndTime == null;
+                        var duration = isDailyRecord
+                            ? $"{CalculateDuration(item.StartDate, item.EndDate)} days"
+                            : $"{CalculateHours(item.StartDate, item.StartTime, item.EndDate, item.EndTime):F1} hours";
+                        var status = item.Status ?? item.ApprovalStatus ?? "Pending";
+
+                        <div class="card" style="border-left:4px solid @GetStatusColor(status)">
+                            <div style="display:flex;justify-content:space-between;align-items:start">
+                                <div style="flex:1">
+                                    <strong>@item.LeaveType</strong>
+                                    <div class="muted" style="margin:0.5rem 0">
+                                        @if (isDailyRecord)
+                                        {
+                                            <span>📅 @item.StartDate.ToString("yyyy-MM-dd") -
+                                                @item.EndDate.ToString("yyyy-MM-dd")</span>
+                                            }
+                                        else if (item.StartTime.HasValue && item.EndTime.HasValue)
+                                            {
+                                                <text>⏰ @item.StartDate.ToString("yyyy-MM-dd") @item.StartTime.Value.ToString("HH:mm") -
+                                                    @item.EndDate.ToString("yyyy-MM-dd") @item.EndTime.Value.ToString("HH:mm")</text>
+                                                }
+                                                <span style="font-weight:bold;display:block;margin-top:0.25rem">@duration</span>
+                                            </div>
+                                            <div style="margin-top:0.5rem;font-size:0.9rem">@(string.IsNullOrWhiteSpace(item.Reason) ?
+                                                                                                                                                                                                                                                       "--" : item.Reason)</div>
+                                            </div>
+                                            <StatusBadge Status="@status" />
+                                        </div>
+                                    </div>
+                                }
+                            }
                         </div>
-                    }
-                }
+                    </div>
+                </div>
             </div>
-        </div>
-    </div>
-</div>
 
 @code {
-    private LeaveForm request = new() { Type = "Annual", Start = DateOnly.FromDateTime(DateTime.Today), End = DateOnly.FromDateTime(DateTime.Today) };
+    private LeaveForm request = new();
     private IReadOnlyList<LeaveDto> history = [];
     private string? error;
+    private string? validationError;
     private bool saving;
-    private int Days => Math.Max(1, request.End.DayNumber - request.Start.DayNumber + 1);
+    private bool loadingHistory;
+    private bool submitSuccess;
+    private bool isDailyLeave = true;
+
+private readonly string[] LeaveTypes =
+[
+    "Жилийн ээлжийн амралт",
+    "Өвчний чөлөө",
+    "Цалингүй чөлөө",
+    "Төрсөн өдрийн чөлөө",
+    "Жирэмсний амралт",
+    "Хувийн чөлөө",
+    "Бусад"
+];
+    private int Days
+    {
+        get
+        {
+            if (request.Start == default || request.End == default)
+                return 0;
+
+            var diff = request.End.DayNumber - request.Start.DayNumber + 1;
+            return Math.Max(1, diff);
+        }
+    }
+
+    private decimal Hours
+    {
+        get
+        {
+            if (request.StartTime == null || request.EndTime == null ||
+                request.EndTime <= request.StartTime)
+                return 0;
+
+            var diff = request.EndTime.Value.ToTimeSpan() - request.StartTime.Value.ToTimeSpan();
+            return (decimal)diff.TotalHours;
+        }
+    }
+
+    private bool IsFormValid =>
+        !string.IsNullOrWhiteSpace(request.Type) &&
+        request.Start != default &&
+        !string.IsNullOrWhiteSpace(request.Reason) &&
+        request.Reason.Length >= 10 &&
+        (isDailyLeave
+            ? (request.End >= request.Start && Days > 0)
+            : (request.StartTime.HasValue && request.EndTime.HasValue && Hours > 0 && Hours <= 24));
+
+    private void SetLeaveType(bool daily)
+    {
+        isDailyLeave = daily;
+        validationError = null;
+        if (daily)
+        {
+            request.End = DateOnly.FromDateTime(DateTime.Today);
+            request.StartTime = null;
+            request.EndTime = null;
+        }
+        else
+        {
+            request.End = request.Start;
+            request.StartTime = new TimeOnly(9, 0);
+            request.EndTime = new TimeOnly(12, 0);
+        }
+    }
 
     protected override Task OnInitializedAsync() => LoadAsync();
+
+    protected override Task OnParametersSetAsync()
+    {
+        request.Start = DateOnly.FromDateTime(DateTime.Today);
+        request.End = DateOnly.FromDateTime(DateTime.Today);
+        request.StartTime = new TimeOnly(9, 0);
+        request.EndTime = new TimeOnly(12, 0);
+        return Task.CompletedTask;
+    }
 
     private async Task LoadAsync()
     {
         try
         {
+            loadingHistory = true;
             error = null;
+            validationError = null;
+
             var result = await Api.GetAsync<PagedResponse<LeaveDto>>("api/leave/history");
-            history = result?.Items ?? [];
+            history = result?.Items?.OrderByDescending(x => x.StartDate).ToList() ?? [];
         }
         catch (Exception ex)
         {
-            error = ex.Message;
+            error = ParseErrorMessage(ex);
             history = [];
+        }
+        finally
+        {
+            loadingHistory = false;
         }
     }
 
     private async Task SubmitAsync()
     {
+        validationError = null;
+        submitSuccess = false;
+
+        // Validation
+        if (!isDailyLeave)
+        {
+            if (!request.StartTime.HasValue || !request.EndTime.HasValue)
+            {
+                validationError = "Start and end times are required";
+                return;
+            }
+
+            if (request.EndTime <= request.StartTime)
+            {
+                validationError = "End time must be after start time";
+                return;
+            }
+
+            if ((request.EndTime.Value.ToTimeSpan() - request.StartTime.Value.ToTimeSpan()).TotalHours > 24)
+            {
+                validationError = "Leave duration cannot exceed 24 hours";
+                return;
+            }
+        }
+
+        if (isDailyLeave && request.End < request.Start)
+        {
+            validationError = "End date must be after or equal to start date";
+            return;
+        }
+
+        if (request.Reason.Length < 10)
+        {
+            validationError = "Reason must be at least 10 characters";
+            return;
+        }
+
         try
         {
             saving = true;
             error = null;
-            await Api.PostAsync("api/leave/requests", new { StartDate = request.Start.ToString("yyyy-MM-dd"), EndDate = request.End.ToString("yyyy-MM-dd"), request.Type, request.Reason });
-            request = new LeaveForm { Type = request.Type, Start = DateOnly.FromDateTime(DateTime.Today), End = DateOnly.FromDateTime(DateTime.Today) };
+
+            object payload;
+
+            if (isDailyLeave)
+            {
+                payload = new
+                {
+                    StartDate = request.Start.ToString("yyyy-MM-dd"),
+                    EndDate = request.End.ToString("yyyy-MM-dd"),
+                    request.Type,
+                    request.Reason,
+                    LeaveMode = "Daily"
+                };
+            }
+            else
+            {
+                payload = new
+                {
+                    StartDate = request.Start.ToString("yyyy-MM-dd"),
+                    StartTime = request.StartTime?.ToString("HH:mm"),
+                    EndDate = request.Start.ToString("yyyy-MM-dd"),
+                    EndTime = request.EndTime?.ToString("HH:mm"),
+                    request.Type,
+                    request.Reason,
+                    LeaveMode = "Hourly",
+                    Hours = Hours
+                };
+            }
+
+            await Api.PostAsync("api/leave/requests", payload);
+
+            submitSuccess = true;
+            request = new LeaveForm { Type = request.Type };
+
+            await Task.Delay(2000);
+            submitSuccess = false;
             await LoadAsync();
         }
         catch (Exception ex)
         {
-            error = ex.Message;
+            error = ParseErrorMessage(ex);
         }
         finally
         {
@@ -105,13 +393,73 @@
         }
     }
 
-    private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "--" : value;
+    private static int CalculateDuration(DateOnly start, DateOnly end)
+    {
+        return (end.DayNumber - start.DayNumber) + 1;
+    }
+
+    private static decimal CalculateHours(DateOnly startDate, TimeOnly? startTime, DateOnly endDate, TimeOnly? endTime)
+    {
+        if (startTime == null || endTime == null)
+            return 0;
+
+        if (startDate == endDate)
+        {
+            var diff = endTime.Value.ToTimeSpan() - startTime.Value.ToTimeSpan();
+            return (decimal)diff.TotalHours;
+        }
+        else
+        {
+            // Multi-day hourly leave
+            var startDiff = new TimeOnly(23, 59) - startTime.Value;
+            var endDiff = endTime.Value - new TimeOnly(0, 0);
+            var daysDiff = endDate.DayNumber - startDate.DayNumber - 1;
+
+            return (decimal)(startDiff.TotalHours + (daysDiff * 24) + endDiff.TotalHours);
+        }
+    }
+
+    private static string GetStatusColor(string status) => status?.ToLower() switch
+    {
+        "approved" => "var(--clr-success)",
+        "rejected" => "var(--clr-danger)",
+        "pending" => "var(--clr-warning)",
+        _ => "var(--clr-muted)"
+    };
+
+    private static string ParseErrorMessage(Exception ex)
+    {
+        if (ex.Message.Contains("400"))
+            return "Invalid request. Please check your input.";
+        if (ex.Message.Contains("401"))
+            return "You are not authorized to perform this action.";
+        if (ex.Message.Contains("409"))
+            return "You already have a leave request for this period.";
+        if (ex.Message.Contains("500"))
+            return "Server error. Please try again later.";
+
+        return ex.Message;
+    }
 
     private sealed class LeaveForm
     {
-        public string Type { get; set; } = string.Empty;
-        public DateOnly Start { get; set; }
-        public DateOnly End { get; set; }
+        [Required(ErrorMessage = "Leave type is required")]
+        public string Type { get; set; } = "Жилийн";
+
+        [Required(ErrorMessage = "Start date is required")]
+
+
+        public DateOnly Start { get; set; } = DateOnly.FromDateTime(DateTime.Today);
+
+        public DateOnly End { get; set; } = DateOnly.FromDateTime(DateTime.Today);
+
+        public TimeOnly? StartTime { get; set; }
+        public TimeOnly? EndTime { get; set; }
+
+
+        [Required(ErrorMessage = "Reason is required")]
+        [StringLength(500, MinimumLength = 10, ErrorMessage = "Reason must be between 10 and 500 characters")]
         public string Reason { get; set; } = string.Empty;
     }
 }
+

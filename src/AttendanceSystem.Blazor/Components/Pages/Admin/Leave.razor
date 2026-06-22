@@ -9,7 +9,8 @@
     <div class="tabs">
         @foreach (var tab in tabs)
         {
-            <button class="tab @(activeStatus == tab.Key ? "active" : "")" @onclick="() => ChangeTab(tab.Key)">@tab.Value</button>
+            <button class="tab @(activeStatus == tab.Key ? "active" : "")"
+                    @onclick="() => ChangeTab(tab.Key)">@tab.Value</button>
         }
     </div>
 
@@ -33,9 +34,27 @@
             <div class="card">
                 <div class="section-title">
                     <div>
-                        <strong>@Display(request.EmployeeName)</strong>
+                        <div class="muted" style="font-weight:600;font-size:0.95rem;color:var(--clr-text)">
+                            👤 @Display(request.EmployeeName)
+                        </div>
+                        <strong>@TranslateLeaveType(request.LeaveType)</strong>
                         <span class="badge badge-leave">@TranslateLeaveType(request.LeaveType)</span>
-                        <div class="muted">@request.StartDate.ToString("yyyy-MM-dd") - @request.EndDate.ToString("yyyy-MM-dd") • @request.TotalDays өдөр</div>
+                        <div class="muted">
+                            @request.StartDate.ToString("yyyy-MM-dd")
+                            -
+                            @request.EndDate.ToString("yyyy-MM-dd")
+
+                            @if (request.LeaveMode == "Hourly")
+                            {
+                                <span> • @(request.Hours ?? 0) цаг</span>
+                            }
+                            else
+                            {
+                                <span>
+                                    • @((request.EndDate.DayNumber - request.StartDate.DayNumber) + 1) өдөр
+                                </span>
+                            }
+                        </div>
                         <div>@Display(request.Reason)</div>
                     </div>
                     <StatusBadge Status="@(request.Status ?? request.ApprovalStatus ?? string.Empty)" />
@@ -60,7 +79,7 @@
     // Key = API-д явуулах статус нэр, Value = дэлгэцэн дээр харагдах Монгол нэр
     private readonly Dictionary<string, string> tabs = new()
     {
-        ["Pending"]  = "Хүлээгдэж буй",
+        ["Pending"] = "Хүлээгдэж буй",
         ["Approved"] = "Зөвшөөрсөн",
         ["Rejected"] = "Татгалзсан"
     };
@@ -164,12 +183,12 @@
 
     private static string TranslateLeaveType(string type) => type switch
     {
-        "Annual"    => "Жилийн ээлжийн",
-        "Sick"      => "Өвчтэй",
-        "Unpaid"    => "Цалингүй",
-        "Birthday"  => "Төрсөн өдөр",
+        "Annual" => "Жилийн ээлжийн",
+        "Sick" => "Өвчтэй",
+        "Unpaid" => "Цалингүй",
+        "Birthday" => "Төрсөн өдөр",
         "Maternity" => "Жирэмсний",
-        "Other"     => "Бусад",
-        _           => type
+        "Other" => "Бусад",
+        _ => type
     };
 }

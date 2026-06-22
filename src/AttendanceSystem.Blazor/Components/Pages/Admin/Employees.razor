@@ -22,6 +22,19 @@
             <option value="active">Идэвхтэй</option>
             <option value="inactive">Идэвхгүй</option>
         </select>
+
+        <select class="form-control" style="max-width:180px" value="@departmentFilter" @onchange="OnDepartmentChanged">
+            <option value="all">Бүх хэлтэс</option>
+            @foreach (var dept in departments)
+            {
+                <option value="@dept.Id">@dept.Name</option>
+            }
+        </select>
+
+        @if (statusFilter != "all" || departmentFilter != "all" || !string.IsNullOrWhiteSpace(search))
+        {
+            <button class="btn btn-ghost" @onclick="ClearFilters">✕ Цэвэрлэх</button>
+        }
     </div>
 
     @if (!string.IsNullOrWhiteSpace(error))
@@ -79,19 +92,9 @@
                                 </td>
                                 <td @onclick:stopPropagation="true" style="text-align:right">
                                     <div class="ctx-menu-wrap">
-                                        <button class="ctx-trigger" @onclick="() => ToggleMenu(emp.Id)" title="Үйлдэл">
+                                        <button class="ctx-trigger" @onclick="() => OpenModal(emp.Id)" title="Үйлдэл">
                                             <span></span><span></span><span></span>
                                         </button>
-
-                                        @if (openMenuId == emp.Id)
-                                        {
-                                            <div class="ctx-menu">
-                                                <button class="ctx-menu-item" @onclick="() => OpenModal(emp.Id)">
-                                                    <span class="ctx-icon">ℹ</span> Дэлгэрэнгүй
-                                                </button>
-                                    
-                                            </div>
-                                        }
                                     </div>
                                 </td>
                             </tr>
@@ -199,7 +202,8 @@
                                     <span class="ctx-icon">✏</span> Засах
                                 </button>
 
-                                
+                                <div class="ctx-menu-divider"></div>
+
                                 @if (_detail.IsActive)
                                 {
                                     <button class="ctx-menu-item danger" @onclick="() => DeactivateEmployee(_detail.Id)">
@@ -223,8 +227,10 @@
 
 @code {
     private IReadOnlyList<EmployeeDto> employees = [];
+    private IReadOnlyList<DepartmentDto> departments = [];
     private string? search;
     private string statusFilter = "all";
+    private string departmentFilter = "all";
     private string? error;
     private string? statusMessage;
     private bool isLoading;
@@ -244,7 +250,24 @@
     private bool _actionInProgress;
     private CancellationTokenSource? _searchCts;
 
-    protected override Task OnInitializedAsync() => LoadAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDepartmentsAsync();
+        await LoadAsync();
+    }
+
+    private async Task LoadDepartmentsAsync()
+    {
+        try
+        {
+            var result = await Api.GetAsync<PagedResponse<DepartmentDto>>("api/departments?pageNumber=1&pageSize=1000");
+            departments = result?.Items ?? [];
+        }
+        catch
+        {
+            departments = [];
+        }
+    }
 
     private void ToggleMenu(Guid id)
     {
@@ -280,6 +303,24 @@
         return LoadAsync();
     }
 
+    private Task OnDepartmentChanged(ChangeEventArgs e)
+    {
+        departmentFilter = e.Value?.ToString() ?? "all";
+        pageNumber = 1;
+        openMenuId = null;
+        return LoadAsync();
+    }
+
+    private Task ClearFilters()
+    {
+        search = null;
+        statusFilter = "all";
+        departmentFilter = "all";
+        pageNumber = 1;
+        openMenuId = null;
+        return LoadAsync();
+    }
+
     private Task GoToPage(int page)
     {
         pageNumber = Math.Clamp(page, 1, TotalPages);
@@ -304,6 +345,9 @@
                 query += "&isActive=true";
             else if (statusFilter == "inactive")
                 query += "&isActive=false";
+
+            if (departmentFilter != "all" && Guid.TryParse(departmentFilter, out var deptId))
+                query += $"&departmentId={deptId}";
 
             var result = await Api.GetAsync<PagedResponse<EmployeeDto>>(query);
             employees = result?.Items ?? [];

@@ -45,7 +45,25 @@ namespace AttendanceSystem.API.Controllers
                 return BadRequest(new { error = "Employee profile not linked to user." });
 
             var leaveType = ParseLeaveType(request.Type);
-            var leaveRequest = LeaveRequest.Create(employeeId.Value, leaveType, startDate, endDate, request.Reason);
+
+            LeaveRequest leaveRequest;
+            if (string.Equals(request.LeaveMode, "Hourly", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!TimeOnly.TryParse(request.StartTime, out var startTime) ||
+                    !TimeOnly.TryParse(request.EndTime, out var endTime))
+                    return BadRequest(new { error = "StartTime and EndTime are required for hourly leave." });
+
+                if (endTime <= startTime)
+                    return BadRequest(new { error = "EndTime must be after StartTime." });
+
+                var hours = request.Hours ?? (decimal)(endTime.ToTimeSpan() - startTime.ToTimeSpan()).TotalHours;
+
+                leaveRequest = LeaveRequest.CreateHourly(employeeId.Value, leaveType, startDate, startTime, endTime, hours, request.Reason);
+            }
+            else
+            {
+                leaveRequest = LeaveRequest.Create(employeeId.Value, leaveType, startDate, endDate, request.Reason);
+            }
 
             await _context.LeaveRequests.AddAsync(leaveRequest);
             await _context.SaveChangesAsync();
@@ -60,7 +78,11 @@ namespace AttendanceSystem.API.Controllers
                 leaveRequest.StartDate,
                 leaveRequest.EndDate,
                 leaveRequest.Reason,
-                leaveRequest.Status
+                leaveRequest.Status,
+                leaveRequest.LeaveMode,
+                leaveRequest.StartTime,
+                leaveRequest.EndTime,
+                leaveRequest.Hours
             });
         }
 
@@ -92,7 +114,11 @@ namespace AttendanceSystem.API.Controllers
                     l.EndDate,
                     LeaveType = l.LeaveType,
                     l.Reason,
-                    Status = l.Status
+                    Status = l.Status,
+                    l.LeaveMode,
+                    l.StartTime,
+                    l.EndTime,
+                    l.Hours
                 })
                 .ToListAsync(cancellationToken);
 
@@ -106,7 +132,11 @@ namespace AttendanceSystem.API.Controllers
                     l.Reason,
                     l.Status.ToString(),
                     l.Status.ToString(),
-                    (decimal)((l.EndDate.ToDateTime(TimeOnly.MinValue) - l.StartDate.ToDateTime(TimeOnly.MinValue)).TotalDays + 1)
+                    (decimal)((l.EndDate.ToDateTime(TimeOnly.MinValue) - l.StartDate.ToDateTime(TimeOnly.MinValue)).TotalDays + 1),
+                    l.LeaveMode,
+                    l.StartTime,
+                    l.EndTime,
+                    l.Hours
                 ))
                 .ToList();
 
@@ -133,7 +163,11 @@ namespace AttendanceSystem.API.Controllers
                     LeaveType = l.LeaveType,
                     l.Reason,
                     Status = l.Status,
-                    l.CreatedAt
+                    l.CreatedAt,
+                    l.LeaveMode,
+                    l.StartTime,
+                    l.EndTime,
+                    l.Hours
                 })
                 .ToListAsync(cancellationToken);
 
@@ -148,7 +182,11 @@ namespace AttendanceSystem.API.Controllers
                     l.Reason,
                     l.Status.ToString(),
                     l.Status.ToString(),
-                    (decimal)((l.EndDate.ToDateTime(TimeOnly.MinValue) - l.StartDate.ToDateTime(TimeOnly.MinValue)).TotalDays + 1)
+                    (decimal)((l.EndDate.ToDateTime(TimeOnly.MinValue) - l.StartDate.ToDateTime(TimeOnly.MinValue)).TotalDays + 1),
+                    l.LeaveMode,
+                    l.StartTime,
+                    l.EndTime,
+                    l.Hours
                 ))
                 .ToList();
 
@@ -249,6 +287,10 @@ namespace AttendanceSystem.API.Controllers
             public string? EndDate { get; set; }
             public string? Type { get; set; }
             public string? Reason { get; set; }
+            public string? LeaveMode { get; set; }
+            public string? StartTime { get; set; }
+            public string? EndTime { get; set; }
+            public decimal? Hours { get; set; }
         }
 
         public sealed record LeaveRequestApiDto(
@@ -261,7 +303,11 @@ namespace AttendanceSystem.API.Controllers
             string? Reason,
             string? ApprovalStatus,
             string? Status,
-            decimal TotalDays);
+            decimal TotalDays,
+            string? LeaveMode = null,
+            TimeOnly? StartTime = null,
+            TimeOnly? EndTime = null,
+            decimal? Hours = null);
 
         public sealed record LeaveStatisticsApiDto(decimal Used, int PendingRequests);
     }

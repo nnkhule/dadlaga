@@ -8,7 +8,7 @@ namespace AttendanceSystem.Infrastructure.Services;
 
 public class AiChatService : IAiChatService
 {
-    private const int MaxHistoryMessages = 12; // token хэмнэх — сүүлийн N мессежийг л дамжуулна
+    private const int MaxHistoryMessages = 120; 
 
     private readonly IAiProvider _aiProvider;
     private readonly ApplicationDbContext _dbContext;
@@ -76,7 +76,7 @@ public class AiChatService : IAiChatService
 
             === ӨНӨӨДРИЙН ТОЙМ ({DateTime.UtcNow:yyyy-MM-dd}) ===
             • Нийт ажилтан: {ctx.TotalEmployees}
-            • Өнөөдөр ирсэн: {ctx.PresentToday}
+            • Өнөөдөр ирсэн: {ctx.PresentToday + ctx.LateTodayCount}
             • Өнөөдөр хоцорсон: {ctx.LateTodayCount}
             • Өнөөдөр ирээгүй: {ctx.AbsentToday}
             • Чөлөөтэй: {ctx.OnLeaveToday}
@@ -200,9 +200,7 @@ public class AiChatService : IAiChatService
         _ => status
     };
 
-    /// <summary>
-    /// Сүүлийн N мессежийг л дамжуулна — token зарцуулалт хязгаарлах.
-    /// </summary>
+
     private static List<(string Role, string Content)> BuildMessageHistory(ChatRequestDto request)
     {
         var messages = new List<(string Role, string Content)>();

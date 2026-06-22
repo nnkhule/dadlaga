@@ -1,0 +1,515 @@
+@page "/admin/departments"
+@layout AdminLayout
+@attribute [Authorize(Roles = "Admin,SuperAdmin,HRManager")]
+@inject ApiClient Api
+@inject IJSRuntime JS
+
+<PageHeader Title="Хэлтэсүүд" Subtitle="Байгууллагын хэлтэс, нэгжүүдийн жагсаалт" Icon="🏢">
+    <Actions>
+        <button class="btn btn-primary" @onclick="OpenCreateModal">+ Хэлтэс нэмэх</button>
+    </Actions>
+</PageHeader>
+
+<div class="page-stack">
+
+    @if (!string.IsNullOrWhiteSpace(error))
+    {
+        <div class="alert alert-danger">⚠ @error</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(successMsg))
+    {
+        <div class="alert alert-success">✓ @successMsg</div>
+    }
+
+    <!-- Filter bar -->
+    <div class="card filter-bar">
+        <input class="form-control"
+               style="flex:1;min-width:200px"
+               placeholder="Хэлтэс хайх..."
+               value="@_search"
+               @oninput="OnSearchInput" />
+
+        <select class="form-control" style="max-width:160px" @onchange="OnStatusChange">
+            <option value="">Бүх төлөв</option>
+            <option value="active">Идэвхтэй</option>
+            <option value="inactive">Идэвхгүй</option>
+        </select>
+
+        @if (!string.IsNullOrWhiteSpace(_search) || !string.IsNullOrWhiteSpace(_statusFilter))
+        {
+            <button class="btn btn-ghost" @onclick="ClearFilters">✕ Цэвэрлэх</button>
+        }
+        <span class="muted" style="margin-left:auto;white-space:nowrap">Нийт @_totalCount хэлтэс</span>
+    </div>
+
+    <!-- KPI cards -->
+    <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+        <div class="kpi-card kpi-blue">
+            <div class="kpi-top">
+                <div class="kpi-icon">🏢</div>
+                <div class="kpi-trend neutral">Нийт</div>
+            </div>
+            <div class="kpi-value">@_totalCount</div>
+            <div class="kpi-label">Нийт хэлтэс</div>
+        </div>
+        <div class="kpi-card kpi-green">
+            <div class="kpi-top">
+                <div class="kpi-icon">✓</div>
+                <div class="kpi-trend up">Идэвхтэй</div>
+            </div>
+            <div class="kpi-value">@_departments.Count(d => d.IsActive)</div>
+            <div class="kpi-label">Идэвхтэй хэлтэс</div>
+        </div>
+        <div class="kpi-card kpi-purple">
+            <div class="kpi-top">
+                <div class="kpi-icon">👥</div>
+                <div class="kpi-trend neutral">Нийт</div>
+            </div>
+            <div class="kpi-value">@_departments.Sum(d => d.EmployeeCount)</div>
+            <div class="kpi-label">Нийт ажилтан</div>
+        </div>
+        <div class="kpi-card kpi-orange">
+            <div class="kpi-top">
+                <div class="kpi-icon">📊</div>
+                <div class="kpi-trend neutral">Дундаж</div>
+            </div>
+            <div class="kpi-value">@(_departments.Count > 0 ? (_departments.Sum(d => d.EmployeeCount) / _departments.Count) : 0)</div>
+            <div class="kpi-label">Дундаж ажилтан</div>
+        </div>
+    </div>
+
+    <!-- Department table -->
+    <div class="card">
+        @if (_isLoading)
+        {
+            <div class="loading-state">
+                <div class="spinner"></div>
+                <span>Ачааллаж байна...</span>
+            </div>
+        }
+        else if (_departments.Count == 0)
+        {
+            <div class="empty-state">
+                <div class="empty-state-icon">🏢</div>
+                <strong>Хэлтэс олдсонгүй</strong>
+                <p>Шинэ хэлтэс нэмэхийн тулд "Хэлтэс нэмэх" товчийг дарна уу.</p>
+                <button class="btn btn-primary" style="margin-top:8px" @onclick="OpenCreateModal">+ Хэлтэс нэмэх</button>
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th style="cursor:pointer" @onclick='() => SetSort("name")'>
+                                Хэлтэсийн нэр @SortIcon("name")
+                            </th>
+                            <th style="cursor:pointer" @onclick='() => SetSort("head")'>
+                                Хэлтсийн дарга @SortIcon("head")
+                            </th>
+                            <th style="cursor:pointer;text-align:center" @onclick='() => SetSort("count")'>
+                                Ажилтан @SortIcon("count")
+                            </th>
+                            <th>Төлөв</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var dept in _paged)
+                        {
+                            <tr class="emp-row">
+                                <td>
+                                    <div style="display:flex;align-items:center;gap:10px">
+                                        <div style="width:36px;height:36px;border-radius:var(--radius-sm);background:var(--clr-primary-light);color:var(--clr-primary);display:grid;place-items:center;font-size:15px;flex-shrink:0">
+                                            🏢
+                                        </div>
+                                        <div>
+                                            <div style="font-weight:600">@dept.Name</div>
+                                            @if (!string.IsNullOrWhiteSpace(dept.Description))
+                                            {
+                                                <div class="muted" style="font-size:12px">@dept.Description</div>
+                                            }
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    @if (!string.IsNullOrWhiteSpace(dept.HeadEmployeeName))
+                                    {
+                                        <div style="display:flex;align-items:center;gap:8px">
+                                            <div class="emp-row-avatar" style="width:28px;height:28px;font-size:11px">
+                                                @Initials(dept.HeadEmployeeName)
+                                            </div>
+                                            <span>@dept.HeadEmployeeName</span>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <span class="muted">—</span>
+                                    }
+                                </td>
+                                <td style="text-align:center">
+                                    <div style="display:flex;align-items:center;justify-content:center;gap:6px">
+                                        <span style="font-weight:700">@dept.EmployeeCount</span>
+                                        @if (_maxCount > 0)
+                                        {
+                                            <div style="width:60px;height:4px;background:var(--clr-border);border-radius:var(--radius-full);overflow:hidden">
+                                                <div style="height:100%;width:@(dept.EmployeeCount * 100 / _maxCount)%;background:var(--clr-primary);border-radius:var(--radius-full)"></div>
+                                            </div>
+                                        }
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="badge @(dept.IsActive ? "badge-present" : "badge-absent")">
+                                        @(dept.IsActive ? "Идэвхтэй" : "Идэвхгүй")
+                                    </span>
+                                </td>
+                                <td style="text-align:right">
+                                    <div class="action-row" style="justify-content:flex-end">
+                                        <button class="btn btn-ghost btn-sm" @onclick="() => OpenEditModal(dept)" title="Засах">
+                                            ✏ Засах
+                                        </button>
+                                        @if (dept.IsActive)
+                                        {
+                                            <button class="btn btn-sm" style="background:var(--clr-warning-light);color:var(--clr-warning);border:1px solid var(--clr-warning)"
+                                                    @onclick="() => ToggleActive(dept)" title="Идэвхгүй болгох">
+                                                🚫
+                                            </button>
+                                        }
+                                        else
+                                        {
+                                            <button class="btn btn-sm" style="background:var(--clr-success-light);color:var(--clr-success);border:1px solid var(--clr-success)"
+                                                    @onclick="() => ToggleActive(dept)" title="Идэвхжүүлэх">
+                                                ✓
+                                            </button>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            @if (_totalCount > _pageSize)
+            {
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 0;gap:12px;flex-wrap:wrap">
+                    <span class="muted">
+                        Нийт @_totalCount-аас @(((_page - 1) * _pageSize) + 1)–@(Math.Min(_page * _pageSize, _totalCount))
+                    </span>
+                    <div style="display:flex;gap:8px;align-items:center">
+                        <button class="btn btn-ghost btn-sm" disabled="@(_page <= 1)" @onclick="() => GoPage(_page - 1)">‹ Өмнөх</button>
+                        <span class="muted">@_page / @_totalPages</span>
+                        <button class="btn btn-ghost btn-sm" disabled="@(_page >= _totalPages)" @onclick="() => GoPage(_page + 1)">Дараах ›</button>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+
+</div>
+
+<!-- ── Create / Edit Modal ── -->
+@if (_modalOpen)
+{
+    <div class="emd-overlay" @onclick="CloseModal">
+        <div class="emd-card" @onclick:stopPropagation="true" style="width:min(480px,calc(100vw - 32px))">
+
+            <div class="emd-header">
+                <h3 class="emd-title">@(_editingId is null ? "Шинэ хэлтэс нэмэх" : "Хэлтэс засах")</h3>
+                <button class="emd-close" @onclick="CloseModal">✕</button>
+            </div>
+
+            <div style="padding:24px;display:grid;gap:16px">
+
+                @if (!string.IsNullOrWhiteSpace(_formError))
+                {
+                    <div class="alert alert-danger" style="margin:0">⚠ @_formError</div>
+                }
+
+                <div class="form-group">
+                    <label>Хэлтэсийн нэр <span class="form-required">*</span></label>
+                    <input class="form-control @(_nameError ? "input-error" : "")"
+                           placeholder="Жишээ: Санхүүгийн хэлтэс"
+                           @bind="_formName"
+                           @bind:event="oninput"
+                           @onkeydown="OnFormKeyDown" />
+                    @if (_nameError)
+                    {
+                        <span class="form-error-msg">Хэлтэсийн нэр оруулна уу.</span>
+                    }
+                </div>
+
+                <div class="form-group">
+                    <label>Тайлбар <span class="form-hint">(заавал биш)</span></label>
+                    <textarea class="form-control" rows="3"
+                              placeholder="Хэлтэсийн үүрэг, чиг үүрэг..."
+                              @bind="_formDesc"></textarea>
+                </div>
+
+            </div>
+
+            <div class="emd-footer">
+                <button class="btn btn-ghost" @onclick="CloseModal" disabled="@_saving">Болих</button>
+                <button class="btn btn-primary" @onclick="SaveAsync" disabled="@_saving">
+                    @if (_saving)
+                    {
+                        <span class="emp-spinner" style="width:14px;height:14px;border-width:2px;display:inline-block;margin-right:6px"></span>
+                    }
+                    @(_editingId is null ? "Нэмэх" : "Хадгалах")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    // ── State ──────────────────────────────────────────────
+    private List<DepartmentDto> _departments = [];
+    private bool   _isLoading;
+    private string? error;
+    private string? successMsg;
+
+    // Filters & sort
+    private string? _search;
+    private string  _statusFilter = "";
+    private string  _sortCol = "name";
+    private bool    _sortDesc;
+    private CancellationTokenSource? _searchCts;
+
+    // Pagination
+    private int _page      = 1;
+    private const int _pageSize = 15;
+    private int _totalCount;
+    private int _totalPages => Math.Max(1, (int)Math.Ceiling(_totalCount / (double)_pageSize));
+
+    // Derived
+    private int _maxCount => _departments.Count > 0 ? _departments.Max(d => d.EmployeeCount) : 1;
+
+    private IEnumerable<DepartmentDto> _sorted => _sortCol switch
+    {
+        "head"  => _sortDesc ? _departments.OrderByDescending(d => d.HeadEmployeeName) : _departments.OrderBy(d => d.HeadEmployeeName),
+        "count" => _sortDesc ? _departments.OrderByDescending(d => d.EmployeeCount)    : _departments.OrderBy(d => d.EmployeeCount),
+        _       => _sortDesc ? _departments.OrderByDescending(d => d.Name)             : _departments.OrderBy(d => d.Name),
+    };
+
+    private IEnumerable<DepartmentDto> _paged => _sorted
+        .Skip((_page - 1) * _pageSize)
+        .Take(_pageSize);
+
+    // Modal
+    private bool    _modalOpen;
+    private Guid?   _editingId;
+    private string  _formName = "";
+    private string  _formDesc = "";
+    private bool    _saving;
+    private string? _formError;
+    private bool    _nameError;
+
+    // ── Lifecycle ──────────────────────────────────────────
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    // ── Data ───────────────────────────────────────────────
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        error = null;
+        StateHasChanged();
+        try
+        {
+            var url = $"api/departments?pageNumber={_page}&pageSize={_pageSize}" +
+                      $"&search={Uri.EscapeDataString(_search ?? "")}";
+
+            var result = await Api.GetAsync<PagedResponse<DepartmentDto>>(url);
+            var all = result?.Items ?? [];
+
+            // Client-side status filter (API doesn't expose isActive query param)
+            _departments = _statusFilter switch
+            {
+                "active"   => all.Where(d => d.IsActive).ToList(),
+                "inactive" => all.Where(d => !d.IsActive).ToList(),
+                _          => all.ToList()
+            };
+            _totalCount = result?.TotalCount ?? _departments.Count;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    // ── Filter handlers ────────────────────────────────────
+    private async Task OnSearchInput(ChangeEventArgs e)
+    {
+        _search = e.Value?.ToString();
+        _page = 1;
+        _searchCts?.Cancel();
+        _searchCts = new CancellationTokenSource();
+        try
+        {
+            await Task.Delay(300, _searchCts.Token);
+            await LoadAsync();
+        }
+        catch (TaskCanceledException) { }
+    }
+
+    private Task OnStatusChange(ChangeEventArgs e)
+    {
+        _statusFilter = e.Value?.ToString() ?? "";
+        _page = 1;
+        return LoadAsync();
+    }
+
+    private Task ClearFilters()
+    {
+        _search = null;
+        _statusFilter = "";
+        _page = 1;
+        return LoadAsync();
+    }
+
+    private void SetSort(string col)
+    {
+        _sortDesc = _sortCol == col && !_sortDesc;
+        _sortCol = col;
+    }
+
+    private string SortIcon(string col) =>
+        _sortCol != col ? "" : (_sortDesc ? " ▼" : " ▲");
+
+    private Task GoPage(int p)
+    {
+        _page = Math.Clamp(p, 1, _totalPages);
+        return LoadAsync();
+    }
+
+    // ── Toggle active ──────────────────────────────────────
+    private async Task ToggleActive(DepartmentDto dept)
+    {
+        error = null;
+        successMsg = null;
+        try
+        {
+            HttpResponseMessage res;
+            if (dept.IsActive)
+            {
+                var confirmed = await JS.InvokeAsync<bool>("confirm",
+                    $"«{dept.Name}» хэлтэсийг идэвхгүй болгох уу?");
+                if (!confirmed) return;
+                res = await Api.DeleteAsync($"api/departments/{dept.Id}");
+            }
+            else
+            {
+                res = await Api.PostAsync($"api/departments/{dept.Id}/activate", new { });
+            }
+
+            if (res.IsSuccessStatusCode)
+            {
+                successMsg = dept.IsActive
+                    ? $"«{dept.Name}» хэлтэсийг идэвхгүй болгосон."
+                    : $"«{dept.Name}» хэлтэсийг идэвхжүүллээ.";
+                await LoadAsync();
+            }
+            else
+            {
+                error = $"Үйлдэл амжилтгүй болсон ({(int)res.StatusCode}).";
+            }
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    // ── Modal ──────────────────────────────────────────────
+    private void OpenCreateModal()
+    {
+        _editingId = null;
+        _formName  = "";
+        _formDesc  = "";
+        _formError = null;
+        _nameError = false;
+        _modalOpen = true;
+    }
+
+    private void OpenEditModal(DepartmentDto dept)
+    {
+        _editingId = dept.Id;
+        _formName  = dept.Name;
+        _formDesc  = dept.Description ?? "";
+        _formError = null;
+        _nameError = false;
+        _modalOpen = true;
+    }
+
+    private void CloseModal()
+    {
+        if (_saving) return;
+        _modalOpen = false;
+    }
+
+    private async Task OnFormKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await SaveAsync();
+    }
+
+    private async Task SaveAsync()
+    {
+        _formError = null;
+        _nameError = false;
+
+        if (string.IsNullOrWhiteSpace(_formName))
+        {
+            _nameError = true;
+            return;
+        }
+
+        _saving = true;
+        StateHasChanged();
+
+        try
+        {
+            var body = new { Name = _formName.Trim(), Description = _formDesc.Trim() };
+            HttpResponseMessage res;
+
+            if (_editingId is null)
+                res = await Api.PostAsync("api/departments", body);
+            else
+                res = await Api.PutAsync($"api/departments/{_editingId}", body);
+
+            if (res.IsSuccessStatusCode)
+            {
+                successMsg = _editingId is null
+                    ? $"«{_formName.Trim()}» хэлтэсийг амжилттай нэмлээ."
+                    : $"«{_formName.Trim()}» хэлтэсийн мэдээллийг шинэчиллээ.";
+                _modalOpen = false;
+                await LoadAsync();
+            }
+            else
+            {
+                var body2 = await res.Content.ReadAsStringAsync();
+                _formError = $"Алдаа гарлаа ({(int)res.StatusCode}). {body2}";
+            }
+        }
+        catch (Exception ex)
+        {
+            _formError = ex.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    // ── Helpers ────────────────────────────────────────────
+    private static string Initials(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "?";
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return string.Concat(parts.Take(2).Select(p => p[0])).ToUpperInvariant();
+    }
+}

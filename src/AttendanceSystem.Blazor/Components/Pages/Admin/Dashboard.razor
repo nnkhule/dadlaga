@@ -1,232 +1,689 @@
+
 @page "/admin/dashboard"
 @layout AdminLayout
 @attribute [Authorize(Roles = "Admin,SuperAdmin,HRManager,HR,Manager")]
+@implements IAsyncDisposable
 @inject ApiClient Api
 @inject IJSRuntime JS
+@inject NavigationManager Nav
 
-<PageHeader Title="Хянах самбар" Subtitle="@DateTime.Today.ToString("yyyy оны MM сарын dd")" Icon="▦" />
+<PageHeader Title="Хянах самбар" Subtitle="@($"{DateTime.Today:yyyy оны MM сарын dd} • {GetWeekLabel()}")" Icon="▦" />
 
 <div class="page-stack">
 
     @if (!string.IsNullOrWhiteSpace(error))
     {
-        <div class="card" style="border-color:var(--clr-danger);color:var(--clr-danger);padding:14px 18px">⚠ @error</div>
+        <div class="alert alert-danger">⚠ @error</div>
     }
 
-    @* ── Stat cards ── *@
-    <div class="dash-stats">
-        <div class="dash-stat dash-stat--success">
-            <div class="dash-stat-icon">✓</div>
-            <div class="dash-stat-body">
-                <div class="dash-stat-value">@(summary?.PresentToday ?? 0)</div>
-                <div class="dash-stat-label">Ирсэн</div>
-            </div>
-            <div class="dash-stat-rate">
-                @if (summary is not null && summary.ActiveEmployees > 0)
+    <!-- Toolbar -->
+    @* <div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 16px">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <span class="muted">
+                🕒 Сүүлд шинэчлэгдсэн: @_lastUpdated.ToString("HH:mm:ss")
+                @if (isLoading)
                 {
-                    <span>@($"{summary.PresentToday * 100 / summary.ActiveEmployees}%")</span>
+                    <span> • ачааллаж байна...</span>
                 }
-            </div>
+            </span>
         </div>
-        <div class="dash-stat dash-stat--warning">
-            <div class="dash-stat-icon">!</div>
-            <div class="dash-stat-body">
-                <div class="dash-stat-value">@(summary?.LateEmployees ?? 0)</div>
-                <div class="dash-stat-label">Хоцорсон</div>
-            </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--clr-text-muted);cursor:pointer">
+                <input type="checkbox" @bind="autoRefresh" @bind:after="OnAutoRefreshChanged" />
+                Автомат шинэчлэлт (30с)
+            </label>
+            <button class="btn btn-ghost btn-sm" @onclick="ExportTodayCsv" disabled="@(records.Count == 0)">
+                ⬇ CSV татах
+            </button>
+            <button class="btn btn-primary btn-sm" @onclick="() => RefreshAsync(true)" disabled="@isLoading">
+                🔄 Шинэчлэх
+            </button>
         </div>
-        <div class="dash-stat dash-stat--danger">
-            <div class="dash-stat-icon">×</div>
-            <div class="dash-stat-body">
-                <div class="dash-stat-value">@(summary?.AbsentToday ?? 0)</div>
-                <div class="dash-stat-label">Ирээгүй</div>
+    </div> *@
+
+    <!-- Quick actions -->
+    @* <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <a class="btn btn-ghost btn-sm" href="/admin/leave">☑ Чөлөөний хүсэлтүүд</a>
+        <a class="btn btn-ghost btn-sm" href="/admin/employees">👥 Ажилтнууд</a>
+        <a class="btn btn-ghost btn-sm" href="/admin/reports">📊 Тайлан</a>
+        <a class="btn btn-ghost btn-sm" href="/admin/departments">🏢 Хэлтэсүүд</a>
+    </div> *@
+
+    <!-- KPI Cards -->
+    <div class="kpi-grid">
+        <div class="kpi-card kpi-blue">
+            <div class="kpi-top">
+                <div class="kpi-icon">👥</div>
+                <div class="kpi-trend neutral">Нийт</div>
             </div>
+            <div class="kpi-value">@(summary?.ActiveEmployees ?? 0)</div>
+            <div class="kpi-label">Нийт ажилтан</div>
+            <div class="kpi-bar"><div class="kpi-bar-fill" style="width:100%"></div></div>
         </div>
-        <div class="dash-stat dash-stat--info">
-            <div class="dash-stat-icon">□</div>
-            <div class="dash-stat-body">
-                <div class="dash-stat-value">@(summary?.OnLeaveEmployees ?? 0)</div>
-                <div class="dash-stat-label">Чөлөөтэй</div>
+        <div class="kpi-card kpi-green">
+            <div class="kpi-top">
+                <div class="kpi-icon">✓</div>
+                <div class="kpi-trend up">↑ @PercentLabel(summary?.PresentToday, summary?.ActiveEmployees)</div>
             </div>
+            <div class="kpi-value">@(summary?.PresentToday ?? 0)</div>
+            <div class="kpi-label">Өнөөдөр ирсэн</div>
+            <div class="kpi-sub">@PercentLabel(summary?.PresentToday, summary?.ActiveEmployees) ажилчид</div>
+            <div class="kpi-bar"><div class="kpi-bar-fill" style="width:@(PercentValue(summary?.PresentToday, summary?.ActiveEmployees))%"></div></div>
         </div>
-        <div class="dash-stat dash-stat--primary">
-            <div class="dash-stat-icon">◈</div>
-            <div class="dash-stat-body">
-                <div class="dash-stat-value">@($"{summary?.AttendanceRate ?? 0:0.#}%")</div>
-                <div class="dash-stat-label">Ирцийн хувь</div>
+        <div class="kpi-card kpi-red">
+            <div class="kpi-top">
+                <div class="kpi-icon">✗</div>
+                <div class="kpi-trend down">Анхаар</div>
             </div>
+            <div class="kpi-value">@(summary?.AbsentToday ?? 0)</div>
+            <div class="kpi-label">Ирээгүй / тооцоогүй</div>
+            <div class="kpi-bar"><div class="kpi-bar-fill" style="width:@(PercentValue(summary?.AbsentToday, summary?.ActiveEmployees))%"></div></div>
         </div>
-        <div class="dash-stat dash-stat--neutral">
-            <div class="dash-stat-icon">⏱</div>
-            <div class="dash-stat-body">
-                <div class="dash-stat-value">@($"{summary?.TotalOvertimeHours ?? 0:0.#}ц")</div>
-                <div class="dash-stat-label">Илүү цаг</div>
+        <div class="kpi-card kpi-yellow">
+            <div class="kpi-top">
+                <div class="kpi-icon">!</div>
+                <div class="kpi-trend down">Хожуу</div>
             </div>
+            <div class="kpi-value">@(summary?.LateEmployees ?? 0)</div>
+            <div class="kpi-label">Хоцорсон</div>
+            <div class="kpi-bar"><div class="kpi-bar-fill" style="width:@(PercentValue(summary?.LateEmployees, summary?.ActiveEmployees))%"></div></div>
+        </div>
+        <div class="kpi-card kpi-purple">
+            <div class="kpi-top">
+                <div class="kpi-icon">□</div>
+                <div class="kpi-trend neutral">@(summary?.OnLeaveEmployees ?? 0) хүн</div>
+            </div>
+            <div class="kpi-value">@(summary?.OnLeaveEmployees ?? 0)</div>
+            <div class="kpi-label">Чөлөөтэй</div>
+            <div class="kpi-bar"><div class="kpi-bar-fill" style="width:@(PercentValue(summary?.OnLeaveEmployees, summary?.ActiveEmployees))%"></div></div>
+        </div>
+        <div class="kpi-card kpi-orange">
+            <div class="kpi-top">
+                <div class="kpi-icon">⏱</div>
+                <div class="kpi-trend up">@(summary?.TotalOvertimeHours ?? 0)ц илүү</div>
+            </div>
+            <div class="kpi-value">@($"{summary?.AttendanceRate ?? 0:0.#}%")</div>
+            <div class="kpi-label">Ирцийн дундаж</div>
+            <div class="kpi-bar"><div class="kpi-bar-fill" style="width:@($"{summary?.AttendanceRate ?? 0:0}")%"></div></div>
         </div>
     </div>
 
-    @* ── Chart + Today table ── *@
+    <!-- Charts row -->
     <div class="dash-grid">
-        <div class="card" style="flex:1.4">
-            <div class="rpt-card-header">
-                <h2 class="rpt-card-title">Ирцийн хандлага</h2>
-                <span class="rpt-badge">Сүүлийн @trends.Count өдөр</span>
-            </div>
-            <div style="position:relative;height:260px">
-                <canvas id="attendanceChart"></canvas>
-            </div>
-        </div>
 
-        <div class="card" style="flex:1">
-            <div class="rpt-card-header">
-                <h2 class="rpt-card-title">Нийт ажилтан</h2>
+        <!-- Donut: Attendance split -->
+        <div class="card">
+            <div class="section-header">
+                <h2>Өнөөдрийн ирцийн хуваарилалт</h2>
+                <span class="muted">@DateTime.Today.ToString("MM/dd")</span>
             </div>
-            <div class="dash-donut-wrap">
-                <canvas id="donutChart" width="180" height="180"></canvas>
-                <div class="dash-donut-legend">
-                    <div class="dash-legend-item"><span style="background:#22c55e"></span>Ирсэн — @(summary?.PresentToday ?? 0)</div>
-                    <div class="dash-legend-item"><span style="background:#f59e0b"></span>Хоцорсон — @(summary?.LateEmployees ?? 0)</div>
-                    <div class="dash-legend-item"><span style="background:#ef4444"></span>Ирээгүй — @(summary?.AbsentToday ?? 0)</div>
-                    <div class="dash-legend-item"><span style="background:#6366f1"></span>Чөлөөтэй — @(summary?.OnLeaveEmployees ?? 0)</div>
+
+            <div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap">
+                <!-- Canvas -->
+                <div style="position:relative;width:160px;height:160px;flex-shrink:0">
+                    <canvas id="donutChart" style="width:160px;height:160px"></canvas>
+                </div>
+
+                <!-- Legend rows -->
+                <div style="flex:1;min-width:160px;display:flex;flex-direction:column;gap:12px">
+                    @foreach (var item in new[] {
+                        (Label:"Ирсэн",    Color:"#16A34A", Value:summary?.PresentToday),
+                        (Label:"Хоцорсон", Color:"#D97706", Value:summary?.LateEmployees),
+                        (Label:"Чөлөөтэй", Color:"#7C3AED", Value:summary?.OnLeaveEmployees),
+                        (Label:"Ирээгүй",  Color:"#DC2626", Value:summary?.AbsentToday)
+                    })
+                    {
+                        var pct = PercentValue(item.Value, summary?.ActiveEmployees);
+                        <div>
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                                <div style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:500">
+                                    <span style="width:8px;height:8px;border-radius:50%;background:@item.Color;flex-shrink:0"></span>
+                                    @item.Label
+                                </div>
+                                <span style="font-size:13px;font-weight:700">@(item.Value ?? 0) <span class="muted" style="font-weight:400">(@pct%)</span></span>
+                            </div>
+                            <div style="height:5px;background:var(--clr-border);border-radius:var(--radius-full);overflow:hidden">
+                                <div style="height:100%;width:@(pct)%;background:@item.Color;border-radius:var(--radius-full);transition:width .6s ease"></div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Bottom stats -->
+            <div class="avg-stat-row" style="margin-top:20px">
+                <div class="avg-stat-item">
+                    <div class="avg-stat-value text-blue">@(summary?.ActiveEmployees ?? 0)</div>
+                    <div class="avg-stat-label">Нийт ажилтан</div>
+                </div>
+                <div class="avg-stat-item">
+                    <div class="avg-stat-value text-green">@(summary?.PresentToday ?? 0)</div>
+                    <div class="avg-stat-label">Ирсэн</div>
+                </div>
+                <div class="avg-stat-item">
+                    <div class="avg-stat-value text-orange">@($"{summary?.AttendanceRate ?? 0:0.#}%")</div>
+                    <div class="avg-stat-label">Ирцийн хувь</div>
                 </div>
             </div>
         </div>
+
+        <!-- Area line: Trend -->
+        <div class="card">
+            <div class="section-header">
+                <h2>Ирцийн хандлага</h2>
+                <span class="muted">Сүүлийн @trends.Count өдөр</span>
+            </div>
+            <div style="position:relative;height:240px">
+                <canvas id="attendanceChart"></canvas>
+            </div>
+        </div>
     </div>
 
-    @* ── Today's attendance table ── *@
+    <!-- Departments + Leave + Activity row -->
+    <div class="dash-grid-3" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px">
+        <!-- Department breakdown -->
+        <div class="card">
+            <div class="section-header">
+                <h2>Хэлтэсүүд</h2>
+                <a href="/admin/departments" style="font-size:12px">Бүгдийг харах →</a>
+            </div>
+            @if (departments.Count == 0)
+            {
+                <div class="muted" style="padding:1rem;text-align:center">Хэлтэс олдсонгүй.</div>
+            }
+            else
+            {
+                <div style="display:flex;flex-direction:column;gap:10px">
+                    @foreach (var dept in departments.OrderByDescending(d => d.EmployeeCount).Take(6))
+                    {
+                        var maxCount = Math.Max(1, departments.Max(d => d.EmployeeCount));
+                        var widthPct = dept.EmployeeCount * 100 / maxCount;
+                        <div>
+                            <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:2px">
+                                <span style="font-weight:600">@dept.Name</span>
+                                <span class="muted">@dept.EmployeeCount хүн</span>
+                            </div>
+                            <div style="width:100%;height:6px;background:var(--clr-border);border-radius:20px;overflow:hidden">
+                                <div style="height:100%;width:@(widthPct)%;background:#2563EB;border-radius:20px"></div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        <!-- Pending leave requests -->
+        <div class="card">
+            <div class="section-header">
+                <h2>Хүлээгдэж буй чөлөө</h2>
+                <a href="/admin/leave" style="font-size:12px">Бүгдийг харах →</a>
+            </div>
+            @if (isLoadingLeave)
+            {
+                <div class="muted" style="padding:1rem;text-align:center">Ачааллаж байна...</div>
+            }
+            else if (pendingLeaves.Count == 0)
+            {
+                <div class="muted" style="padding:1rem;text-align:center">Хүлээгдэж буй хүсэлт алга 🎉</div>
+            }
+            else
+            {
+                <div style="display:flex;flex-direction:column;gap:10px">
+                    @foreach (var leave in pendingLeaves)
+                    {
+                        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--clr-border)">
+                            <div style="min-width:0">
+                                <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+                                    @(leave.EmployeeName ?? "—")
+                                </div>
+                                <div class="muted" style="font-size:12px">
+                                    @TranslateLeaveType(leave.LeaveType) • @leave.StartDate.ToString("MM/dd")@(leave.EndDate != leave.StartDate ? $" - {leave.EndDate:MM/dd}" : "")
+                                </div>
+                            </div>
+                            <div style="display:flex;gap:4px;flex-shrink:0">
+                                <button class="btn btn-success btn-sm" title="Зөвшөөрөх" disabled="@isProcessingLeave" @onclick="() => QuickApproveAsync(leave.Id)">✓</button>
+                                <button class="btn btn-danger btn-sm" title="Татгалзах" disabled="@isProcessingLeave" @onclick="() => QuickRejectAsync(leave.Id)">✗</button>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        <!-- Recent activity -->
+        <div class="card">
+            <div class="section-header">
+                <h2>Сонин мэдээ</h2>
+            </div>
+            @if (activities.Count == 0)
+            {
+                <div class="muted" style="padding:1rem;text-align:center">Сонин мэдээ алга.</div>
+            }
+            else
+            {
+                <div style="display:flex;flex-direction:column;gap:10px;max-height:280px;overflow-y:auto">
+                    @foreach (var activity in activities)
+                    {
+                        <div style="display:flex;gap:10px;align-items:flex-start">
+                            <div style="width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:@ActivityColor(activity.Type)1A;color:@ActivityColor(activity.Type);font-size:13px">
+                                @ActivityIcon(activity.Type)
+                            </div>
+                            <div style="min-width:0">
+                                <div style="font-size:13px;font-weight:600">@activity.Title</div>
+                                <div class="muted" style="font-size:12px">@activity.Message</div>
+                                <div class="muted" style="font-size:11px">@RelativeTime(activity.CreatedDate)</div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Today's attendance table -->
     <div class="card">
-        <div class="rpt-card-header">
-            <h2 class="rpt-card-title">Өнөөдрийн ирц</h2>
-            <div style="display:flex;gap:8px;align-items:center">
-                <span class="rpt-badge">@records.Count бүртгэл</span>
+        <div class="section-header">
+            <h2>Өнөөдрийн ирц</h2>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                <span style="font-size:12px;color:var(--clr-text-muted)">@filtered.Count / @records.Count бүртгэл</span>
+                <select class="form-control" style="width:140px;height:34px;font-size:13px" @bind="_statusFilter">
+                    <option value="">Бүх төлөв</option>
+                    <option value="Present">Ирсэн</option>
+                    <option value="Late">Хоцорсон</option>
+                    <option value="Absent">Ирээгүй</option>
+                    <option value="OnLeave">Чөлөөтэй</option>
+                </select>
                 <input class="form-control" style="width:200px;height:34px;font-size:13px"
                        placeholder="Хайх..."
                        value="@_tableSearch"
-                       @oninput="e => _tableSearch = e.Value?.ToString()" />
+                       @oninput="e => { _tableSearch = e.Value?.ToString(); _page = 1; }" />
             </div>
         </div>
         <div class="table-responsive">
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th>Ажилтан</th>
-                        <th>Ирсэн цаг</th>
+                        <th style="cursor:pointer" @onclick='() => SetSort("name")'>Ажилтан @SortIndicator("name")</th>
+                        <th style="cursor:pointer" @onclick='() => SetSort("checkin")'>Ирсэн цаг @SortIndicator("checkin")</th>
                         <th>Явсан цаг</th>
-                        <th>Ажилласан</th>
+                        <th style="cursor:pointer" @onclick='() => SetSort("hours")'>Ажилласан @SortIndicator("hours")</th>
                         <th>Илүү цаг</th>
                         <th>Төлөв</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @{
-                        var filtered = string.IsNullOrWhiteSpace(_tableSearch)
-                            ? records
-                            : records.Where(r => (r.EmployeeName ?? "").Contains(_tableSearch, StringComparison.OrdinalIgnoreCase)).ToList();
-                    }
-                    @if (!filtered.Any())
+                    @if (!pagedRows.Any())
                     {
                         <tr><td colspan="6" class="muted" style="text-align:center;padding:24px">Өнөөдрийн бүртгэл олдсонгүй.</td></tr>
                     }
                     else
                     {
-                        @foreach (var row in filtered)
+                        @foreach (var row in pagedRows)
                         {
                             <tr>
                                 <td>
                                     <div style="display:flex;align-items:center;gap:8px">
-                                        <div class="emp-row-avatar">@Initials(row.EmployeeName)</div>
-                                        @(row.EmployeeName ?? "—")
+                                        <div class="emp-row-avatar" style="background:@AvatarColor(row.EmployeeName)">@Initials(row.EmployeeName)</div>
+                                        <span style="font-weight:600">@(row.EmployeeName ?? "—")</span>
                                     </div>
                                 </td>
                                 <td>@(row.CheckInTime?.ToString("HH:mm") ?? "—")</td>
                                 <td>@(row.CheckOutTime?.ToString("HH:mm") ?? "—")</td>
                                 <td>@(row.WorkHours > 0 ? $"{row.WorkHours:0.#}ц" : "—")</td>
                                 <td>@(row.OvertimeHours > 0 ? $"{row.OvertimeHours:0.##}ц" : "—")</td>
-                                <td>
-                                    @{ var st = row.Status ?? row.AttendanceStatus; }
-                                    <span class="badge @StatusBadge(st)">@TranslateStatus(st)</span>
-                                </td>
+                                <td><StatusBadge Status="@(row.Status ?? row.AttendanceStatus ?? string.Empty)" /></td>
                             </tr>
                         }
                     }
                 </tbody>
             </table>
         </div>
+        @if (filtered.Count > PageSize)
+        {
+            <div style="display:flex;justify-content:center;align-items:center;gap:10px;margin-top:10px">
+                <button class="btn btn-ghost btn-sm" disabled="@(_page <= 1)" @onclick="() => _page--">‹ Өмнөх</button>
+                <span class="muted" style="font-size:13px">Хуудас @_page / @TotalPages</span>
+                <button class="btn btn-ghost btn-sm" disabled="@(_page >= TotalPages)" @onclick="() => _page++">Дараах ›</button>
+            </div>
+        }
     </div>
-
 </div>
 
 @code {
+    private const int PageSize = 10;
+
     private DashboardSummaryDto? summary;
     private IReadOnlyList<AttendanceDto> records = [];
     private IReadOnlyList<AttendanceTrendDto> trends = [];
+    private IReadOnlyList<DepartmentDto> departments = [];
+    private IReadOnlyList<LeaveDto> pendingLeaves = [];
+    private IReadOnlyList<RecentActivityDto> activities = [];
+
     private string? error;
     private string? _tableSearch;
+    private string _statusFilter = "";
+    private string _sortColumn = "name";
+    private bool _sortDescending;
+    private int _page = 1;
     private bool _chartDrawn;
+    private bool isLoading;
+    private bool isLoadingLeave;
+    private bool isProcessingLeave;
+    private bool autoRefresh;
+    private DateTime _lastUpdated = DateTime.Now;
+    private PeriodicTimer? _timer;
+    private CancellationTokenSource? _timerCts;
+
+    private IReadOnlyList<AttendanceDto> filtered =>
+        records
+            .Where(r => string.IsNullOrWhiteSpace(_tableSearch) ||
+                        (r.EmployeeName ?? "").Contains(_tableSearch, StringComparison.OrdinalIgnoreCase))
+            .Where(r => string.IsNullOrWhiteSpace(_statusFilter) ||
+                        string.Equals(r.Status ?? r.AttendanceStatus, _statusFilter, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+    private IReadOnlyList<AttendanceDto> sorted => _sortColumn switch
+    {
+        "checkin" => _sortDescending
+            ? filtered.OrderByDescending(r => r.CheckInTime).ToList()
+            : filtered.OrderBy(r => r.CheckInTime).ToList(),
+        "hours" => _sortDescending
+            ? filtered.OrderByDescending(r => r.WorkHours).ToList()
+            : filtered.OrderBy(r => r.WorkHours).ToList(),
+        _ => _sortDescending
+            ? filtered.OrderByDescending(r => r.EmployeeName).ToList()
+            : filtered.OrderBy(r => r.EmployeeName).ToList(),
+    };
+
+    private int TotalPages => Math.Max(1, (int)Math.Ceiling(filtered.Count / (double)PageSize));
+
+    private IReadOnlyList<AttendanceDto> pagedRows =>
+        sorted.Skip((Math.Min(_page, TotalPages) - 1) * PageSize).Take(PageSize).ToList();
 
     protected override async Task OnInitializedAsync()
     {
+        await RefreshAsync(false);
+    }
+
+    private async Task RefreshAsync(bool forceRedrawCharts)
+    {
+        isLoading = true;
+        StateHasChanged();
         try
         {
+            error = null;
             var today = DateTime.Today.ToString("yyyy-MM-dd");
+
             var t1 = Api.GetDashboardSummaryAsync();
             var t2 = Api.GetAttendanceTrendsAsync();
             var t3 = Api.GetAsync<PagedResponse<AttendanceDto>>(
                 $"api/attendance/records?from={today}&to={today}&pageSize=100");
+            var t4 = Api.GetAsync<PagedResponse<DepartmentDto>>("api/departments?pageNumber=1&pageSize=1000");
+            var t5 = LoadPendingLeavesAsync();
+            var t6 = LoadActivitiesAsync();
 
-            await Task.WhenAll(t1, t2, t3);
+            await Task.WhenAll(t1, t2, t3, t4, t5, t6);
 
             summary = t1.Result;
             trends  = t2.Result ?? [];
             records = t3.Result?.Items ?? [];
+            departments = t4.Result?.Items ?? [];
+
+            _lastUpdated = DateTime.Now;
+            _page = 1;
+
+            if (forceRedrawCharts)
+            {
+                _chartDrawn = false;
+                await DrawChartsAsync();
+            }
         }
-        catch (Exception ex) { error = ex.Message; }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadPendingLeavesAsync()
+    {
+        isLoadingLeave = true;
+        try
+        {
+            var result = await Api.GetAsync<PagedResponse<LeaveDto>>("api/leave/requests?status=Pending&pageSize=5");
+            pendingLeaves = result?.Items ?? [];
+        }
+        catch
+        {
+            pendingLeaves = [];
+        }
+        finally
+        {
+            isLoadingLeave = false;
+        }
+    }
+
+    private async Task LoadActivitiesAsync()
+    {
+        try
+        {
+            var result = await Api.GetRecentActivitiesAsync();
+            activities = result ?? [];
+        }
+        catch
+        {
+            activities = [];
+        }
+    }
+
+    private async Task QuickApproveAsync(Guid id)
+    {
+        if (isProcessingLeave) return;
+        try
+        {
+            isProcessingLeave = true;
+            await Api.ApproveLeaveRequestAsync(id);
+            await LoadPendingLeavesAsync();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            isProcessingLeave = false;
+        }
+    }
+
+    private async Task QuickRejectAsync(Guid id)
+    {
+        if (isProcessingLeave) return;
+        try
+        {
+            isProcessingLeave = true;
+            await Api.RejectLeaveRequestAsync(id);
+            await LoadPendingLeavesAsync();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            isProcessingLeave = false;
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (_chartDrawn || trends.Count == 0) return;
+        if (_chartDrawn) return;
+        if (trends.Count == 0 && summary is null) return;
+        await DrawChartsAsync();
+    }
+
+    private async Task DrawChartsAsync()
+    {
         _chartDrawn = true;
         try
         {
-            await JS.InvokeVoidAsync("renderAttendanceChart",
-                "attendanceChart",
-                trends.Select(t => t.Date.ToString("MM-dd")).ToArray(),
-                trends.Select(t => t.Present).ToArray(),
-                trends.Select(t => t.Absent).ToArray(),
-                trends.Select(t => t.Late).ToArray());
+            if (trends.Count > 0)
+                await JS.InvokeVoidAsync("renderAttendanceChart",
+                    "attendanceChart",
+                    trends.Select(t => t.Date.ToString("MM/dd")).ToArray(),
+                    trends.Select(t => t.Present).ToArray(),
+                    trends.Select(t => t.Absent).ToArray(),
+                    trends.Select(t => t.Late).ToArray());
 
             if (summary is not null)
                 await JS.InvokeVoidAsync("renderDonutChart",
                     "donutChart",
-                    new[] { summary.PresentToday, summary.LateEmployees, summary.AbsentToday, summary.OnLeaveEmployees },
-                    new[] { "#22c55e", "#f59e0b", "#ef4444", "#6366f1" });
+                    new[] { summary.PresentToday, summary.LateEmployees, summary.OnLeaveEmployees, summary.AbsentToday },
+                    new[] { "#16A34A", "#D97706", "#7C3AED", "#DC2626" });
         }
-        catch { }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
     }
 
-    private static string TranslateStatus(string? s) => s?.ToLower() switch
+    private void OnAutoRefreshChanged()
     {
-        "present"           => "Ирсэн",
-        "absent"            => "Ирээгүй",
-        "late"              => "Хоцорсон",
-        "leave" or "onleave"=> "Чөлөөтэй",
-        _                   => s ?? "—"
-    };
+        _timerCts?.Cancel();
+        _timerCts = null;
+        _timer?.Dispose();
+        _timer = null;
 
-    private static string StatusBadge(string? s) => s?.ToLower() switch
+        if (!autoRefresh) return;
+
+        _timerCts = new CancellationTokenSource();
+        _timer = new PeriodicTimer(TimeSpan.FromSeconds(30));
+        _ = AutoRefreshLoopAsync(_timer, _timerCts.Token);
+    }
+
+    private async Task AutoRefreshLoopAsync(PeriodicTimer timer, CancellationToken token)
     {
-        "present"            => "badge-present",
-        "late"               => "badge-late",
-        "absent"             => "badge-absent",
-        "leave" or "onleave" => "badge-leave",
-        _                    => ""
-    };
+        try
+        {
+            while (await timer.WaitForNextTickAsync(token))
+            {
+                await InvokeAsync(() => RefreshAsync(true));
+            }
+        }
+        catch (OperationCanceledException) { /* зогссон */ }
+    }
+
+    private void SetSort(string column)
+    {
+        if (_sortColumn == column)
+            _sortDescending = !_sortDescending;
+        else
+        {
+            _sortColumn = column;
+            _sortDescending = false;
+        }
+    }
+
+    private string SortIndicator(string column) =>
+        _sortColumn != column ? "" : (_sortDescending ? "▼" : "▲");
+
+    private async Task ExportTodayCsv()
+    {
+        var lines = new List<string> { "Ажилтан,Ирсэн цаг,Явсан цаг,Ажилласан цаг,Илүү цаг,Төлөв" };
+        lines.AddRange(filtered.Select(r =>
+            $"{Csv(r.EmployeeName)},{r.CheckInTime?.ToString("HH:mm")},{r.CheckOutTime?.ToString("HH:mm")},{r.WorkHours:0.#},{r.OvertimeHours:0.##},{Csv(r.Status ?? r.AttendanceStatus)}"));
+
+        var csv = string.Join("\n", lines);
+        await JS.InvokeVoidAsync("downloadCsv", $"irts_{DateTime.Today:yyyy-MM-dd}.csv", csv);
+    }
+
+    private static string Csv(string? value) =>
+        string.IsNullOrEmpty(value) ? "" : $"\"{value.Replace("\"", "\"\"")}\"";
+
+    private static string GetWeekLabel()
+    {
+        var jan1 = new DateTime(DateTime.Today.Year, 1, 1);
+        var week = (DateTime.Today - jan1).Days / 7 + 1;
+        return $"Долоо хоног {week}";
+    }
 
     private static string Initials(string? name)
     {
         if (string.IsNullOrWhiteSpace(name)) return "?";
-        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        return string.Concat(parts.Take(2).Select(p => p[0])).ToUpperInvariant();
+        var p = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return string.Concat(p.Take(2).Select(x => x[0])).ToUpperInvariant();
+    }
+
+    private static readonly string[] AvatarPalette =
+        ["#2563EB", "#16A34A", "#D97706", "#7C3AED", "#DC2626", "#0891B2", "#DB2777"];
+
+    private static string AvatarColor(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return AvatarPalette[0];
+        var hash = name.Sum(c => c);
+        return AvatarPalette[hash % AvatarPalette.Length];
+    }
+
+    private static string PercentValue(int? part, int? total)
+    {
+        if (part is null || total is null || total == 0) return "0";
+        return (part.Value * 100 / total.Value).ToString();
+    }
+
+    private static string PercentLabel(int? part, int? total)
+    {
+        if (part is null || total is null || total == 0) return "—";
+        return $"{part.Value * 100 / total.Value}%";
+    }
+
+    private static string TranslateLeaveType(string type) => type switch
+    {
+        "Annual" => "Жилийн ээлжийн",
+        "Sick" => "Өвчтэй",
+        "Unpaid" => "Цалингүй",
+        "Birthday" => "Төрсөн өдөр",
+        "Maternity" => "Жирэмсний",
+        "Other" => "Бусад",
+        _ => type
+    };
+
+    private static string ActivityIcon(string type) => type?.ToLowerInvariant() switch
+    {
+        "checkin" or "attendance" => "🟢",
+        "checkout" => "🔵",
+        "leave" => "☑",
+        "employee" => "👤",
+        "alert" or "warning" => "⚠",
+        _ => "🔔"
+    };
+
+    private static string ActivityColor(string type) => type?.ToLowerInvariant() switch
+    {
+        "checkin" or "attendance" => "#16A34A",
+        "checkout" => "#2563EB",
+        "leave" => "#7C3AED",
+        "employee" => "#D97706",
+        "alert" or "warning" => "#DC2626",
+        _ => "#64748B"
+    };
+
+    private static string RelativeTime(DateTime value)
+    {
+        var diff = DateTime.Now - value;
+        if (diff.TotalMinutes < 1) return "дөнгөж сая";
+        if (diff.TotalMinutes < 60) return $"{(int)diff.TotalMinutes} минутын өмнө";
+        if (diff.TotalHours < 24) return $"{(int)diff.TotalHours} цагийн өмнө";
+        return $"{(int)diff.TotalDays} өдрийн өмнө";
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _timerCts?.Cancel();
+        _timer?.Dispose();
+        _timerCts?.Dispose();
+        await Task.CompletedTask;
     }
 }
