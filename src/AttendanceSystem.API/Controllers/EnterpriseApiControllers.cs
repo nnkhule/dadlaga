@@ -284,11 +284,11 @@ public sealed record CreateGeofenceEventRequestDto(string EventType, double Lati
 public sealed record GeofenceEventResponseDto(Guid Id, string EventType, DateTime CreatedAt);
 
 [ApiController]
-[Route("api/v1/dashboard")]
+[Route("api/dashboard-v2")]
 [Authorize(Roles = Roles.ManagerHrOrAdmin)]
 public sealed class DashboardController : ContractControllerBase
 {
-    [HttpGet("summary")]
+    [HttpGet("summary-v2")]
     public IActionResult Summary([FromQuery] DashboardQueryDto query)
         => Contract("MVP", "Get dashboard summary.", nameof(DashboardQueryDto), nameof(DashboardSummaryResponseDto), "Manager, HR, Admin", "Date must be valid.");
 

@@ -19,7 +19,7 @@ public sealed record DashboardSummaryDto(
     decimal TotalOvertimeHours);
 
 public sealed record RecentActivityDto(Guid Id, string Type, string Title, string Message, DateTime CreatedDate);
-public sealed record AttendanceTrendDto(DateOnly Date, int Present, int Absent, int Late);
+public sealed record AttendanceTrendDto(DateOnly Date, int Present, int Absent, int Late, int OnLeave);
 
 public sealed record EmployeeDto(
     Guid Id,

@@ -33,6 +33,12 @@ body{
 
 button,input,select,textarea{font:inherit}
 
+.badge-earlybird {
+    background: #EFF6FF;
+    color: #1D4ED8;
+    border: 1px solid #BFDBFE;
+}
+
 .auth-body{
   display:flex;
   align-items:center;

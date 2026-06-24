@@ -90,9 +90,11 @@ namespace AttendanceSystem.API.Services
             }
 
             // Calculate present days, late days, absent days
-            int presentDays = attendanceRecords.Count(a => a.Status != AttendanceStatus.Absent && a.Status != AttendanceStatus.OnLeave);
-            int lateDays = attendanceRecords.Count(a => a.Status == AttendanceStatus.Late || a.LateMinutes > 0);
-            int absentDays = attendanceRecords.Count(a => a.Status == AttendanceStatus.Absent);
+            // Single source of truth: classify strictly off AttendanceRecord.Status via
+            // AttendanceStatusClassifier so these never disagree with the admin dashboard.
+            int presentDays = attendanceRecords.Count(a => AttendanceStatusClassifier.IsPresentBucket(a.Status));
+            int lateDays = attendanceRecords.Count(a => AttendanceStatusClassifier.IsLate(a.Status));
+            int absentDays = attendanceRecords.Count(a => AttendanceStatusClassifier.IsAbsent(a.Status));
 
             // Calculate total working hours and overtime hours
             double totalWorkingHours = 0.0;
@@ -137,10 +139,11 @@ namespace AttendanceSystem.API.Services
             double monthlyOvertime = overtimeHours;
             double monthlyLateMinutes = (double)attendanceRecords.Sum(a => a.LateMinutes);
 
-            // Attendance rate: (present days) / (total working days) * 100
+            // Attendance rate: (present days + late days) / (total working days) * 100.
+            // Present and Late are mutually exclusive buckets, so adding them never double counts.
             if (totalWorkingDays > 0)
             {
-                monthlyAttendanceRate = (double)presentDays / totalWorkingDays * 100.0;
+                monthlyAttendanceRate = (double)(presentDays + lateDays) / totalWorkingDays * 100.0;
             }
 
             // For the chart, we might want to show data for the last few months? 
@@ -383,8 +386,8 @@ namespace AttendanceSystem.API.Services
                 }
 
                 // Calculate present days, late days, overtime hours, late minutes for the month
-                int presentDays = attendanceRecords.Count(a => a.Status != AttendanceStatus.Absent && a.Status != AttendanceStatus.OnLeave);
-                int lateDays = attendanceRecords.Count(a => a.Status == AttendanceStatus.Late || a.LateMinutes > 0);
+                int presentDays = attendanceRecords.Count(a => AttendanceStatusClassifier.IsPresentBucket(a.Status));
+                int lateDays = attendanceRecords.Count(a => AttendanceStatusClassifier.IsLate(a.Status));
                 double overtimeHours = (double)attendanceRecords.Sum(a => a.OvertimeHours);
                 double lateMinutes = (double)attendanceRecords.Sum(a => a.LateMinutes);
 
@@ -392,7 +395,7 @@ namespace AttendanceSystem.API.Services
                 double attendanceRate = 0.0;
                 if (totalWorkingDays > 0)
                 {
-                    attendanceRate = (double)presentDays / totalWorkingDays * 100.0;
+                    attendanceRate = (double)(presentDays + lateDays) / totalWorkingDays * 100.0;
                 }
 
                 // Calculate total working hours (net of breaks) for the month

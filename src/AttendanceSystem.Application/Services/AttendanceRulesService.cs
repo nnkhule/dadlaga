@@ -40,13 +40,43 @@ public class AttendanceRulesService
     /// <summary>
     /// Evaluates check-out against scheduled end time.
     /// </summary>
-    public AttendanceStatus EvaluateCheckOut(DateTime checkOutUtc, WorkSchedule schedule, DateOnly localDate,
-        AttendanceStatus currentStatus)
+    /// <remarks>
+    /// Previous (buggy) implementation flagged EarlyLeave for ANY checkout before ShiftEnd,
+    /// with no grace period and no regard for how many hours were actually worked. That meant
+    /// an employee who checked in early and worked a full standard day, but happened to check
+    /// out a minute before the nominal shift-end clock time, was incorrectly marked EarlyLeave.
+    ///
+    /// Correct rule: EarlyLeave only applies when checkout is before (ShiftEnd - grace period)
+    /// AND the employee did not complete a standard work day (worked hours < StandardHoursPerDay).
+    /// An employee who completed a full standard day is never EarlyLeave, regardless of the
+    /// clock time they checked out at.
+    /// </remarks>
+    public AttendanceStatus EvaluateCheckOut(DateTime checkInUtc, DateTime checkOutUtc, WorkSchedule schedule,
+        DateOnly localDate, AttendanceStatus currentStatus, int graceMinutes = 15)
     {
+        // Statuses that are already final/non-attendance-derived must not be overwritten.
+        if (currentStatus is AttendanceStatus.OnLeave or AttendanceStatus.Holiday
+            or AttendanceStatus.PendingManualReview)
+            return currentStatus;
+
         var shiftEnd = localDate.ToDateTime(schedule.ShiftEnd, DateTimeKind.Unspecified);
-        if (checkOutUtc < shiftEnd && currentStatus is AttendanceStatus.Present or AttendanceStatus.Late)
+        var graceEnd = shiftEnd.AddMinutes(-Math.Abs(graceMinutes));
+
+        var workedHours = (decimal)(checkOutUtc - checkInUtc).TotalHours;
+        var completedStandardDay = workedHours >= schedule.StandardHoursPerDay;
+
+        var leftBeforeGrace = checkOutUtc < graceEnd;
+
+        if (leftBeforeGrace && !completedStandardDay &&
+            currentStatus is AttendanceStatus.Present or AttendanceStatus.Late or AttendanceStatus.HalfDay
+                or AttendanceStatus.NightShift or AttendanceStatus.WeekendWork)
+        {
             return AttendanceStatus.EarlyLeave;
-        return currentStatus == AttendanceStatus.Late ? AttendanceStatus.Late : AttendanceStatus.Present;
+        }
+
+        // Preserve whatever check-in already determined (Late, HalfDay, NightShift,
+        // WeekendWork, etc.) instead of collapsing everything to Present/Late.
+        return currentStatus;
     }
 
     /// <summary>

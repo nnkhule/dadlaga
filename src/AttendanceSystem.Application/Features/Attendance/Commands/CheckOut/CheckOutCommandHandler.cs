@@ -60,7 +60,7 @@ public class CheckOutCommandHandler : IRequestHandler<CheckOutCommand, Result<At
         var breakDuration = _rulesService.CalculateBreakDuration(workDuration, employee.WorkSchedule);
         var isWeekend = today.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
         var overtime = _rulesService.CalculateOvertimeHours(workDuration, breakDuration, employee.WorkSchedule, isWeekend, false);
-        var status = _rulesService.EvaluateCheckOut(checkOutTime, employee.WorkSchedule, today, record.Status);
+        var status = _rulesService.EvaluateCheckOut(record.CheckInTime, checkOutTime, employee.WorkSchedule, today, record.Status);
 
         Enum.TryParse<VerificationMethod>(request.VerificationMethod, true, out var method);
         record.CheckOut(checkOutTime, status, breakDuration, overtime, method,

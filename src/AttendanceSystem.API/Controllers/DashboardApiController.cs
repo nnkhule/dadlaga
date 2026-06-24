@@ -24,21 +24,46 @@ public sealed class DashboardApiController : ControllerBase
 
         var todayRecords = _db.AttendanceRecords.AsNoTracking().Where(a => a.Date == targetDate);
         var presentToday = await todayRecords.CountAsync(a =>
-            a.Status == AttendanceStatus.Present ||
-            a.Status == AttendanceStatus.Late ||
-            a.Status == AttendanceStatus.EarlyLeave ||
-            a.Status == AttendanceStatus.HalfDay ||
-            a.Status == AttendanceStatus.NightShift ||
-            a.Status == AttendanceStatus.WeekendWork, cancellationToken);
-        var lateEmployees = await todayRecords.CountAsync(a => a.Status == AttendanceStatus.Late || a.LateMinutes > 0, cancellationToken);
-        var overtimeHours = await todayRecords.SumAsync(a => a.OvertimeHours, cancellationToken);
-        var onLeaveEmployees = await _db.LeaveRequests.AsNoTracking().CountAsync(l =>
-            l.Status == RequestStatus.Approved &&
-            l.StartDate <= targetDate &&
-            l.EndDate >= targetDate, cancellationToken);
-        var absentToday = Math.Max(0, activeEmployees - presentToday - onLeaveEmployees);
-        var attendanceRate = activeEmployees == 0 ? 0 : Math.Round((decimal)presentToday / activeEmployees * 100, 2);
+    a.Status == AttendanceStatus.Present ||
+    a.Status == AttendanceStatus.Late ||
+    a.Status == AttendanceStatus.EarlyLeave ||
+    a.Status == AttendanceStatus.HalfDay ||
+    a.Status == AttendanceStatus.NightShift ||
+    a.Status == AttendanceStatus.WeekendWork,
+    cancellationToken);
 
+var lateEmployees = await todayRecords.CountAsync(a =>
+    a.Status == AttendanceStatus.Late,
+    cancellationToken);
+
+var onLeaveEmployees = await _db.LeaveRequests
+    .AsNoTracking()
+    .CountAsync(l =>
+        l.Status == RequestStatus.Approved &&
+        l.StartDate <= targetDate &&
+        l.EndDate >= targetDate,
+        cancellationToken);
+
+        var absentToday =
+            activeEmployees -
+            presentToday -
+            onLeaveEmployees;
+
+
+    var overtimeHours = await todayRecords.SumAsync(
+        a => a.OvertimeHours,
+        cancellationToken);
+
+if (absentToday < 0)
+    absentToday = 0;
+
+var attendanceRate =
+    activeEmployees == 0
+        ? 0
+        : Math.Round(
+            ((decimal)(presentToday + lateEmployees) /
+            activeEmployees) * 100,
+            2);
         return Ok(new DashboardSummaryApiDto(
             totalEmployees,
             activeEmployees,

@@ -8,65 +8,72 @@
 <div class="admin-shell @(_collapsed ? "collapsed" : "") @(_chatOpen ? "chat-open" : "")">
 
     <!-- ── Sidebar ── -->
-    <aside class="admin-sidebar">
+    <aside class="admin-sidebar" role="navigation" aria-label="Үндсэн навигаци">
         <div class="admin-brand">
-            <a href="/admin/dashboard" class="brand-link">
+            <a href="/admin/dashboard" class="brand-link" aria-label="Нүүр хуудас">
                 <div class="brand-logo">◆</div>
                 <span class="brand-text">AttendIQ</span>
             </a>
             <button class="collapse-btn" @onclick:stopPropagation="true"
                     @onclick="() => _collapsed = !_collapsed"
+                    aria-label="@(_collapsed ? "Сайдбар нээх" : "Сайдбар хаах")"
                     title="@(_collapsed ? "Нээх" : "Хаах")">
                 <span class="collapse-icon">@(_collapsed ? "→" : "←")</span>
             </button>
         </div>
 
-        <nav class="sidebar-nav">
+        <nav class="sidebar-nav" role="list">
             <div class="nav-group">
-                <span class="nav-section-label">Үндсэн</span>
+                <span class="nav-section-label" role="heading" aria-level="2">Үндсэн</span>
                 @NavItem("/admin/dashboard",  "▦", "Самбар")
                 @NavItem("/admin/attendance", "◷", "Ирц")
                 @NavItem("/admin/leave",      "☑", "Чөлөө")
             </div>
 
             <div class="nav-group">
-                <span class="nav-section-label">Удирдлага</span>
-                @NavItem("/admin/employees", "☷", "Ажилтнууд")
-                @NavItem("/admin/reports",   "▤", "Тайлан")
+                <span class="nav-section-label" role="heading" aria-level="2">Удирдлага</span>
+                @NavItem("/admin/employees",  "☷", "Ажилтнууд")
+                @NavItem("/admin/reports",    "▤", "Тайлан")
                 @NavItem("/admin/reports/employee", "☉", "Хувийн тайлан")
-                @NavItem("/admin/ai-chat",   "✦", "AI Туслах")
+                @NavItem("/admin/ai-chat",    "✦", "AI Туслах")
             </div>
         </nav>
 
         <div class="sidebar-footer">
             <div class="sidebar-user">
-                <div class="sidebar-user-avatar">@GetInitial()</div>
+                <div class="sidebar-user-avatar" title="@_displayName">@GetInitial()</div>
                 <div class="sidebar-user-info">
                     <div class="sidebar-user-name">@_displayName</div>
                     <div class="sidebar-user-role">@_displayRole</div>
                 </div>
             </div>
-            <button class="btn-logout" @onclick="LogoutAsync" disabled="@isLoggingOut">
+            <button class="btn-logout" @onclick="LogoutAsync" disabled="@_isLoggingOut" 
+                    aria-label="Гарах">
                 <span class="logout-icon">⇤</span>
-                <span class="logout-label">@(isLoggingOut ? "Гарч байна..." : "Гарах")</span>
+                <span class="logout-label">@(_isLoggingOut ? "Гарч байна..." : "Гарах")</span>
             </button>
         </div>
     </aside>
 
-    <!-- ── Main ── -->
+    <!-- ── Main Content ── -->
     <div class="admin-main">
-        <header class="admin-topbar">
+        <!-- Top Bar -->
+        <header class="admin-topbar" role="banner">
             <div class="topbar-left">
-                <button class="mobile-menu-btn" @onclick="() => _collapsed = !_collapsed">☰</button>
-                <div class="topbar-breadcrumb">
-                    <span class="breadcrumb-parent">Admin</span>
-                    <span class="breadcrumb-sep">›</span>
+                <button class="mobile-menu-btn" @onclick="() => _collapsed = !_collapsed"
+                        aria-label="Цэс"
+                        title="Навигаци цэс">☰</button>
+                <div class="topbar-breadcrumb" role="navigation" aria-label="Хүлээгч">
+                    <a href="/admin/dashboard" class="breadcrumb-parent">Admin</a>
+                    <span class="breadcrumb-sep" aria-hidden="true">›</span>
                     <span class="breadcrumb-current">@Breadcrumb</span>
                 </div>
             </div>
 
             <div class="topbar-actions">
                 <button class="ai-toggle-btn @(_chatOpen ? "active" : "")" @onclick="ToggleChat"
+                        aria-label="@(_chatOpen ? "AI туслахыг хаах" : "AI туслахыг нээх")"
+                        aria-pressed="@_chatOpen"
                         title="AI Туслах">
                     <span class="ai-toggle-icon">✦</span>
                     <span class="ai-toggle-label">AI Туслах</span>
@@ -75,42 +82,58 @@
                         <span class="unread-badge" aria-label="@_unread шинэ мессеж">@_unread</span>
                     }
                 </button>
-                <div class="topbar-user">
-                    <div class="topbar-avatar" title="@_displayName">@GetInitial()</div>
+                <div class="topbar-user" title="@_displayName" role="img" aria-label="@_displayName">
+                    <div class="topbar-avatar">@GetInitial()</div>
                 </div>
             </div>
         </header>
 
-        <main class="content-area">@Body</main>
+        <!-- Content Area -->
+        <main class="content-area" role="main">
+            @Body
+        </main>
     </div>
 
     <!-- ── AI Chat Panel ── -->
-    <aside class="ai-panel @(_chatOpen ? "ai-panel--open" : "")" aria-label="AI Туслах">
+    <aside class="ai-panel @(_chatOpen ? "ai-panel--open" : "")" 
+           role="complementary"
+           aria-label="AI Туслах"
+           aria-hidden="@(!_chatOpen)">
+        
         <div class="ai-panel-header">
             <div class="ai-panel-title">
-                <div class="ai-panel-icon">✦</div>
+                <div class="ai-panel-icon" aria-hidden="true">✦</div>
                 <div>
                     <div class="ai-panel-name">AI Туслах</div>
                     <div class="ai-panel-status">
-                        <span class="status-dot @(_loading ? "status-dot--busy" : "")"></span>
+                        <span class="status-dot @(_loading ? "status-dot--busy" : "")" 
+                              aria-hidden="true"></span>
                         <span>@(_loading ? "Бодож байна..." : "Бэлэн")</span>
                     </div>
                 </div>
             </div>
             <div class="ai-panel-actions">
-                <button class="icon-btn" @onclick="ClearChat" title="Чат цэвэрлэх" disabled="@(!_messages.Any())">
+                <button class="icon-btn" @onclick="ClearChat" 
+                        title="Чат цэвэрлэх" 
+                        aria-label="Чат цэвэрлэх"
+                        disabled="@(!_messages.Any())">
                     🗑
                 </button>
-                <button class="icon-btn" @onclick="ToggleChat" title="Хаах">✕</button>
+                <button class="icon-btn" @onclick="ToggleChat" 
+                        title="Хаах"
+                        aria-label="AI туслахыг хаах">✕</button>
             </div>
         </div>
 
-        <div class="ai-messages" id="layoutChatMessages" @ref="_messagesRef">
+        <!-- Chat Messages -->
+        <div class="ai-messages" id="layoutChatMessages" @ref="_messagesRef" 
+             role="log" aria-live="polite" aria-label="Чат мессеж">
+            
             @if (!_messages.Any())
             {
                 <div class="ai-empty">
-                    <div class="ai-empty-icon">✦</div>
-                    <p class="ai-empty-text">Ирц, ажилтан, амралттай холбоотой асуултад тусална.</p>
+                    <div class="ai-empty-icon" aria-hidden="true">✦</div>
+                    <p class="ai-empty-text">Ирц, ажилтан, амралтай холбоотой асуултад тусална.</p>
                     <div class="ai-suggestions">
                         @foreach (var chip in _suggestions)
                         {
@@ -124,24 +147,27 @@
             {
                 @foreach (var msg in _messages)
                 {
-                    <div class="ai-bubble ai-bubble--@msg.Role">
+                    <div class="ai-bubble ai-bubble--@msg.Role" role="article">
                         @if (msg.Role == "assistant")
                         {
-                            <div class="ai-bubble-avatar">✦</div>
+                            <div class="ai-bubble-avatar" aria-hidden="true">✦</div>
                         }
                         <div class="ai-bubble-body">
-                            <div class="ai-bubble-content">@msg.Content</div>
-                            <div class="ai-bubble-time">@msg.Timestamp.ToString("HH:mm")</div>
+                            <div class="ai-bubble-content" lang="mn">@msg.Content</div>
+                            <div class="ai-bubble-time" aria-label="@msg.Timestamp.ToString("HH:mm дээр илгээсэн")">
+                                @msg.Timestamp.ToString("HH:mm")
+                            </div>
                         </div>
                     </div>
                 }
             }
+
             @if (_loading)
             {
-                <div class="ai-bubble ai-bubble--assistant">
-                    <div class="ai-bubble-avatar">✦</div>
+                <div class="ai-bubble ai-bubble--assistant" role="status" aria-live="polite">
+                    <div class="ai-bubble-avatar" aria-hidden="true">✦</div>
                     <div class="ai-bubble-body">
-                        <div class="ai-typing">
+                        <div class="ai-typing" aria-label="AI туслах хариулт бичиж байна">
                             <span></span><span></span><span></span>
                         </div>
                     </div>
@@ -149,6 +175,7 @@
             }
         </div>
 
+        <!-- Chat Input -->
         <div class="ai-input-area">
             <textarea class="ai-input"
                       rows="1"
@@ -161,7 +188,8 @@
             <button class="ai-send-btn"
                     @onclick="SendMessage"
                     disabled="@(_loading || string.IsNullOrWhiteSpace(_input))"
-                    aria-label="Илгээх">
+                    aria-label="Илгээх"
+                    title="Мессеж илгээх (Enter)">
                 ➤
             </button>
         </div>
@@ -174,7 +202,7 @@
 </div>
 
 <style>
-    /* ── Reset & tokens ── */
+    /* ── Reset & Tokens ── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
@@ -187,8 +215,10 @@
         --radius-lg: 14px;
         --c-brand: #4F46E5;
         --c-brand-light: #EEF2FF;
+        --c-brand-dark: #3730A3;
         --c-surface: #FFFFFF;
         --c-bg: #F5F6F8;
+        --c-bg-alt: #FAFBFC;
         --c-border: rgba(0,0,0,.08);
         --c-border-strong: rgba(0,0,0,.14);
         --c-text: #111827;
@@ -196,6 +226,9 @@
         --c-text-hint: #9CA3AF;
         --c-active-bg: #EEF2FF;
         --c-active-text: #4F46E5;
+        --c-success: #10B981;
+        --c-warning: #F59E0B;
+        --c-danger: #EF4444;
         --transition: 220ms cubic-bezier(.4,0,.2,1);
     }
 
@@ -208,12 +241,15 @@
         background: var(--c-bg);
         transition: grid-template-columns var(--transition);
     }
+
     .admin-shell.collapsed {
         grid-template-columns: var(--sidebar-w-collapsed) 1fr;
     }
+
     .admin-shell.chat-open {
         grid-template-columns: var(--sidebar-w) 1fr var(--panel-w);
     }
+
     .admin-shell.collapsed.chat-open {
         grid-template-columns: var(--sidebar-w-collapsed) 1fr var(--panel-w);
     }
@@ -233,7 +269,10 @@
         width: var(--sidebar-w);
         z-index: 40;
     }
-    .admin-shell.collapsed .admin-sidebar { width: var(--sidebar-w-collapsed); }
+
+    .admin-shell.collapsed .admin-sidebar {
+        width: var(--sidebar-w-collapsed);
+    }
 
     .admin-brand {
         display: flex;
@@ -244,13 +283,20 @@
         border-bottom: 1px solid var(--c-border);
         flex-shrink: 0;
     }
+
     .brand-link {
         display: flex;
         align-items: center;
         gap: 10px;
         text-decoration: none;
         overflow: hidden;
+        transition: opacity var(--transition);
     }
+
+    .brand-link:hover .brand-logo {
+        background: #E0E7FF;
+    }
+
     .brand-logo {
         font-size: 18px;
         color: var(--c-brand);
@@ -262,16 +308,23 @@
         justify-content: center;
         background: var(--c-brand-light);
         border-radius: var(--radius-sm);
+        transition: background var(--transition);
     }
+
     .brand-text {
         font-size: 15px;
-        font-weight: 600;
+        font-weight: 700;
         color: var(--c-text);
         white-space: nowrap;
         opacity: 1;
         transition: opacity var(--transition);
+        letter-spacing: -0.5px;
     }
-    .admin-shell.collapsed .brand-text { opacity: 0; pointer-events: none; }
+
+    .admin-shell.collapsed .brand-text {
+        opacity: 0;
+        pointer-events: none;
+    }
 
     .collapse-btn {
         flex-shrink: 0;
@@ -288,11 +341,48 @@
         font-size: 12px;
         transition: background var(--transition), color var(--transition);
     }
-    .collapse-btn:hover { background: var(--c-bg); color: var(--c-text); }
 
-    .sidebar-nav { flex: 1; overflow-y: auto; padding: 8px 0; }
-    .nav-group { padding: 8px 0; }
-    .nav-group + .nav-group { border-top: 1px solid var(--c-border); }
+    .collapse-btn:hover {
+        background: var(--c-bg);
+        color: var(--c-text);
+    }
+
+    .collapse-btn:focus-visible {
+        outline: 2px solid var(--c-brand);
+        outline-offset: 2px;
+    }
+
+    .sidebar-nav {
+        flex: 1;
+        overflow-y: auto;
+        padding: 8px 0;
+        scroll-behavior: smooth;
+    }
+
+    .sidebar-nav::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .sidebar-nav::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .sidebar-nav::-webkit-scrollbar-thumb {
+        background: var(--c-border);
+        border-radius: 3px;
+    }
+
+    .sidebar-nav::-webkit-scrollbar-thumb:hover {
+        background: var(--c-border-strong);
+    }
+
+    .nav-group {
+        padding: 8px 0;
+    }
+
+    .nav-group + .nav-group {
+        border-top: 1px solid var(--c-border);
+    }
 
     .nav-section-label {
         display: block;
@@ -306,7 +396,12 @@
         overflow: hidden;
         transition: opacity var(--transition);
     }
-    .admin-shell.collapsed .nav-section-label { opacity: 0; }
+
+    .admin-shell.collapsed .nav-section-label {
+        opacity: 0;
+        height: 0;
+        padding: 0;
+    }
 
     .nav-link {
         display: flex;
@@ -323,12 +418,23 @@
         transition: background var(--transition), color var(--transition);
         position: relative;
     }
-    .nav-link:hover { background: var(--c-bg); color: var(--c-text); }
+
+    .nav-link:hover {
+        background: var(--c-bg);
+        color: var(--c-text);
+    }
+
+    .nav-link:focus-visible {
+        outline: 2px solid var(--c-brand);
+        outline-offset: -2px;
+    }
+
     .nav-link.active {
         background: var(--c-active-bg);
         color: var(--c-active-text);
         font-weight: 600;
     }
+
     .nav-link.active::before {
         content: '';
         position: absolute;
@@ -340,25 +446,32 @@
         background: var(--c-brand);
         border-radius: 0 2px 2px 0;
     }
+
     .nav-icon {
         font-size: 16px;
         width: 20px;
         text-align: center;
         flex-shrink: 0;
     }
+
     .nav-label {
         overflow: hidden;
         transition: opacity var(--transition), max-width var(--transition);
         max-width: 160px;
     }
-    .admin-shell.collapsed .nav-label { opacity: 0; max-width: 0; }
 
-    /* Sidebar footer */
+    .admin-shell.collapsed .nav-label {
+        opacity: 0;
+        max-width: 0;
+    }
+
+    /* Sidebar Footer */
     .sidebar-footer {
         padding: 12px;
         border-top: 1px solid var(--c-border);
         flex-shrink: 0;
     }
+
     .sidebar-user {
         display: flex;
         align-items: center;
@@ -367,6 +480,7 @@
         border-radius: var(--radius-md);
         overflow: hidden;
     }
+
     .sidebar-user-avatar {
         width: 34px;
         height: 34px;
@@ -380,12 +494,17 @@
         font-weight: 700;
         flex-shrink: 0;
     }
+
     .sidebar-user-info {
         overflow: hidden;
         opacity: 1;
         transition: opacity var(--transition);
     }
-    .admin-shell.collapsed .sidebar-user-info { opacity: 0; }
+
+    .admin-shell.collapsed .sidebar-user-info {
+        opacity: 0;
+    }
+
     .sidebar-user-name {
         font-size: 13px;
         font-weight: 600;
@@ -394,6 +513,7 @@
         overflow: hidden;
         text-overflow: ellipsis;
     }
+
     .sidebar-user-role {
         font-size: 11px;
         color: var(--c-text-muted);
@@ -401,6 +521,7 @@
         overflow: hidden;
         text-overflow: ellipsis;
     }
+
     .btn-logout {
         display: flex;
         align-items: center;
@@ -417,12 +538,37 @@
         transition: background var(--transition), color var(--transition), border-color var(--transition);
         overflow: hidden;
         white-space: nowrap;
+        font-weight: 500;
     }
-    .btn-logout:hover:not(:disabled) { background: #FEF2F2; color: #DC2626; border-color: #FECACA; }
-    .btn-logout:disabled { opacity: .5; cursor: not-allowed; }
-    .logout-icon { flex-shrink: 0; font-size: 15px; }
-    .logout-label { transition: opacity var(--transition); }
-    .admin-shell.collapsed .logout-label { opacity: 0; }
+
+    .btn-logout:hover:not(:disabled) {
+        background: #FEF2F2;
+        color: #DC2626;
+        border-color: #FECACA;
+    }
+
+    .btn-logout:focus-visible {
+        outline: 2px solid var(--c-danger);
+        outline-offset: -2px;
+    }
+
+    .btn-logout:disabled {
+        opacity: .5;
+        cursor: not-allowed;
+    }
+
+    .logout-icon {
+        flex-shrink: 0;
+        font-size: 15px;
+    }
+
+    .logout-label {
+        transition: opacity var(--transition);
+    }
+
+    .admin-shell.collapsed .logout-label {
+        opacity: 0;
+    }
 
     /* ── Main ── */
     .admin-main {
@@ -446,7 +592,13 @@
         top: 0;
         z-index: 30;
     }
-    .topbar-left { display: flex; align-items: center; gap: 12px; }
+
+    .topbar-left {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
     .mobile-menu-btn {
         display: none;
         width: 32px;
@@ -457,13 +609,51 @@
         font-size: 18px;
         color: var(--c-text-muted);
         border-radius: var(--radius-sm);
+        transition: background var(--transition);
     }
-    .topbar-breadcrumb { display: flex; align-items: center; gap: 6px; font-size: 14px; }
-    .breadcrumb-parent { color: var(--c-text-hint); }
-    .breadcrumb-sep { color: var(--c-text-hint); font-size: 12px; }
-    .breadcrumb-current { color: var(--c-text); font-weight: 600; }
 
-    .topbar-actions { display: flex; align-items: center; gap: 10px; }
+    .mobile-menu-btn:hover {
+        background: var(--c-bg);
+    }
+
+    .mobile-menu-btn:focus-visible {
+        outline: 2px solid var(--c-brand);
+        outline-offset: 2px;
+    }
+
+    .topbar-breadcrumb {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 14px;
+    }
+
+    .breadcrumb-parent {
+        color: var(--c-text-hint);
+        text-decoration: none;
+        transition: color var(--transition);
+    }
+
+    .breadcrumb-parent:hover {
+        color: var(--c-text-muted);
+    }
+
+    .breadcrumb-sep {
+        color: var(--c-text-hint);
+        font-size: 12px;
+    }
+
+    .breadcrumb-current {
+        color: var(--c-text);
+        font-weight: 600;
+    }
+
+    .topbar-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
     .ai-toggle-btn {
         display: flex;
         align-items: center;
@@ -479,14 +669,29 @@
         position: relative;
         transition: background var(--transition), color var(--transition), border-color var(--transition), box-shadow var(--transition);
     }
-    .ai-toggle-btn:hover { background: var(--c-brand-light); color: var(--c-brand); border-color: #C7D2FE; }
+
+    .ai-toggle-btn:hover {
+        background: var(--c-brand-light);
+        color: var(--c-brand);
+        border-color: #C7D2FE;
+    }
+
+    .ai-toggle-btn:focus-visible {
+        outline: 2px solid var(--c-brand);
+        outline-offset: 2px;
+    }
+
     .ai-toggle-btn.active {
         background: var(--c-brand);
         color: #fff;
         border-color: var(--c-brand);
         box-shadow: 0 2px 8px rgba(79,70,229,.25);
     }
-    .ai-toggle-icon { font-size: 14px; }
+
+    .ai-toggle-icon {
+        font-size: 14px;
+    }
+
     .unread-badge {
         position: absolute;
         top: -6px;
@@ -503,7 +708,21 @@
         justify-content: center;
         padding: 0 4px;
         border: 2px solid var(--c-surface);
+        animation: pulse-badge 2s ease-in-out infinite;
     }
+
+    @@keyframes pulse-badge {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.1); }
+    }
+
+    .topbar-user {
+        display: flex;
+        align-items: center;
+        cursor: default;
+        user-select: none;
+    }
+
     .topbar-avatar {
         width: 34px;
         height: 34px;
@@ -515,14 +734,29 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        cursor: default;
-        user-select: none;
     }
 
     .content-area {
         flex: 1;
         overflow-y: auto;
         padding: 24px;
+    }
+
+    .content-area::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    .content-area::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .content-area::-webkit-scrollbar-thumb {
+        background: var(--c-border);
+        border-radius: 4px;
+    }
+
+    .content-area::-webkit-scrollbar-thumb:hover {
+        background: var(--c-border-strong);
     }
 
     /* ── AI Panel ── */
@@ -539,7 +773,10 @@
         transition: width var(--transition);
         z-index: 50;
     }
-    .ai-panel--open { width: var(--panel-w); }
+
+    .ai-panel--open {
+        width: var(--panel-w);
+    }
 
     .ai-panel-header {
         display: flex;
@@ -550,7 +787,13 @@
         border-bottom: 1px solid var(--c-border);
         flex-shrink: 0;
     }
-    .ai-panel-title { display: flex; align-items: center; gap: 10px; }
+
+    .ai-panel-title {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
     .ai-panel-icon {
         width: 34px;
         height: 34px;
@@ -563,7 +806,13 @@
         font-size: 15px;
         flex-shrink: 0;
     }
-    .ai-panel-name { font-size: 14px; font-weight: 600; color: var(--c-text); }
+
+    .ai-panel-name {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--c-text);
+    }
+
     .ai-panel-status {
         display: flex;
         align-items: center;
@@ -572,22 +821,30 @@
         color: var(--c-text-muted);
         margin-top: 1px;
     }
+
     .status-dot {
         width: 7px;
         height: 7px;
         border-radius: 50%;
-        background: #22C55E;
+        background: var(--c-success);
         flex-shrink: 0;
     }
+
     .status-dot--busy {
-        background: #F59E0B;
+        background: var(--c-warning);
         animation: pulse-dot 1.2s ease-in-out infinite;
     }
+
     @@keyframes pulse-dot {
         0%, 100% { opacity: 1; }
         50% { opacity: .4; }
     }
-    .ai-panel-actions { display: flex; gap: 4px; }
+
+    .ai-panel-actions {
+        display: flex;
+        gap: 4px;
+    }
+
     .icon-btn {
         width: 30px;
         height: 30px;
@@ -602,8 +859,21 @@
         justify-content: center;
         transition: background var(--transition), color var(--transition);
     }
-    .icon-btn:hover:not(:disabled) { background: var(--c-bg); color: var(--c-text); }
-    .icon-btn:disabled { opacity: .35; cursor: not-allowed; }
+
+    .icon-btn:hover:not(:disabled) {
+        background: var(--c-bg);
+        color: var(--c-text);
+    }
+
+    .icon-btn:focus-visible {
+        outline: 2px solid var(--c-brand);
+        outline-offset: -2px;
+    }
+
+    .icon-btn:disabled {
+        opacity: .35;
+        cursor: not-allowed;
+    }
 
     /* Messages */
     .ai-messages {
@@ -616,17 +886,32 @@
         scroll-behavior: smooth;
     }
 
+    .ai-messages::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .ai-messages::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .ai-messages::-webkit-scrollbar-thumb {
+        background: var(--c-border);
+        border-radius: 3px;
+    }
+
     .ai-empty {
         margin: auto;
         text-align: center;
         padding: 24px 16px;
     }
+
     .ai-empty-icon {
         font-size: 28px;
         color: var(--c-brand);
         margin-bottom: 10px;
         opacity: .7;
     }
+
     .ai-empty-text {
         font-size: 13px;
         color: var(--c-text-muted);
@@ -634,7 +919,14 @@
         max-width: 240px;
         margin: 0 auto 16px;
     }
-    .ai-suggestions { display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
+
+    .ai-suggestions {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        align-items: stretch;
+    }
+
     .suggestion-chip {
         padding: 8px 12px;
         border: 1px solid var(--c-border);
@@ -646,7 +938,17 @@
         text-align: left;
         transition: background var(--transition), color var(--transition), border-color var(--transition);
     }
-    .suggestion-chip:hover { background: var(--c-brand-light); color: var(--c-brand); border-color: #C7D2FE; }
+
+    .suggestion-chip:hover {
+        background: var(--c-brand-light);
+        color: var(--c-brand);
+        border-color: #C7D2FE;
+    }
+
+    .suggestion-chip:focus-visible {
+        outline: 2px solid var(--c-brand);
+        outline-offset: -2px;
+    }
 
     /* Bubble */
     .ai-bubble {
@@ -655,12 +957,19 @@
         gap: 8px;
         animation: bubble-in 160ms ease-out both;
     }
+
     @@keyframes bubble-in {
         from { opacity: 0; transform: translateY(6px); }
-        to   { opacity: 1; transform: translateY(0); }
+        to { opacity: 1; transform: translateY(0); }
     }
-    .ai-bubble--user { flex-direction: row-reverse; }
-    .ai-bubble--user .ai-bubble-body { align-items: flex-end; }
+
+    .ai-bubble--user {
+        flex-direction: row-reverse;
+    }
+
+    .ai-bubble--user .ai-bubble-body {
+        align-items: flex-end;
+    }
 
     .ai-bubble-avatar {
         width: 28px;
@@ -675,7 +984,14 @@
         flex-shrink: 0;
         margin-bottom: 2px;
     }
-    .ai-bubble-body { display: flex; flex-direction: column; gap: 3px; max-width: calc(100% - 44px); }
+
+    .ai-bubble-body {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        max-width: calc(100% - 44px);
+    }
+
     .ai-bubble-content {
         padding: 9px 13px;
         border-radius: var(--radius-md);
@@ -687,17 +1003,18 @@
         word-break: break-word;
         white-space: pre-wrap;
     }
+
     .ai-bubble--user .ai-bubble-content {
         background: var(--c-brand);
         color: #fff;
         border-color: var(--c-brand);
+        border-radius: var(--radius-md) var(--radius-sm) var(--radius-md) var(--radius-md);
     }
+
     .ai-bubble--assistant .ai-bubble-content {
         border-radius: var(--radius-sm) var(--radius-md) var(--radius-md) var(--radius-md);
     }
-    .ai-bubble--user .ai-bubble-content {
-        border-radius: var(--radius-md) var(--radius-sm) var(--radius-md) var(--radius-md);
-    }
+
     .ai-bubble-time {
         font-size: 11px;
         color: var(--c-text-hint);
@@ -705,7 +1022,13 @@
     }
 
     /* Typing */
-    .ai-typing { display: flex; align-items: center; gap: 4px; padding: 10px 14px; }
+    .ai-typing {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 10px 14px;
+    }
+
     .ai-typing span {
         width: 7px;
         height: 7px;
@@ -713,8 +1036,15 @@
         background: var(--c-text-hint);
         animation: typing-dot 1.2s ease-in-out infinite;
     }
-    .ai-typing span:nth-child(2) { animation-delay: .2s; }
-    .ai-typing span:nth-child(3) { animation-delay: .4s; }
+
+    .ai-typing span:nth-child(2) {
+        animation-delay: .2s;
+    }
+
+    .ai-typing span:nth-child(3) {
+        animation-delay: .4s;
+    }
+
     @@keyframes typing-dot {
         0%, 60%, 100% { transform: translateY(0); opacity: .4; }
         30% { transform: translateY(-5px); opacity: 1; }
@@ -730,6 +1060,7 @@
         flex-shrink: 0;
         background: var(--c-surface);
     }
+
     .ai-input {
         flex: 1;
         min-height: 40px;
@@ -746,12 +1077,17 @@
         transition: border-color var(--transition), box-shadow var(--transition);
         overflow-y: auto;
     }
+
     .ai-input:focus {
         outline: none;
         border-color: var(--c-brand);
         box-shadow: 0 0 0 3px rgba(79,70,229,.12);
     }
-    .ai-input:disabled { opacity: .5; }
+
+    .ai-input:disabled {
+        opacity: .5;
+    }
+
     .ai-send-btn {
         width: 40px;
         height: 40px;
@@ -767,14 +1103,28 @@
         flex-shrink: 0;
         transition: background var(--transition), transform var(--transition), box-shadow var(--transition);
     }
+
     .ai-send-btn:hover:not(:disabled) {
-        background: #4338CA;
+        background: var(--c-brand-dark);
         box-shadow: 0 2px 8px rgba(79,70,229,.3);
     }
-    .ai-send-btn:active:not(:disabled) { transform: scale(.95); }
-    .ai-send-btn:disabled { background: var(--c-border-strong); opacity: .5; cursor: not-allowed; }
 
-    /* Backdrop (mobile) */
+    .ai-send-btn:active:not(:disabled) {
+        transform: scale(.95);
+    }
+
+    .ai-send-btn:focus-visible {
+        outline: 2px solid var(--c-brand);
+        outline-offset: 2px;
+    }
+
+    .ai-send-btn:disabled {
+        background: var(--c-border-strong);
+        opacity: .5;
+        cursor: not-allowed;
+    }
+
+    /* Backdrop */
     .ai-backdrop {
         display: none;
         position: fixed;
@@ -788,10 +1138,12 @@
         .admin-shell {
             grid-template-columns: 0 1fr !important;
         }
+
         .admin-shell.collapsed .admin-sidebar {
             width: 0;
             border-right: none;
         }
+
         .admin-sidebar {
             position: fixed;
             left: 0;
@@ -799,25 +1151,55 @@
             transform: translateX(-100%);
             transition: transform var(--transition);
             z-index: 60;
+            box-shadow: 2px 0 8px rgba(0,0,0,.1);
         }
+
         .admin-shell:not(.collapsed) .admin-sidebar {
             transform: translateX(0);
         }
-        .mobile-menu-btn { display: flex; }
-        .ai-toggle-label { display: none; }
+
+        .mobile-menu-btn {
+            display: flex;
+        }
+
+        .ai-toggle-label {
+            display: none;
+        }
+
         .ai-panel {
             position: fixed;
             right: 0;
             top: 0;
             height: 100vh;
         }
-        .ai-backdrop { display: block; }
+
+        .ai-backdrop {
+            display: block;
+        }
+
+        .content-area {
+            padding: 16px;
+        }
+    }
+
+    @@media (max-width: 480px) {
+        .topbar-breadcrumb {
+            display: none;
+        }
+
+        .content-area {
+            padding: 12px;
+        }
+
+        .ai-panel {
+            width: 100% !important;
+        }
     }
 </style>
 
 @code {
     private bool _collapsed;
-    private bool isLoggingOut;
+    private bool _isLoggingOut;
     private string _displayName = "Admin";
     private string _displayRole = "Administrator";
 
@@ -829,7 +1211,12 @@
     private readonly List<ChatMsg> _messages = [];
 
     private static readonly string[] _suggestions =
-        ["Өнөөдөр хэдэн ажилтан ирсэн бэ?", "Хүлээгдэж буй амралтын хүсэлт", "Нийт ажилтан хэдэн вэ?", "Хоцорсон ажилтнууд"];
+    [
+        "Өнөөдөр хэдэн ажилтан ирсэн бэ?",
+        "Хүлээгдэж буй амралтын хүсэлт",
+        "Нийт ажилтан хэдэн вэ?",
+        "Хоцорсон ажилтнууд"
+    ];
 
     protected override async Task OnInitializedAsync()
     {
@@ -837,6 +1224,7 @@
         {
             var token = await Auth.GetTokenAsync();
             if (string.IsNullOrWhiteSpace(token)) return;
+
             var (name, role) = ParseTokenClaims(token);
             if (!string.IsNullOrWhiteSpace(name)) _displayName = name;
             if (!string.IsNullOrWhiteSpace(role)) _displayRole = role;
@@ -846,11 +1234,18 @@
             var resp = await Http.SendAsync(req);
             if (resp.IsSuccessStatusCode)
             {
-                var p = await resp.Content.ReadFromJsonAsync<ProfileDto>();
-                if (p is not null) { _displayName = p.FullName; _displayRole = p.Department ?? _displayRole; }
+                var profile = await resp.Content.ReadFromJsonAsync<ProfileDto>();
+                if (profile is not null)
+                {
+                    _displayName = profile.FullName;
+                    _displayRole = profile.Department ?? _displayRole;
+                }
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Layout init error: {ex.Message}");
+        }
     }
 
     private static (string Name, string Role) ParseTokenClaims(string jwt)
@@ -859,13 +1254,17 @@
         {
             var parts = jwt.Split('.');
             if (parts.Length < 2) return ("", "");
+
             var payload = parts[1].Replace('-', '+').Replace('_', '/');
             payload = payload.PadRight(payload.Length + (4 - payload.Length % 4) % 4, '=');
+
             var json = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(payload));
             using var doc = System.Text.Json.JsonDocument.Parse(json);
             var root = doc.RootElement;
+
             var name = root.TryGetProperty("email", out var e) ? e.GetString() ?? "" : "";
             var role = "";
+
             foreach (var key in new[] { "role", "roles", "http://schemas.microsoft.com/ws/2008/06/identity/claims/role" })
             {
                 if (!root.TryGetProperty(key, out var rp)) continue;
@@ -874,6 +1273,7 @@
                     : rp.GetString() ?? "";
                 break;
             }
+
             return (name, role);
         }
         catch { return ("", ""); }
@@ -889,28 +1289,37 @@
     }
 
     private RenderFragment NavItem(string href, string icon, string label) =>
-        @<a class="nav-link @(Nav.Uri.Contains(href, StringComparison.OrdinalIgnoreCase) ? "active" : "")" href="@href">
+        @<a class="nav-link @(Nav.Uri.Contains(href, StringComparison.OrdinalIgnoreCase) ? "active" : "")" 
+            href="@href"
+            role="listitem">
             <span class="nav-icon" aria-hidden="true">@icon</span>
             <span class="nav-label">@label</span>
         </a>;
 
-    private void ToggleChat() { _chatOpen = !_chatOpen; if (_chatOpen) _unread = 0; }
-    private void ClearChat() { _messages.Clear(); _unread = 0; }
+    private void ToggleChat() { _chatOpen = !_chatOpen; if (_chatOpen) _unread = 0; StateHasChanged(); }
+    private void ClearChat() { _messages.Clear(); _unread = 0; StateHasChanged(); }
 
     private async Task QuickSend(string text) { _input = text; await SendMessage(); }
 
     private async Task OnKeyDown(KeyboardEventArgs e)
-    { if (e.Key == "Enter" && !e.ShiftKey) await SendMessage(); }
+    {
+        if (e.Key == "Enter" && !e.ShiftKey)
+        {
+            await SendMessage();
+        }
+    }
 
     private async Task SendMessage()
     {
         var text = _input.Trim();
         if (string.IsNullOrWhiteSpace(text) || _loading) return;
+
         _input = string.Empty;
         _messages.Add(new ChatMsg("user", text));
         _loading = true;
         StateHasChanged();
         await ScrollBottom();
+
         try
         {
             var resp = await Http.PostAsJsonAsync("api/ai/admin/chat", new { message = text });
@@ -920,8 +1329,17 @@
             _messages.Add(new ChatMsg("assistant", reply));
             if (!_chatOpen) _unread++;
         }
-        catch { _messages.Add(new ChatMsg("assistant", "Сервертэй холбогдоход алдаа гарлаа.")); }
-        finally { _loading = false; StateHasChanged(); await ScrollBottom(); }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Chat error: {ex.Message}");
+            _messages.Add(new ChatMsg("assistant", "Сервертэй холбогдоход алдаа гарлаа."));
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+            await ScrollBottom();
+        }
     }
 
     private async Task ScrollBottom() =>
@@ -929,7 +1347,7 @@
 
     private async Task LogoutAsync()
     {
-        isLoggingOut = true;
+        _isLoggingOut = true;
         await Auth.LogoutAsync();
         Nav.NavigateTo("/login", replace: true);
     }

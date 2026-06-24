@@ -2,6 +2,7 @@ using System.Linq;
 using AttendanceSystem.Application.Common;
 using AttendanceSystem.Application.DTOs.Attendance;
 using AttendanceSystem.Application.Interfaces.Repositories;
+using AttendanceSystem.Domain.Enums;
 using MediatR;
 
 namespace AttendanceSystem.Application.Features.Attendance.Queries.GetAttendanceStatistics;
@@ -43,8 +44,11 @@ public class GetAttendanceStatisticsQueryHandler : IRequestHandler<GetAttendance
             .ToList();
 
         var workingDays = CountWorkingDays(employee.WorkSchedule, startOfMonth, today);
-        var presentDays = records.Count;
-        var lateCount = records.Count(x => x.LateMinutes > 0);
+        // Single source of truth: classify off AttendanceRecord.Status via
+        // AttendanceStatusClassifier. Previously presentDays counted every record
+        // (including Absent ones) and lateCount used LateMinutes>0 instead of Status.
+        var presentDays = records.Count(x => AttendanceStatusClassifier.IsPresentBucket(x.Status));
+        var lateCount = records.Count(x => AttendanceStatusClassifier.IsLate(x.Status));
         var overtimeHours = records.Sum(x => x.OvertimeHours);
 
         var monthLabel = today.ToString("MMMM yyyy");

@@ -136,8 +136,14 @@ public sealed class ReportsApiController : ControllerBase
             {
                 d.Id,
                 d.Name,
-                Present = d.Employees.SelectMany(e => e.AttendanceRecords).Count(a => a.Date >= from && a.Date <= to && a.Status != AttendanceStatus.Absent && a.Status != AttendanceStatus.OnLeave),
-                Late = d.Employees.SelectMany(e => e.AttendanceRecords).Count(a => a.Date >= from && a.Date <= to && (a.Status == AttendanceStatus.Late || a.LateMinutes > 0)),
+                // Present = mutually exclusive bucket (Present, EarlyLeave, NightShift, WeekendWork,
+                // HalfDay) - deliberately excludes Late, which is counted separately below.
+                Present = d.Employees.SelectMany(e => e.AttendanceRecords).Count(a => a.Date >= from && a.Date <= to &&
+                    (a.Status == AttendanceStatus.Present || a.Status == AttendanceStatus.EarlyLeave ||
+                     a.Status == AttendanceStatus.NightShift || a.Status == AttendanceStatus.WeekendWork ||
+                     a.Status == AttendanceStatus.HalfDay)),
+                // Late = Status only (not LateMinutes>0, which is a different and inconsistent signal).
+                Late = d.Employees.SelectMany(e => e.AttendanceRecords).Count(a => a.Date >= from && a.Date <= to && a.Status == AttendanceStatus.Late),
                 Leave = d.Employees.SelectMany(e => e.AttendanceRecords).Count(a => a.Date >= from && a.Date <= to && a.Status == AttendanceStatus.OnLeave)
             })
             .Select(d => new DepartmentReportSummaryApiDto(d.Id, d.Name, d.Present, d.Late, d.Leave))

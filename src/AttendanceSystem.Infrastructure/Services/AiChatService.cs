@@ -231,9 +231,12 @@ public class AiChatService : IAiChatService
 
         var totalEmployees = await _dbContext.Employees.CountAsync(e => e.IsActive, cancellationToken);
 
-        var presentToday = await _dbContext.AttendanceRecords
-            .Where(a => a.Date == today && a.Status == AttendanceStatus.Present)
-            .Select(a => a.EmployeeId).Distinct().CountAsync(cancellationToken);
+        var presentTodayRecords = await _dbContext.AttendanceRecords
+            .Where(a => a.Date == today)
+            .Select(a => new { a.EmployeeId, a.Status })
+            .Distinct()
+            .ToListAsync(cancellationToken);
+        var presentTodayCount = presentTodayRecords.Count(a => AttendanceStatusClassifier.IsPresentBucket(a.Status));
 
         var lateToday = await _dbContext.AttendanceRecords
             .Where(a => a.Date == today && a.Status == AttendanceStatus.Late)
@@ -276,10 +279,12 @@ public class AiChatService : IAiChatService
             .Select(e => new { e.Id, e.DepartmentId })
             .ToListAsync(cancellationToken);
 
-        var presentEmployeeIds = await _dbContext.AttendanceRecords
-            .Where(a => a.Date == today && a.Status != AttendanceStatus.Absent)
-            .Select(a => a.EmployeeId)
-            .ToListAsync(cancellationToken);
+        var presentEmployeeIds = (await _dbContext.AttendanceRecords
+            .Where(a => a.Date == today)
+            .Select(a => new { a.EmployeeId, a.Status })
+            .ToListAsync(cancellationToken))
+            .Where(a => AttendanceStatusClassifier.CountsAsAttended(a.Status))
+            .Select(a => a.EmployeeId);
         var presentSet = presentEmployeeIds.ToHashSet();
 
         var departmentBreakdown = departments.Select(d =>
@@ -333,8 +338,8 @@ public class AiChatService : IAiChatService
         return new AdminAiContextDto
         {
             TotalEmployees               = totalEmployees,
-            PresentToday                 = presentToday,
-            AbsentToday                  = Math.Max(totalEmployees - presentToday - onLeaveToday - lateToday, 0),
+            PresentToday                 = presentTodayCount,
+            AbsentToday                  = Math.Max(totalEmployees - presentTodayCount - onLeaveToday - lateToday, 0),
             OnLeaveToday                 = onLeaveToday,
             LateTodayCount                = lateToday,
             PendingLeaveRequests         = pendingLeaveRequests,

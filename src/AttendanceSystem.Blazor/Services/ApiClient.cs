@@ -58,7 +58,7 @@ public sealed class ApiClient
         if (response is null)
             return [];
 
-        var count = new[] { response.Labels.Count, response.PresentCounts.Count, response.AbsentCounts.Count, response.LateCounts.Count }.Min();
+        var count = new[] { response.Labels.Count, response.PresentCounts.Count, response.AbsentCounts.Count, response.LateCounts.Count, response.OnLeaveCounts.Count }.Min();
         var items = new List<AttendanceTrendDto>();
         for (var i = 0; i < count; i++)
         {
@@ -66,7 +66,7 @@ public sealed class ApiClient
                 ? parsed
                 : DateOnly.FromDateTime(DateTime.Today.AddDays(i - count + 1));
 
-            items.Add(new AttendanceTrendDto(date, response.PresentCounts[i], response.AbsentCounts[i], response.LateCounts[i]));
+            items.Add(new AttendanceTrendDto(date, response.PresentCounts[i], response.AbsentCounts[i], response.LateCounts[i], response.OnLeaveCounts[i]));
         }
 
         return items;
@@ -205,8 +205,8 @@ public sealed class ApiClient
     private sealed record ApiErrorResponse(string? Message, string? Error, string? Detail, string? Code);
 
     public Task<EmployeeStatisticsDto?> GetEmployeeStatisticsAsync()
-        => GetAsync<EmployeeStatisticsDto>("api/v1/statistics/employee");
+        => GetAsync<EmployeeStatisticsDto>("api/statistics/employee");
 
     private sealed record RecentActivityResponse(Guid Id, string Type, string Title, string? Description, DateTime CreatedAt);
-    private sealed record AttendanceTrendResponse(IReadOnlyList<string> Labels, IReadOnlyList<int> PresentCounts, IReadOnlyList<int> AbsentCounts, IReadOnlyList<int> LateCounts);
+    private sealed record AttendanceTrendResponse(IReadOnlyList<string> Labels, IReadOnlyList<int> PresentCounts, IReadOnlyList<int> AbsentCounts, IReadOnlyList<int> LateCounts, IReadOnlyList<int> OnLeaveCounts);
 }

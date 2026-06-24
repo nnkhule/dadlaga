@@ -3,7 +3,8 @@
 @code {
     [Parameter] public string Status { get; set; } = "Pending";
 
-    private string Key => Status.Replace(" ", "", StringComparison.OrdinalIgnoreCase).ToLowerInvariant();
+    private string Key => Status.Replace(" ", "", StringComparison.OrdinalIgnoreCase)
+                                .ToLowerInvariant();
 
     private string DisplayText => Key switch
     {
@@ -13,6 +14,8 @@
         "onleave" or "leave" => "Чөлөөтэй",
         "approved" => "Батлагдсан",
         "rejected" => "Татгалзсан",
+        "earlybird" => "Эрт ирсэн",
+        "earlyleave" => "Эрт гарсан",
         _ => "Хүлээгдэж байна"
     };
 
@@ -24,6 +27,8 @@
         "onleave" or "leave" => "badge-leave",
         "approved" => "badge-approved",
         "rejected" => "badge-rejected",
+        "earlybird" => "badge-earlybird",
+        "earlyleave" => "badge-earlyleave",
         _ => "badge-pending"
     };
 }

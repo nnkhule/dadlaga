@@ -67,7 +67,7 @@
             </div>
             <div class="kpi-value">@(summary?.PresentToday ?? 0)</div>
             <div class="kpi-label">Өнөөдөр ирсэн</div>
-            <div class="kpi-sub">@PercentLabel(summary?.PresentToday, summary?.ActiveEmployees) ажилчид</div>
+            <div class="kpi-sub">@PercentLabel(summary?.PresentToday, summary?.ActiveEmployees) </div>
             <div class="kpi-bar"><div class="kpi-bar-fill" style="width:@(PercentValue(summary?.PresentToday, summary?.ActiveEmployees))%"></div></div>
         </div>
         <div class="kpi-card kpi-red">
@@ -290,8 +290,13 @@
                     <option value="">Бүх төлөв</option>
                     <option value="Present">Ирсэн</option>
                     <option value="Late">Хоцорсон</option>
+                    <option value="EarlyLeave">Эрт явсан</option>
                     <option value="Absent">Ирээгүй</option>
                     <option value="OnLeave">Чөлөөтэй</option>
+                    <option value="HalfDay">Хагас өдөр</option>
+                    <option value="NightShift">Шөнийн ээлж</option>
+                    <option value="WeekendWork">Амралтын өдөр</option>
+                    <option value="PendingManualReview">Хяналт хүлээгдэж буй</option>
                 </select>
                 <input class="form-control" style="width:200px;height:34px;font-size:13px"
                        placeholder="Хайх..."
@@ -330,8 +335,24 @@
                                 <td>@(row.CheckInTime?.ToString("HH:mm") ?? "—")</td>
                                 <td>@(row.CheckOutTime?.ToString("HH:mm") ?? "—")</td>
                                 <td>@(row.WorkHours > 0 ? $"{row.WorkHours:0.#}ц" : "—")</td>
-                                <td>@(row.OvertimeHours > 0 ? $"{row.OvertimeHours:0.##}ц" : "—")</td>
-                                <td><StatusBadge Status="@(row.Status ?? row.AttendanceStatus ?? string.Empty)" /></td>
+                                <td>
+                                @{
+                                    double overtime = 0;
+
+                                    if (row.CheckInTime.HasValue && row.CheckOutTime.HasValue)
+                                    {
+                                        var workedHours =
+                                            (row.CheckOutTime.Value - row.CheckInTime.Value).TotalHours;
+
+                                        overtime = workedHours > 6
+                                            ? workedHours - 6
+                                            : 0;
+                                    }
+                                }
+
+                                @(overtime > 0 ? $"{overtime:0.##}ц" : "—")
+                                </td>  
+                            <td><StatusBadge Status="@(row.Status ?? row.AttendanceStatus ?? string.Empty)" /></td>
                             </tr>
                         }
                     }
@@ -535,8 +556,9 @@
                     "attendanceChart",
                     trends.Select(t => t.Date.ToString("MM/dd")).ToArray(),
                     trends.Select(t => t.Present).ToArray(),
+                    trends.Select(t => t.Late).ToArray(),
                     trends.Select(t => t.Absent).ToArray(),
-                    trends.Select(t => t.Late).ToArray());
+                    trends.Select(t => t.OnLeave).ToArray());
 
             if (summary is not null)
                 await JS.InvokeVoidAsync("renderDonutChart",
@@ -681,7 +703,9 @@
 
     public async ValueTask DisposeAsync()
     {
-        _timerCts?.Cancel();
+        _timerCts?.Cancel(
+
+        );
         _timer?.Dispose();
         _timerCts?.Dispose();
         await Task.CompletedTask;
