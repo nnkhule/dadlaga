@@ -30,9 +30,9 @@ public class AttendanceRulesServiceTests
     {
         var schedule = WorkSchedule.CreateStandard();
         var date = new DateOnly(2024, 6, 3);
-        var checkIn = date.ToDateTime(new TimeOnly(9, 5), DateTimeKind.Unspecified);
+        var checkIn = date.ToDateTime(new TimeOnly(8, 5), DateTimeKind.Unspecified);
 
-        var (status, late, _, _) = _sut.EvaluateCheckIn(checkIn, schedule, date);
+        var (status, late, _, _) = _sut.EvaluateCheckIn(checkIn, schedule);
 
         status.Should().Be(AttendanceStatus.Present);
         late.Should().Be(0);
@@ -45,7 +45,7 @@ public class AttendanceRulesServiceTests
         var date = new DateOnly(2024, 6, 3);
         var checkIn = date.ToDateTime(new TimeOnly(9, 25), DateTimeKind.Unspecified);
 
-        var (status, late, _, _) = _sut.EvaluateCheckIn(checkIn, schedule, date);
+        var (status, late, _, _) = _sut.EvaluateCheckIn(checkIn, schedule);
 
         status.Should().Be(AttendanceStatus.Late);
         late.Should().BeGreaterThan(10);
@@ -58,7 +58,7 @@ public class AttendanceRulesServiceTests
         var date = new DateOnly(2024, 6, 3);
         var checkIn = date.ToDateTime(new TimeOnly(13, 0), DateTimeKind.Unspecified);
 
-        var (status, _, _, isHalfDay) = _sut.EvaluateCheckIn(checkIn, schedule, date);
+        var (status, _, _, isHalfDay) = _sut.EvaluateCheckIn(checkIn, schedule);
 
         status.Should().Be(AttendanceStatus.HalfDay);
         isHalfDay.Should().BeTrue();

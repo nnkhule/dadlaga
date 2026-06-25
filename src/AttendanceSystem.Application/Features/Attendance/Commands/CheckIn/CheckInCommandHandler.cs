@@ -6,9 +6,8 @@ using AttendanceSystem.Application.Interfaces.Repositories;
 using AttendanceSystem.Application.Services;
 using AttendanceSystem.Domain.Entities;
 using AttendanceSystem.Domain.Enums;
-using MediatR;
 using Microsoft.Extensions.Options;
-
+using MediatR;
 
 namespace AttendanceSystem.Application.Features.Attendance.Commands.CheckIn;
 
@@ -23,6 +22,8 @@ public class CheckInCommandHandler : IRequestHandler<CheckInCommand, Result<Atte
     private readonly IGeofenceService _geofenceService;
     private readonly AttendanceRulesService _rulesService;
     private readonly AttendanceRulesOptions _options;
+
+    private const double UtcOffsetHours = 8; // Ulaanbaatar Time (UTC+8)
 
     public CheckInCommandHandler(
         IAttendanceRepository attendanceRepository,
@@ -47,8 +48,8 @@ public class CheckInCommandHandler : IRequestHandler<CheckInCommand, Result<Atte
         if (employee is null || !employee.IsActive)
             return Result<AttendanceRecordDto>.Failure("Employee not found.", "EMPLOYEE_NOT_FOUND");
 
-        var today = DateOnly.FromDateTime(DateTime.Now);
-        var existing = await _attendanceRepository.GetTodayRecordAsync(request.EmployeeId, today, cancellationToken);
+        var todayLocal = DateOnly.FromDateTime(DateTime.Now.AddHours(UtcOffsetHours));
+        var existing = await _attendanceRepository.GetTodayRecordAsync(request.EmployeeId, todayLocal, cancellationToken);
         if (existing is not null)
             return Result<AttendanceRecordDto>.Failure("Already checked in today.", "ALREADY_CHECKED_IN");
 
@@ -82,7 +83,7 @@ public class CheckInCommandHandler : IRequestHandler<CheckInCommand, Result<Atte
         }
         else
         {
-            var evaluation = _rulesService.EvaluateCheckIn(checkInTime, schedule, today);
+            var evaluation = _rulesService.EvaluateCheckIn(checkInTime, schedule);
             status = evaluation.Status;
             lateMinutes = evaluation.LateMinutes;
             if (evaluation.IsVeryEarly)
@@ -114,5 +115,5 @@ public class CheckInCommandHandler : IRequestHandler<CheckInCommand, Result<Atte
 
     private static AttendanceRecordDto MapToDto(AttendanceRecord r) => new(
         r.Id, r.EmployeeId, r.Date, r.CheckInTime, r.CheckOutTime,
-        r.Status, r.OvertimeHours, r.LateMinutes,r.ShortHours, r.VerificationMethod, r.IsSuspicious, r.IsAutoGeo);
+        r.Status, r.OvertimeHours, r.LateMinutes, r.ShortHours, r.VerificationMethod, r.IsSuspicious, r.IsAutoGeo);
 }

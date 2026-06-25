@@ -19,6 +19,8 @@ public class CheckOutCommandHandler : IRequestHandler<CheckOutCommand, Result<At
     private readonly IGeofenceService _geofenceService;
     private readonly AttendanceRulesService _rulesService;
 
+    private const double UtcOffsetHours = 8; // Ulaanbaatar Time (UTC+8)
+
     public CheckOutCommandHandler(
         IAttendanceRepository attendanceRepository,
         IEmployeeRepository employeeRepository,
@@ -40,8 +42,8 @@ public class CheckOutCommandHandler : IRequestHandler<CheckOutCommand, Result<At
         if (employee?.WorkSchedule is null || employee.OfficeLocation is null)
             return Result<AttendanceRecordDto>.Failure("Employee not configured.", "CONFIG_MISSING");
 
-        var today = DateOnly.FromDateTime(DateTime.Now);
-        var record = await _attendanceRepository.GetTodayRecordAsync(request.EmployeeId, today, cancellationToken);
+        var todayLocal = DateOnly.FromDateTime(DateTime.Now.AddHours(UtcOffsetHours));
+        var record = await _attendanceRepository.GetTodayRecordAsync(request.EmployeeId, todayLocal, cancellationToken);
         if (record is null)
             return Result<AttendanceRecordDto>.Failure("No check-in found for today.", "NO_CHECKIN");
 
@@ -58,14 +60,11 @@ public class CheckOutCommandHandler : IRequestHandler<CheckOutCommand, Result<At
         var checkOutTime = DateTime.Now;
         var workDuration = checkOutTime - record.CheckInTime;
         var breakDuration = _rulesService.CalculateBreakDuration(workDuration, employee.WorkSchedule);
-        var isWeekend = today.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
+        var localDate = DateOnly.FromDateTime(record.CheckInTime.AddHours(UtcOffsetHours));
+        var isWeekend = localDate.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
         var overtime = _rulesService.CalculateOvertimeHours(workDuration, breakDuration, employee.WorkSchedule, isWeekend, false);
-        var shortHours =
-        _rulesService.CalculateShortHours(
-            workDuration,
-            breakDuration,
-            employee.WorkSchedule);
-        var status = _rulesService.EvaluateCheckOut(record.CheckInTime, checkOutTime, employee.WorkSchedule, today, record.Status);
+        var shortHours = _rulesService.CalculateShortHours(workDuration, breakDuration, employee.WorkSchedule);
+        var status = _rulesService.EvaluateCheckOut(record.CheckInTime, checkOutTime, employee.WorkSchedule, record.Status);
 
         Enum.TryParse<VerificationMethod>(request.VerificationMethod, true, out var method);
         record.CheckOut(checkOutTime, status, breakDuration, overtime, shortHours, method,

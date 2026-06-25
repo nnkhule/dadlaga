@@ -21,14 +21,15 @@ public class WorkSchedule : BaseEntity
 
     private WorkSchedule() { }
 
-    public static WorkSchedule CreateStandard(string name = "Standard 9-18")
+    public static WorkSchedule CreateStandard(string name = "Standard 08-12,13-17")
         => new()
         {
             Name = name,
-            ShiftStart = new TimeOnly(9, 0),
-            ShiftEnd = new TimeOnly(18, 0),
+            ShiftStart = new TimeOnly(8, 0),
+            ShiftEnd = new TimeOnly(17, 0),
             GraceMinutes = 10,
             WorkDays = WorkDays.Weekdays,
+            BreakDurationMinutes = 60,
             StandardHoursPerDay = 8m
         };
 
