@@ -145,11 +145,11 @@ public sealed class ReportsApiController : ControllerBase
                 // Late = Status only (not LateMinutes>0, which is a different and inconsistent signal).
                 Late = d.Employees.SelectMany(e => e.AttendanceRecords).Count(a => a.Date >= from && a.Date <= to && a.Status == AttendanceStatus.Late),
                 // Leave = approved leave requests in date range (consistent with employee reports)
-                Leave = d.Employees.Sum(e => e.LeaveRequests
-                    .Where(l => l.Status == RequestStatus.Approved &&
-                               l.StartDate <= to &&
-                               l.EndDate >= from)
-                    .Sum(l => CalculateLeaveDays(l)))
+                Leave = _db.LeaveRequests.Count(lr =>
+                    lr.Status == RequestStatus.Approved &&
+                    lr.StartDate <= to &&
+                    lr.EndDate >= from &&
+                    d.Employees.Any(e => e.Id == lr.EmployeeId))
             })
             .Select(d => new DepartmentReportSummaryApiDto(d.Id, d.Name, d.Present, d.Late, d.Leave))
             .ToListAsync(cancellationToken);

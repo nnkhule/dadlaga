@@ -263,13 +263,13 @@ public sealed class EmployeeReportService(ApplicationDbContext db) : IEmployeeRe
         {
             builder.AppendLine(string.Join('\t', new[]
             {
-                report.Date.ToString("yyyy-MM-dd"),
-                report.CheckIn?.ToString(@"HH\:mm") ?? "",
-                report.CheckOut?.ToString(@"HH\:mm") ?? "",
-                report.WorkedHours?.ToString("F1") ?? "",
-                report.OvertimeHours?.ToString("F1") ?? "",
-                report.UndertimeHours?.ToString("F1") ?? "",
-                report.Status,
+                record.Date.ToString("yyyy-MM-dd"),
+                record.CheckIn?.ToString(@"HH\:mm") ?? "",
+                record.CheckOut?.ToString(@"HH\:mm") ?? "",
+                record.WorkedHours?.ToString("F1") ?? "",
+                record.OvertimeHours?.ToString("F1") ?? "",
+                record.UndertimeHours?.ToString("F1") ?? "",
+                record.Status,
                 record.Note ?? ""
             }));
         }
