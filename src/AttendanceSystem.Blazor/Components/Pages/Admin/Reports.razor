@@ -1,6 +1,7 @@
 @page "/admin/reports"
 @layout AdminLayout
 @attribute [Authorize(Roles = "Admin,SuperAdmin,HRManager,HR")]
+@inject NavigationManager Nav
 @inject ApiClient Api
 @inject IJSRuntime JS
 
@@ -452,7 +453,7 @@
                 <div class="rpt-card-actions">
                     <input class="rpt-search-mini" type="search" placeholder="Нэр хайх…"
                            value="@_empSearch"
-                           @oninput="e => _empSearch = e.Value?.ToString() ?? string.Empty" />
+                           @oninput="OnEmpSearchInput" />
                     <button class="rpt-export-btn" @onclick='() => ExportCsvAsync("employees")'>
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                         CSV
@@ -480,8 +481,8 @@
                         @foreach (var row in FilteredEmployees)
                         {
                             var active = row.TryGetValue("IsActive", out var ia) && ia?.ToString() == "True";
-                            <tr class="rpt-row">
-                                <td class="rpt-muted-cell">@Val(row, "EmployeeCode")</td>
+                            <tr class="rpt-row rpt-clickable"
+                                @onclick="() => OpenEmployeeReport(row)">                                <td class="rpt-muted-cell">@Val(row, "EmployeeCode")</td>
                                 <td>
                                     <div class="rpt-emp-cell">
                                         <div class="rpt-emp-avatar">@Initials(Val(row, "FullName"))</div>
@@ -697,11 +698,9 @@
     private List<Dictionary<string, object?>>   attendanceRows = [];
     private List<Dictionary<string, object?>>   employeeRows   = [];
     private int _attendanceTotal;
-    private int _attendancePage = 1;
-    private int _empTotal;
+        private int _empTotal;
     private int _empPage = 1;
-    private bool _employeesLoaded;
-    private OvertimeSummaryDto? overtimeSummary;
+        private OvertimeSummaryDto? overtimeSummary;
 
     // ─── Employee filter ───────────────────────────────────────────────────
     private string _empFilterSearch  = string.Empty;
@@ -804,18 +803,13 @@
     {
         get
         {
-            var q = _empSearch.Trim().ToLowerInvariant();
-            var list = employeeRows
-                .Where(r => string.IsNullOrEmpty(q) ||
-                    Val(r, "FullName").ToLowerInvariant().Contains(q) ||
-                    Val(r, "Department").ToLowerInvariant().Contains(q))
-                .ToList();
+            var list = employeeRows;
             return (_sortGroup == "emp" ? _sortField : "name") switch
             {
-                "code" => _sortAsc ? list.OrderBy(r => Val(r,"EmployeeCode")).ToList() : list.OrderByDescending(r => Val(r,"EmployeeCode")).ToList(),
-                "name" => _sortAsc ? list.OrderBy(r => Val(r,"FullName")).ToList()     : list.OrderByDescending(r => Val(r,"FullName")).ToList(),
-                "dept" => _sortAsc ? list.OrderBy(r => Val(r,"Department")).ToList()   : list.OrderByDescending(r => Val(r,"Department")).ToList(),
-                "hire" => _sortAsc ? list.OrderBy(r => Val(r,"HireDate")).ToList()     : list.OrderByDescending(r => Val(r,"HireDate")).ToList(),
+                "code" => _sortAsc ? list.OrderBy(r => Val(r, "EmployeeCode")).ToList() : list.OrderByDescending(r => Val(r, "EmployeeCode")).ToList(),
+                "name" => _sortAsc ? list.OrderBy(r => Val(r, "FullName")).ToList() : list.OrderByDescending(r => Val(r, "FullName")).ToList(),
+                "dept" => _sortAsc ? list.OrderBy(r => Val(r, "Department")).ToList() : list.OrderByDescending(r => Val(r, "Department")).ToList(),
+                "hire" => _sortAsc ? list.OrderBy(r => Val(r, "HireDate")).ToList() : list.OrderByDescending(r => Val(r, "HireDate")).ToList(),
                 _ => list
             };
         }
@@ -829,7 +823,6 @@
     {
         _loading = true;
         error    = null;
-        _attendancePage = 1;
         _attPage = 1;
         attendanceRows  = [];
         StateHasChanged();
@@ -863,16 +856,18 @@
     private async Task SwitchEmployeesTab()
     {
         _tab = "employees";
-        if (_employeesLoaded) return;
+        _empPage = 1;
+        employeeRows = [];
+
         _loading = true;
         StateHasChanged();
         try
         {
             var r = await Api.GetAsync<PagedResponse<Dictionary<string, object?>>>(
-                "api/reports/employees?pageNumber=1&pageSize=100");
+                $"api/reports/employees?search={Uri.EscapeDataString(_empSearch)}&pageNumber={_empPage}&pageSize=100");
             employeeRows     = r?.Items?.ToList() ?? [];
             _empTotal        = r?.TotalCount ?? 0;
-            _employeesLoaded = true;
+
         }
         catch (Exception ex) { error = ex.Message; }
         finally { _loading = false; }
@@ -880,12 +875,12 @@
 
     private async Task LoadMoreAttendance()
     {
-        _attendancePage++;
+        _attPage++;
         try
         {
             var empParam = _selectedEmployee is not null ? $"&employeeId={_selectedEmployee.Id}" : "";
             var r = await Api.GetAsync<PagedResponse<Dictionary<string, object?>>>(
-                $"api/reports/attendance?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}{empParam}&pageNumber={_attendancePage}&pageSize=50");
+                $"api/reports/attendance?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}{empParam}&pageNumber={_attPage}&pageSize=50");
             if (r?.Items is not null) attendanceRows.AddRange(r.Items);
             if (_selectedEmployee is not null) RecalcEmpStats();
         }
@@ -898,7 +893,7 @@
         try
         {
             var r = await Api.GetAsync<PagedResponse<Dictionary<string, object?>>>(
-                $"api/reports/employees?pageNumber={_empPage}&pageSize=100");
+                $"api/reports/employees?search={Uri.EscapeDataString(_empSearch)}&pageNumber={_empPage}&pageSize=100");
             if (r?.Items is not null) employeeRows.AddRange(r.Items);
         }
         catch (Exception ex) { error = ex.Message; }
@@ -910,6 +905,10 @@
         _empFilterSearch = e.Value?.ToString() ?? string.Empty;
         _empSuggestions  = [];
         _empDropdownOpen = false;
+
+        // Reset the employee list for the Employees tab
+        _empPage = 1;
+        employeeRows = [];
 
         if (_empFilterSearch.Length < 2) { StateHasChanged(); return; }
 
@@ -1065,6 +1064,15 @@
 
     private static string Truncate(string s, int max) =>
         s.Length <= max ? s : s[..max] + "…";
+
+    private void OpenEmployeeReport(Dictionary<string, object?> row)
+{
+    if (row.TryGetValue("Id", out var idObj) &&
+        Guid.TryParse(idObj?.ToString(), out var employeeId))
+    {
+        Nav.NavigateTo($"/admin/reports/employee/{employeeId}");
+    }
+}
 
     private sealed record DepartmentSummaryDto(Guid DepartmentId, string DepartmentName, int Present, int Late, int Leave);
 }

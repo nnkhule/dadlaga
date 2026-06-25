@@ -23,20 +23,21 @@ public sealed class DashboardApiController : ControllerBase
         var activeEmployees = await _db.Employees.AsNoTracking().CountAsync(e => e.IsActive, cancellationToken);
 
         var todayRecords = _db.AttendanceRecords.AsNoTracking().Where(a => a.Date == targetDate);
-        // presentToday = чек-ин хийсэн бүх ажилтан (Late орно, absent/onLeave орохгүй)
-        var checkedInToday = await todayRecords.CountAsync(a =>
+        // Present bucket: Present, EarlyLeave, HalfDay, NightShift, WeekendWork (excludes Late)
+        var presentBucketToday = await todayRecords.CountAsync(a =>
             a.Status == AttendanceStatus.Present ||
-            a.Status == AttendanceStatus.Late ||
             a.Status == AttendanceStatus.EarlyLeave ||
             a.Status == AttendanceStatus.HalfDay ||
             a.Status == AttendanceStatus.NightShift ||
             a.Status == AttendanceStatus.WeekendWork,
             cancellationToken);
-        var presentToday = checkedInToday;
+        // Late: only those with Status == Late
+        var lateEmployees = await todayRecords.CountAsync(a =>
+            a.Status == AttendanceStatus.Late,
+            cancellationToken);
+        // Total checked in = Present bucket + Late
+        var checkedInToday = presentBucketToday + lateEmployees;
 
-var lateEmployees = await todayRecords.CountAsync(a =>
-    a.Status == AttendanceStatus.Late,
-    cancellationToken);
 
 var onLeaveEmployees = await _db.LeaveRequests
     .AsNoTracking()
@@ -48,7 +49,7 @@ var onLeaveEmployees = await _db.LeaveRequests
 
         var absentToday =
             activeEmployees -
-            presentToday -
+            checkedInToday -
             onLeaveEmployees;
 
 
@@ -59,17 +60,17 @@ var onLeaveEmployees = await _db.LeaveRequests
 if (absentToday < 0)
     absentToday = 0;
 
-        // attendanceRate = чек-ин хийсэн / нийт идэвхтэй (Late давхар тооцохгүй)
+        // attendanceRate = (Present bucket + Late) / актив ажилтнууд * 100
         var attendanceRate = activeEmployees == 0
             ? 0
             : Math.Round((decimal)checkedInToday / activeEmployees * 100, 2);
-        attendanceRate = Math.Min(attendanceRate, 100); // хэзээ ч 100% хэтрэхгүй
+        attendanceRate = Math.Min(attendanceRate, 100); // Ensure not over 100%
         return Ok(new DashboardSummaryApiDto(
             totalEmployees,
             activeEmployees,
-            presentToday,
+            presentBucketToday,   // Present today (present bucket only)
             absentToday,
-            lateEmployees,
+            lateEmployees,        // Late employees
             onLeaveEmployees,
             attendanceRate,
             overtimeHours));
@@ -119,12 +120,39 @@ if (absentToday < 0)
             .Select(g => new
             {
                 Date    = g.Key,
-                Present = g.Count(a => a.Status != AttendanceStatus.Absent && a.Status != AttendanceStatus.OnLeave),
-                Late    = g.Count(a => a.Status == AttendanceStatus.Late),
-                Absent  = g.Count(a => a.Status == AttendanceStatus.Absent),
-                OnLeave = g.Count(a => a.Status == AttendanceStatus.OnLeave)
+                Present = g.Count(a => a.Status == AttendanceStatus.Present ||
+                                       a.Status == AttendanceStatus.EarlyLeave ||
+                                       a.Status == AttendanceStatus.HalfDay ||
+                                       a.Status == AttendanceStatus.NightShift ||
+                                       a.Status == AttendanceStatus.WeekendWork),
+                Late    = g.Count(a => a.Status == AttendanceStatus.Late)
             })
             .ToListAsync(cancellationToken);
+
+        // Get OnLeave counts from LeaveRequests for each date
+        var onLeaveRecords = await _db.LeaveRequests
+            .AsNoTracking()
+            .Where(l => l.Status == RequestStatus.Approved &&
+                        l.StartDate <= today &&
+                        l.EndDate >= from)
+            .ToListAsync(cancellationToken);
+
+        var onLeaveCounts = new Dictionary<DateOnly, int>();
+        foreach (var leave in onLeaveRecords)
+        {
+            // For each day the leave is active, increment the count
+            var currentDate = leave.StartDate;
+            while (currentDate <= leave.EndDate)
+            {
+                if (currentDate >= from && currentDate <= today)
+                {
+                    if (!onLeaveCounts.ContainsKey(currentDate))
+                        onLeaveCounts[currentDate] = 0;
+                    onLeaveCounts[currentDate]++;
+                }
+                currentDate = currentDate.AddDays(1);
+            }
+        }
 
         var labels  = new List<string>();
         var present = new List<int>();
@@ -135,15 +163,15 @@ if (absentToday < 0)
         for (var date = from; date <= today; date = date.AddDays(1))
         {
             var row = records.FirstOrDefault(x => x.Date == date);
+            int presentCount = row?.Present ?? 0;
+            int lateCount = row?.Late ?? 0;
+            int onLeaveCount = onLeaveCounts.TryGetValue(date, out var count) ? count : 0;
+
             labels.Add(date.ToString("yyyy-MM-dd"));
-            present.Add(row?.Present ?? 0);
-            // Бичлэг байгаа өдөр: absent = record-оос шууд унших
-            // Бичлэг байхгүй өдөр: 0 (мэдээлэл ороогүй = ирцгүй биш)
-            absent.Add(row is not null
-                ? Math.Max(0, activeEmployees - (row.Present + row.OnLeave))
-                : 0);
-            late.Add(row?.Late ?? 0);
-            onLeave.Add(row?.OnLeave ?? 0);
+            present.Add(presentCount);
+            absent.Add(Math.Max(0, activeEmployees - (presentCount + lateCount + onLeaveCount)));
+            late.Add(lateCount);
+            onLeave.Add(onLeaveCount);
         }
 
         return Ok(new AttendanceTrendApiDto(labels, present, absent, late, onLeave));

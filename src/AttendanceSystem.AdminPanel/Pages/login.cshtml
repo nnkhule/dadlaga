@@ -12,10 +12,10 @@
     <title>Admin Login — Attendance System</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
-        
+        @@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
         * {
-            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            font-family: 'Inter', system-ui, -apple-userSystem, sans-serif;
         }
 
         body {
@@ -35,7 +35,7 @@
             border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
-        @keyframes slideIn {
+        @@keyframes slideIn {
             from {
                 opacity: 0;
                 transform: translateY(30px);
@@ -185,7 +185,7 @@
         function togglePassword() {
             const passwordInput = document.getElementById('Password');
             const eyeIcon = document.getElementById('eye-icon');
-            
+
             if (passwordInput.type === 'password') {
                 passwordInput.type = 'text';
             } else {
@@ -196,34 +196,12 @@
         // Add loading state to form
         const form = document.querySelector('form');
         const submitBtn = document.getElementById('submit-btn');
-        
+
         form?.addEventListener('submit', function() {
             submitBtn.disabled = true;
             submitBtn.textContent = 'Signing in...';
         });
     </script>
 
-</body>
-</html>
-
-    <script>
-        function togglePassword() {
-            const input = document.getElementById('Password');
-            const icon  = document.getElementById('eye-icon');
-            if (input.type === 'password') {
-                input.type = 'text';
-                icon.textContent = '🙈';
-            } else {
-                input.type = 'password';
-                icon.textContent = '👁';
-            }
-        }
-
-        document.querySelector('form').addEventListener('submit', function () {
-            const btn = document.getElementById('submit-btn');
-            btn.disabled = true;
-            btn.textContent = 'Нэвтэрч байна…';
-        });
-    </script>
 </body>
 </html>

@@ -141,36 +141,36 @@ else
             <!-- Summary Cards -->
             <div class="summary-cards">
                 <div class="card card-stat">
-                    <div class="stat-number">@_report.TotalWorkDays</div>
+                    <div class="stat-number">@(_report?.TotalWorkDays ?? 0)</div>
                     <div class="stat-label">Нийт ажлын өдөр</div>
                 </div>
                 <div class="card card-stat card-success">
-                    <div class="stat-number">@_report.PresentDays</div>
+                    <div class="stat-number">@(_report?.PresentDays ?? 0)</div>
                     <div class="stat-label">Ирсэн өдөр</div>
                     <div class="stat-progress">
                         <div class="progress-bar">
-                            <div class="progress-fill" style="width: @(Math.Min(_report.AttendanceRate, 100))%"></div>
+                            <div class="progress-fill" style="width: @(Math.Min(_report?.AttendanceRate ?? 0, 100))%"></div>
                         </div>
-                        <span class="progress-text">@_report.AttendanceRate.ToString("F0")%</span>
+                        <span class="progress-text">@((_report?.AttendanceRate ?? 0).ToString("F0"))%</span>
                     </div>
                 </div>
                 <div class="card card-stat card-warning">
-                    <div class="stat-number">@_report.LateDays</div>
+                    <div class="stat-number">@(_report?.LateDays ?? 0)</div>
                     <div class="stat-label">Хоцорсон өдөр</div>
                 </div>
                 <div class="card card-stat card-danger">
-                    <div class="stat-number">@_report.AbsentDays</div>
+                    <div class="stat-number">@(_report?.AbsentDays ?? 0)</div>
                     <div class="stat-label">Тасалсан өдөр</div>
                 </div>
                 <div class="card card-stat card-info">
-                    <div class="stat-number">@_report.OvertimeHours.ToString("F1")</div>
+                    <div class="stat-number">@((_report?.OvertimeHours ?? 0.0).ToString("F1"))</div>
                     <div class="stat-label">Илүү цаг</div>
                     <div class="stat-sub">цаг</div>
                 </div>
                 <div class="card card-stat">
-                    <div class="stat-number">@_report.LeaveDays</div>
+                    <div class="stat-number">@(_report?.LeaveDays ?? 0)</div>
                     <div class="stat-label">Чөлөө авсан</div>
-                    <div class="stat-sub">@_report.LeaveBalance өдөр үлдсэн</div>
+                    <div class="stat-sub">@(_report?.LeaveBalance ?? 0) өдөр үлдсэн</div>
                 </div>
             </div>
 
@@ -209,7 +209,7 @@ else
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @if ((_report.AttendanceRecords?.Count ?? 0) == 0)
+                                    @if ((_report?.AttendanceRecords?.Count ?? 0) == 0)
                                     {
                                         <tr class="empty-row">
                                             <td colspan="7">Ирцийн мэдээлэл олдсонгүй</td>
@@ -217,16 +217,16 @@ else
                                     }
                                     else
                                     {
-                                        @foreach (var record in _report.AttendanceRecords!)
+                                        @foreach (var record in _report.AttendanceRecords ?? new List<AttendanceRecord>())
                                         {
                                             <tr class="@GetRowClass(record.Status)">
                                                 <td>@record.Date.ToString("yyyy-MM-dd")</td>
                                                 <td class="text-muted">@GetDayName(record.Date)</td>
                                                 <td>@(record.CheckIn?.ToString(@"HH\:mm") ?? "—")</td>
                                                 <td>@(record.CheckOut?.ToString(@"HH\:mm") ?? "—")</td>
-                                                <td>@(record.WorkedHours.HasValue ? record.WorkedHours.Value.ToString("F1") + "ц" : "—")</td>
+                                                <td>@(record.WorkedHours.HasValue ? (record.WorkedHours ?? 0).ToString("F1") + "ц" : "—")</td>
                                                 <td class="@(record.OvertimeHours.GetValueOrDefault() > 0 ? "text-success" : "")">
-                                                    @(record.OvertimeHours.GetValueOrDefault() > 0 ? "+" + record.OvertimeHours!.Value.ToString("F1") + "ц" : "—")
+                                                    @(record.OvertimeHours.GetValueOrDefault() > 0 ? "+" + (record.OvertimeHours ?? 0).ToString("F1") + "ц" : "—")
                                                 </td>
                                                 <td>
                                                     <span class="badge @GetBadgeClass(record.Status)">@record.Status</span>
@@ -246,15 +246,15 @@ else
                     <div class="tab-content">
                         <div class="overtime-summary">
                             <div class="ot-card">
-                                <div class="ot-value">@_report.OvertimeHours.ToString("F1")ц</div>
+                                <div class="ot-value">@((_report?.OvertimeHours ?? 0.0).ToString("F1"))ц</div>
                                 <div class="ot-label">Нийт илүү цаг</div>
                             </div>
                             <div class="ot-card">
-                                <div class="ot-value">@(_report.PresentDays > 0 ? (_report.OvertimeHours / _report.PresentDays).ToString("F1") : "0")ц</div>
+                                <div class="ot-value">@((_report?.PresentDays > 0) ? ((_report?.OvertimeHours ?? 0.0) / (_report?.PresentDays ?? 1)).ToString("F1") : "0")ц</div>
                                 <div class="ot-label">Дундаж өдөрт</div>
                             </div>
                             <div class="ot-card ot-card-danger">
-                                <div class="ot-value">@_report.UndertimeHours.ToString("F1")ц</div>
+                                <div class="ot-value">@((_report?.UndertimeHours ?? 0.0).ToString("F1"))ц</div>
                                 <div class="ot-label">Дутуу цаг</div>
                             </div>
                         </div>
@@ -272,7 +272,7 @@ else
                                 </thead>
                                 <tbody>
                                     @{
-                                        var overtimeRecords = (_report.AttendanceRecords ?? [])
+                                        var overtimeRecords = (_report?.AttendanceRecords ?? [])
                                             .Where(x => x.OvertimeHours.GetValueOrDefault() != 0 || x.UndertimeHours.GetValueOrDefault() != 0)
                                             .ToList();
                                     }
@@ -293,11 +293,11 @@ else
                                                 <td class="@(record.OvertimeHours.GetValueOrDefault() > 0 ? "text-success" : "text-danger")">
                                                     @if (record.OvertimeHours.GetValueOrDefault() > 0)
                                                     {
-                                                        <span>+@record.OvertimeHours!.Value.ToString("F1")ц</span>
+                                                        <span>+@(record.OvertimeHours ?? 0).ToString("F1")ц</span>
                                                     }
                                                     else if (record.UndertimeHours.GetValueOrDefault() > 0)
                                                     {
-                                                        <span>-@record.UndertimeHours!.Value.ToString("F1")ц</span>
+                                                        <span>-@(record.UndertimeHours ?? 0).ToString("F1")ц</span>
                                                     }
                                                 </td>
                                                 <td class="text-muted">@(record.Note ?? "—")</td>
@@ -315,13 +315,13 @@ else
                 {
                     <div class="tab-content">
                         <div class="leave-balances">
-                            @if ((_report.LeaveBalances?.Count ?? 0) == 0)
+                            @if ((_report?.LeaveBalances?.Count ?? 0) == 0)
                             {
                                 <p class="text-muted">Чөлөөний баланс олдсонгүй</p>
                             }
                             else
                             {
-                                @foreach (var balance in _report.LeaveBalances!)
+                                @foreach (var balance in _report.LeaveBalances ?? new List<LeaveBalance>())
                                 {
                                     <div class="leave-balance-card">
                                         <div class="balance-header">
@@ -359,7 +359,7 @@ else
                                     }
                                     else
                                     {
-                                        @foreach (var leave in _report.LeaveRequests!)
+                                        @foreach (var leave in _report.LeaveRequests ?? new List<LeaveRequest>())
                                         {
                                             <tr>
                                                 <td>@leave.RequestedAt.ToString("yyyy-MM-dd")</td>
@@ -390,10 +390,10 @@ else
                                 <svg class="perf-circle" viewBox="0 0 100 100">
                                     <circle cx="50" cy="50" r="45" fill="none" stroke="#E5E7EB" stroke-width="8"/>
                                     <circle cx="50" cy="50" r="45" fill="none" stroke="#3B82F6" stroke-width="8"
-                                            stroke-dasharray="@(2 * Math.PI * 45 * Math.Min(_report.AttendanceRate, 100) / 100) @(2 * Math.PI * 45)"
+                                            stroke-dasharray="@(2 * Math.PI * 45 * Math.Min(_report?.AttendanceRate ?? 0, 100) / 100) @(2 * Math.PI * 45)"
                                             stroke-linecap="round" transform="rotate(-90 50 50)"/>
                                     <text x="50" y="55" text-anchor="middle" font-size="24" font-weight="bold" fill="#1F2937">
-                                        @_report.AttendanceRate.ToString("F0")%
+                                        @((_report?.AttendanceRate ?? 0).ToString("F0"))%
                                     </text>
                                 </svg>
                             </div>
@@ -403,10 +403,10 @@ else
                                 <svg class="perf-circle" viewBox="0 0 100 100">
                                     <circle cx="50" cy="50" r="45" fill="none" stroke="#E5E7EB" stroke-width="8"/>
                                     <circle cx="50" cy="50" r="45" fill="none" stroke="#10B981" stroke-width="8"
-                                            stroke-dasharray="@(2 * Math.PI * 45 * Math.Min(_report.PunctualityRate, 100) / 100) @(2 * Math.PI * 45)"
+                                            stroke-dasharray="@(2 * Math.PI * 45 * Math.Min(_report?.PunctualityRate ?? 0, 100) / 100) @(2 * Math.PI * 45)"
                                             stroke-linecap="round" transform="rotate(-90 50 50)"/>
                                     <text x="50" y="55" text-anchor="middle" font-size="24" font-weight="bold" fill="#1F2937">
-                                        @_report.PunctualityRate.ToString("F0")%
+                                        @((_report?.PunctualityRate ?? 0).ToString("F0"))%
                                     </text>
                                 </svg>
                             </div>
@@ -415,21 +415,21 @@ else
                         <div class="perf-stats">
                             <div class="stat-row">
                                 <span>Дундаж ирэх цаг</span>
-                                <span class="stat-value">@(_report.AvgCheckIn ?? "—")</span>
+                                <span class="stat-value">@(_report?.AvgCheckIn ?? "—")</span>
                             </div>
                             <div class="stat-row">
                                 <span>Дундаж гарах цаг</span>
-                                <span class="stat-value">@(_report.AvgCheckOut ?? "—")</span>
+                                <span class="stat-value">@(_report?.AvgCheckOut ?? "—")</span>
                             </div>
                             <div class="stat-row">
                                 <span>Хамгийн их хоцорсон</span>
-                                <span class="stat-value @(_report.MaxLateMinutes > 0 ? "text-warning" : "")">
-                                    @(_report.MaxLateMinutes > 0 ? _report.MaxLateMinutes + " мин" : "—")
+                                <span class="stat-value @(_report?.MaxLateMinutes > 0 ? "text-warning" : "")">
+                                    @(_report?.MaxLateMinutes > 0 ? (_report?.MaxLateMinutes ?? 0) + " мин" : "—")
                                 </span>
                             </div>
                             <div class="stat-row">
                                 <span>Дараалсан ирсэн өдөр</span>
-                                <span class="stat-value text-success">@_report.ConsecutivePresentDays өдөр</span>
+                                <span class="stat-value text-success">@(_report?.ConsecutivePresentDays ?? 0) өдөр</span>
                             </div>
                         </div>
                     </div>
@@ -1043,7 +1043,7 @@ else
     private DateOnly _from = DateOnly.FromDateTime(DateTime.Today.AddDays(-DateTime.Today.Day + 1));
     private DateOnly _to = DateOnly.FromDateTime(DateTime.Today);
 
-    private bool _showInitialSpinner => false;
+    private bool _showInitialSpinner;
     private bool _loading;
     private bool _loadingEmployees;
     private bool _exporting;
@@ -1063,8 +1063,10 @@ else
         // concurrently (e.g. hot-reload or re-render), it won't double-load.
         _initialized = true;
 
+        _showInitialSpinner = true;
         await LoadEmployees();
         if (EmployeeId != default) await LoadReport();
+        _showInitialSpinner = false;
         StateHasChanged();
     }
 
@@ -1123,13 +1125,13 @@ else
             if (resp.IsSuccessStatusCode)
             {
                 _report = await resp.Content.ReadFromJsonAsync<EmployeeReportDto>();
-                // Ensure lists are never null after deserialization
-                if (_report is not null)
-                {
-                    _report.AttendanceRecords ??= [];
-                    _report.LeaveRequests     ??= [];
-                    _report.LeaveBalances     ??= [];
-                }
+
+                if (_report == null)
+                    _report = new EmployeeReportDto();
+
+                _report.AttendanceRecords ??= [];
+                _report.LeaveRequests ??= [];
+                _report.LeaveBalances ??= [];
             }
             else
             {

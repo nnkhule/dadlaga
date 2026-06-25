@@ -1,3 +1,4 @@
+
 using System.Text;
 using AttendanceSystem.Domain.Entities;
 using AttendanceSystem.Domain.Enums;
@@ -121,21 +122,21 @@ public sealed class EmployeeReportService(ApplicationDbContext db) : IEmployeeRe
         }
 
         int presentDays = records.Count(r => r.Status is AttendanceStatus.Present
-            or AttendanceStatus.Late
             or AttendanceStatus.EarlyLeave
+            or AttendanceStatus.HalfDay
             or AttendanceStatus.NightShift
-            or AttendanceStatus.WeekendWork
-            or AttendanceStatus.HalfDay);
-        int lateDays = records.Count(r => r.Status == AttendanceStatus.Late || r.LateMinutes > 0);
-        int absentDays = Math.Max(0, totalWorkDays - presentDays);
-        double overtimeTotal = records.Sum(r => (double)r.OvertimeHours);
-        double undertimeTotal = attendanceDtos.Sum(r => r.UndertimeHours ?? 0);
+            or AttendanceStatus.WeekendWork);
+        int lateDays = records.Count(r => r.Status == AttendanceStatus.Late);
 
         int approvedLeaveDays = leaves
             .Where(l => l.Status == RequestStatus.Approved)
             .Sum(CalculateLeaveDays);
 
-        double attendanceRate = totalWorkDays > 0 ? (double)presentDays / totalWorkDays * 100 : 0;
+        int absentDays = Math.Max(0, totalWorkDays - (presentDays + lateDays + approvedLeaveDays));
+        double overtimeTotal = records.Sum(r => (double)r.OvertimeHours);
+        double undertimeTotal = attendanceDtos.Sum(r => r.UndertimeHours ?? 0);
+
+        double attendanceRate = totalWorkDays > 0 ? (double)(presentDays + lateDays) / totalWorkDays * 100 : 0;
         double punctualityRate = presentDays > 0 ? (double)(presentDays - lateDays) / presentDays * 100 : 0;
 
         var checkins = records
@@ -262,13 +263,13 @@ public sealed class EmployeeReportService(ApplicationDbContext db) : IEmployeeRe
         {
             builder.AppendLine(string.Join('\t', new[]
             {
-                record.Date.ToString("yyyy-MM-dd"),
-                record.CheckIn?.ToString(@"HH\:mm") ?? "",
-                record.CheckOut?.ToString(@"HH\:mm") ?? "",
-                record.WorkedHours?.ToString("F1") ?? "",
-                record.OvertimeHours?.ToString("F1") ?? "",
-                record.UndertimeHours?.ToString("F1") ?? "",
-                record.Status,
+                report.Date.ToString("yyyy-MM-dd"),
+                report.CheckIn?.ToString(@"HH\:mm") ?? "",
+                report.CheckOut?.ToString(@"HH\:mm") ?? "",
+                report.WorkedHours?.ToString("F1") ?? "",
+                report.OvertimeHours?.ToString("F1") ?? "",
+                report.UndertimeHours?.ToString("F1") ?? "",
+                report.Status,
                 record.Note ?? ""
             }));
         }
