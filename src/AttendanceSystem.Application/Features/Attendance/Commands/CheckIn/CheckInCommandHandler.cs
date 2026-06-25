@@ -114,5 +114,5 @@ public class CheckInCommandHandler : IRequestHandler<CheckInCommand, Result<Atte
 
     private static AttendanceRecordDto MapToDto(AttendanceRecord r) => new(
         r.Id, r.EmployeeId, r.Date, r.CheckInTime, r.CheckOutTime,
-        r.Status, r.OvertimeHours, r.LateMinutes, r.VerificationMethod, r.IsSuspicious, r.IsAutoGeo);
+        r.Status, r.OvertimeHours, r.LateMinutes,r.ShortHours, r.VerificationMethod, r.IsSuspicious, r.IsAutoGeo);
 }

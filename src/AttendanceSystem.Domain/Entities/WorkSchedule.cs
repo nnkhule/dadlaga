@@ -14,7 +14,7 @@ public class WorkSchedule : BaseEntity
     public int GraceMinutes { get; private set; } = 10;
     public WorkDays WorkDays { get; private set; } = WorkDays.Weekdays;
     public int BreakDurationMinutes { get; private set; } = 60;
-    public decimal StandardHoursPerDay { get; private set; } = 8m;
+    public decimal StandardHoursPerDay { get; private set; } = 9;
     public bool IsNightShift { get; private set; }
     public decimal NightShiftMultiplier { get; private set; } = 1.5m;
     public decimal WeekendMultiplier { get; private set; } = 2.0m;

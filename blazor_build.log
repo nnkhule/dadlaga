@@ -1,7 +1,7 @@
   Determining projects to restore...
   All projects are up-to-date for restore.
-  AttendanceSystem.Domain -> C:\Users\HP\AttendanceSystem\src\AttendanceSystem.Domain\bin\Debug\net8.0\AttendanceSystem.Domain.dll
-  AttendanceSystem.Application -> C:\Users\HP\AttendanceSystem\src\AttendanceSystem.Application\bin\Debug\net8.0\AttendanceSystem.Application.dll
+  AttendanceSystem.Domain -> C:\Users\HP\AttendanceSystem\src\AttendanceSystem.Domain\bin\Debug\net10.0\AttendanceSystem.Domain.dll
+  AttendanceSystem.Application -> C:\Users\HP\AttendanceSystem\src\AttendanceSystem.Application\bin\Debug\net10.0\AttendanceSystem.Application.dll
 C:\Users\HP\AttendanceSystem\src\AttendanceSystem.Blazor\Models\ApiModels.cs(234,19): warning CS8618: Non-nullable property 'Location' must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring the property as nullable. [C:\Users\HP\AttendanceSystem\src\AttendanceSystem.Blazor\AttendanceSystem.Blazor.csproj]
 C:\Users\HP\AttendanceSystem\src\AttendanceSystem.Blazor\Models\ApiModels.cs(224,32): warning CS8618: Non-nullable property 'GpsHistory' must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring the property as nullable. [C:\Users\HP\AttendanceSystem\src\AttendanceSystem.Blazor\AttendanceSystem.Blazor.csproj]
 C:\Users\HP\AttendanceSystem\src\AttendanceSystem.Blazor\Models\ApiModels.cs(213,19): warning CS8618: Non-nullable property 'LeaveType' must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring the property as nullable. [C:\Users\HP\AttendanceSystem\src\AttendanceSystem.Blazor\AttendanceSystem.Blazor.csproj]

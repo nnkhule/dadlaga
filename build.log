@@ -1,10 +1,10 @@
   Determining projects to restore...
   All projects are up-to-date for restore.
-  AttendanceSystem.Domain -> C:\Users\HP\AttendanceSystem\src\AttendanceSystem.Domain\bin\Debug\net8.0\AttendanceSystem.Domain.dll
-  AttendanceSystem.Application -> C:\Users\HP\AttendanceSystem\src\AttendanceSystem.Application\bin\Debug\net8.0\AttendanceSystem.Application.dll
-  AttendanceSystem.Mobile -> C:\Users\HP\AttendanceSystem\src\AttendanceSystem.Mobile\bin\Debug\net8.0\AttendanceSystem.Mobile.dll
-  AttendanceSystem.Infrastructure -> C:\Users\HP\AttendanceSystem\src\AttendanceSystem.Infrastructure\bin\Debug\net8.0\AttendanceSystem.Infrastructure.dll
-  AttendanceSystem.UnitTests -> C:\Users\HP\AttendanceSystem\tests\AttendanceSystem.UnitTests\bin\Debug\net8.0\AttendanceSystem.UnitTests.dll
+  AttendanceSystem.Domain -> C:\Users\HP\AttendanceSystem\src\AttendanceSystem.Domain\bin\Debug\net10.0\AttendanceSystem.Domain.dll
+  AttendanceSystem.Application -> C:\Users\HP\AttendanceSystem\src\AttendanceSystem.Application\bin\Debug\net10.0\AttendanceSystem.Application.dll
+  AttendanceSystem.Mobile -> C:\Users\HP\AttendanceSystem\src\AttendanceSystem.Mobile\bin\Debug\net10.0\AttendanceSystem.Mobile.dll
+  AttendanceSystem.Infrastructure -> C:\Users\HP\AttendanceSystem\src\AttendanceSystem.Infrastructure\bin\Debug\net10.0\AttendanceSystem.Infrastructure.dll
+  AttendanceSystem.UnitTests -> C:\Users\HP\AttendanceSystem\tests\AttendanceSystem.UnitTests\bin\Debug\net10.0\AttendanceSystem.UnitTests.dll
 C:\Users\HP\AttendanceSystem\src\AttendanceSystem.API\Dtos\EmployeeStatisticsDto.cs(8,27): warning CS8618: Non-nullable property 'Summary' must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring the property as nullable. [C:\Users\HP\AttendanceSystem\src\AttendanceSystem.API\AttendanceSystem.API.csproj]
 C:\Users\HP\AttendanceSystem\src\AttendanceSystem.API\Dtos\EmployeeStatisticsDto.cs(9,39): warning CS8618: Non-nullable property 'AttendanceAnalytics' must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring the property as nullable. [C:\Users\HP\AttendanceSystem\src\AttendanceSystem.API\AttendanceSystem.API.csproj]
 C:\Users\HP\AttendanceSystem\src\AttendanceSystem.API\Dtos\EmployeeStatisticsDto.cs(10,43): warning CS8618: Non-nullable property 'AttendanceHistory' must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring the property as nullable. [C:\Users\HP\AttendanceSystem\src\AttendanceSystem.API\AttendanceSystem.API.csproj]
@@ -1028,8 +1028,8 @@ C:\Users\HP\AttendanceSystem\src\AttendanceSystem.API\Services\IEmployeeStatisti
 C:\Users\HP\AttendanceSystem\src\AttendanceSystem.API\Services\IEmployeeStatisticsService.cs(11,42): warning CS1591: Missing XML comment for publicly visible type or member 'IEmployeeStatisticsService.GetAttendanceHistoryAsync(Guid, DateOnly, DateOnly)' [C:\Users\HP\AttendanceSystem\src\AttendanceSystem.API\AttendanceSystem.API.csproj]
 C:\Users\HP\AttendanceSystem\src\AttendanceSystem.API\Services\IEmployeeStatisticsService.cs(12,34): warning CS1591: Missing XML comment for publicly visible type or member 'IEmployeeStatisticsService.GetLeaveStatisticsAsync(Guid)' [C:\Users\HP\AttendanceSystem\src\AttendanceSystem.API\AttendanceSystem.API.csproj]
 C:\Users\HP\AttendanceSystem\src\AttendanceSystem.API\Services\IEmployeeStatisticsService.cs(13,32): warning CS1591: Missing XML comment for publicly visible type or member 'IEmployeeStatisticsService.GetGpsStatisticsAsync(Guid)' [C:\Users\HP\AttendanceSystem\src\AttendanceSystem.API\AttendanceSystem.API.csproj]
-  AttendanceSystem.API -> C:\Users\HP\AttendanceSystem\src\AttendanceSystem.API\bin\Debug\net8.0\AttendanceSystem.API.dll
-  AttendanceSystem.IntegrationTests -> C:\Users\HP\AttendanceSystem\tests\AttendanceSystem.IntegrationTests\bin\Debug\net8.0\AttendanceSystem.IntegrationTests.dll
+  AttendanceSystem.API -> C:\Users\HP\AttendanceSystem\src\AttendanceSystem.API\bin\Debug\net10.0\AttendanceSystem.API.dll
+  AttendanceSystem.IntegrationTests -> C:\Users\HP\AttendanceSystem\tests\AttendanceSystem.IntegrationTests\bin\Debug\net10.0\AttendanceSystem.IntegrationTests.dll
 
 Build succeeded.
 

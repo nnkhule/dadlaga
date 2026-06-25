@@ -1,7 +1,7 @@
 
 @page "/admin/dashboard"
 @layout AdminLayout
-@attribute [Authorize(Roles = "Admin,SuperAdmin,HRManager,HR,Manager")]
+@attribute [Authorize(Roles = "SuperAdmin,HRManager,DepartmentHead")]
 @implements IAsyncDisposable
 @inject ApiClient Api
 @inject IJSRuntime JS
@@ -103,7 +103,7 @@
                 <div class="kpi-trend up">@(summary?.TotalOvertimeHours ?? 0)ц илүү</div>
             </div>
             <div class="kpi-value">@($"{summary?.AttendanceRate ?? 0:0.#}%")</div>
-            <div class="kpi-label">Ирцийн дундаж</div>
+            <div class="kpi-label">Ирцийн хувь</div>
             <div class="kpi-bar"><div class="kpi-bar-fill" style="width:@($"{summary?.AttendanceRate ?? 0:0}")%"></div></div>
         </div>
     </div>
@@ -557,12 +557,12 @@
                     trends.Select(t => t.Date.ToString("MM/dd")).ToArray(),
                     trends.Select(t => t.Present).ToArray(),
                     trends.Select(t => t.Late).ToArray(),
-                    trends.Select(t => t.Absent).ToArray(),
-                    trends.Select(t => t.OnLeave).ToArray());
+                    trends.Select(t => t.Absent).ToArray());
 
             if (summary is not null)
                 await JS.InvokeVoidAsync("renderDonutChart",
                     "donutChart",
+                    new[] { "Ирсэн", "Хоцорсон", "Чөлөөтэй", "Ирээгүй" },
                     new[] { summary.PresentToday, summary.LateEmployees, summary.OnLeaveEmployees, summary.AbsentToday },
                     new[] { "#16A34A", "#D97706", "#7C3AED", "#DC2626" });
         }
@@ -695,19 +695,17 @@
     private static string RelativeTime(DateTime value)
     {
         var diff = DateTime.Now - value;
-        if (diff.TotalMinutes < 1) return "дөнгөж сая";
-        if (diff.TotalMinutes < 60) return $"{(int)diff.TotalMinutes} минутын өмнө";
-        if (diff.TotalHours < 24) return $"{(int)diff.TotalHours} цагийн өмнө";
-        return $"{(int)diff.TotalDays} өдрийн өмнө";
+        if (diff.TotalDays >= 1)    return $"{(int)diff.TotalDays} өдрийн өмнө";
+        if (diff.TotalHours >= 1)   return $"{(int)diff.TotalHours} цагийн өмнө";
+        if (diff.TotalMinutes >= 1) return $"{(int)diff.TotalMinutes} минутын өмнө";
+        return "дөнгөж сая";
     }
 
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
     {
-        _timerCts?.Cancel(
-
-        );
+        _timerCts?.Cancel();
         _timer?.Dispose();
         _timerCts?.Dispose();
-        await Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 }

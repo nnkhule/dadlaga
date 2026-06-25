@@ -16,6 +16,7 @@ public class AttendanceRecord : AggregateRoot
     public TimeSpan? BreakDuration { get; private set; }
     public AttendanceStatus Status { get; private set; }
     public decimal OvertimeHours { get; private set; }
+    public decimal ShortHours { get; set; }
     public decimal LateMinutes { get; private set; }
     public string? Notes { get; private set; }
     public bool IsManualEntry { get; private set; }
@@ -80,6 +81,7 @@ public class AttendanceRecord : AggregateRoot
         AttendanceStatus status,
         TimeSpan breakDuration,
         decimal overtimeHours,
+        decimal shortHours,
         VerificationMethod method,
         double? latitude,
         double? longitude,
@@ -89,6 +91,7 @@ public class AttendanceRecord : AggregateRoot
         Status = status;
         BreakDuration = breakDuration;
         OvertimeHours = overtimeHours;
+        ShortHours = shortHours;
         if (method != VerificationMethod.Gps)
             VerificationMethod = method;
         CheckOutLatitude = latitude;
@@ -102,7 +105,7 @@ public class AttendanceRecord : AggregateRoot
     /// Updates metrics after admin-approved time adjustment.
     /// </summary>
     public void ApplyAdjustment(DateTime? checkIn, DateTime? checkOut, AttendanceStatus status,
-        decimal lateMinutes, decimal overtimeHours, TimeSpan? breakDuration, Guid approvedBy)
+        decimal lateMinutes, decimal overtimeHours, decimal shortHours, TimeSpan? breakDuration, Guid approvedBy)
     {
         if (checkIn.HasValue) CheckInTime = checkIn.Value;
         if (checkOut.HasValue) CheckOutTime = checkOut.Value;
@@ -110,6 +113,7 @@ public class AttendanceRecord : AggregateRoot
         LateMinutes = lateMinutes;
         OvertimeHours = overtimeHours;
         BreakDuration = breakDuration;
+        ShortHours = shortHours;
         ApprovedBy = approvedBy;
         IsManualEntry = true;
         SetUpdated();

@@ -23,14 +23,16 @@ public sealed class DashboardApiController : ControllerBase
         var activeEmployees = await _db.Employees.AsNoTracking().CountAsync(e => e.IsActive, cancellationToken);
 
         var todayRecords = _db.AttendanceRecords.AsNoTracking().Where(a => a.Date == targetDate);
-        var presentToday = await todayRecords.CountAsync(a =>
-    a.Status == AttendanceStatus.Present ||
-    a.Status == AttendanceStatus.Late ||
-    a.Status == AttendanceStatus.EarlyLeave ||
-    a.Status == AttendanceStatus.HalfDay ||
-    a.Status == AttendanceStatus.NightShift ||
-    a.Status == AttendanceStatus.WeekendWork,
-    cancellationToken);
+        // presentToday = чек-ин хийсэн бүх ажилтан (Late орно, absent/onLeave орохгүй)
+        var checkedInToday = await todayRecords.CountAsync(a =>
+            a.Status == AttendanceStatus.Present ||
+            a.Status == AttendanceStatus.Late ||
+            a.Status == AttendanceStatus.EarlyLeave ||
+            a.Status == AttendanceStatus.HalfDay ||
+            a.Status == AttendanceStatus.NightShift ||
+            a.Status == AttendanceStatus.WeekendWork,
+            cancellationToken);
+        var presentToday = checkedInToday;
 
 var lateEmployees = await todayRecords.CountAsync(a =>
     a.Status == AttendanceStatus.Late,
@@ -57,13 +59,11 @@ var onLeaveEmployees = await _db.LeaveRequests
 if (absentToday < 0)
     absentToday = 0;
 
-var attendanceRate =
-    activeEmployees == 0
-        ? 0
-        : Math.Round(
-            ((decimal)(presentToday + lateEmployees) /
-            activeEmployees) * 100,
-            2);
+        // attendanceRate = чек-ин хийсэн / нийт идэвхтэй (Late давхар тооцохгүй)
+        var attendanceRate = activeEmployees == 0
+            ? 0
+            : Math.Round((decimal)checkedInToday / activeEmployees * 100, 2);
+        attendanceRate = Math.Min(attendanceRate, 100); // хэзээ ч 100% хэтрэхгүй
         return Ok(new DashboardSummaryApiDto(
             totalEmployees,
             activeEmployees,
@@ -118,28 +118,35 @@ var attendanceRate =
             .GroupBy(a => a.Date)
             .Select(g => new
             {
-                Date = g.Key,
+                Date    = g.Key,
                 Present = g.Count(a => a.Status != AttendanceStatus.Absent && a.Status != AttendanceStatus.OnLeave),
-                Late = g.Count(a => a.Status == AttendanceStatus.Late || a.LateMinutes > 0)
+                Late    = g.Count(a => a.Status == AttendanceStatus.Late),
+                Absent  = g.Count(a => a.Status == AttendanceStatus.Absent),
+                OnLeave = g.Count(a => a.Status == AttendanceStatus.OnLeave)
             })
             .ToListAsync(cancellationToken);
 
-        var labels = new List<string>();
+        var labels  = new List<string>();
         var present = new List<int>();
-        var absent = new List<int>();
-        var late = new List<int>();
+        var absent  = new List<int>();
+        var late    = new List<int>();
+        var onLeave = new List<int>();
 
         for (var date = from; date <= today; date = date.AddDays(1))
         {
             var row = records.FirstOrDefault(x => x.Date == date);
-            var presentCount = row?.Present ?? 0;
             labels.Add(date.ToString("yyyy-MM-dd"));
-            present.Add(presentCount);
-            absent.Add(Math.Max(0, activeEmployees - presentCount));
+            present.Add(row?.Present ?? 0);
+            // Бичлэг байгаа өдөр: absent = record-оос шууд унших
+            // Бичлэг байхгүй өдөр: 0 (мэдээлэл ороогүй = ирцгүй биш)
+            absent.Add(row is not null
+                ? Math.Max(0, activeEmployees - (row.Present + row.OnLeave))
+                : 0);
             late.Add(row?.Late ?? 0);
+            onLeave.Add(row?.OnLeave ?? 0);
         }
 
-        return Ok(new AttendanceTrendApiDto(labels, present, absent, late));
+        return Ok(new AttendanceTrendApiDto(labels, present, absent, late, onLeave));
     }
 }
 
@@ -154,4 +161,4 @@ public sealed record DashboardSummaryApiDto(
     decimal TotalOvertimeHours);
 
 public sealed record RecentActivityApiDto(Guid Id, string Type, string Title, string Description, DateTime CreatedAt);
-public sealed record AttendanceTrendApiDto(IReadOnlyList<string> Labels, IReadOnlyList<int> PresentCounts, IReadOnlyList<int> AbsentCounts, IReadOnlyList<int> LateCounts);
+public sealed record AttendanceTrendApiDto(IReadOnlyList<string> Labels, IReadOnlyList<int> PresentCounts, IReadOnlyList<int> AbsentCounts, IReadOnlyList<int> LateCounts, IReadOnlyList<int> OnLeaveCounts);

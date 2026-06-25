@@ -18,6 +18,8 @@ public class AttendanceRecordConfiguration : IEntityTypeConfiguration<Attendance
         builder.HasIndex(x => new { x.EmployeeId, x.Date })
             .IsUnique()
             .HasDatabaseName("UQ_Attendance_Employee_Date");
+        builder.Property(x => x.ShortHours)
+            .HasPrecision(18, 2);
         builder.HasIndex(x => new { x.EmployeeId, x.Date })
             .HasDatabaseName("IX_Attendance_EmployeeId_Date")
             .IncludeProperties(x => new { x.Status, x.CheckInTime, x.CheckOutTime });

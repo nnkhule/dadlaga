@@ -843,7 +843,7 @@ builder.Services.AddScoped<EmployeeService>();
 | 2 | `App.razor` | `<script src="location.js">` — `/wwwroot`-д файл байхгүй | Нэмэх эсвэл устгах |
 | 3 | `AiChat.razor` (Admin) | `@inject HttpClient Http` — `ApiClient` ашиглах ёстой (auth header дутуу) | Засах |
 | 4 | `EmployeeStatisticsController.cs` | `Roles` class-ыг `EnterpriseApiControllers.cs`-с давхардуулан тодорхойлсон байна | Нэгтгэх |
-| 5 | Blazor `.csproj` | `<TargetFramework>net10.0</TargetFramework>` — API нь `net8.0`, тааралдахгүй target | Нэгтгэх |
+| 5 | Blazor `.csproj` | `<TargetFramework>net10.0</TargetFramework>` — API нь `net10.0`, тааралдахгүй target | Нэгтгэх |
 | 6 | `AttendanceRepository.cs` | Pagination query-д `AsNoTracking()` дуталтай | Нэмэх |
 
 ---

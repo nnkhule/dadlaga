@@ -77,117 +77,81 @@ window.startClock = (elementId) => {
 
 window.stopClock = (clockId) => clearInterval(clockId);
 
-window.renderAttendanceChart = (canvasId, labels, present, late, absent) => {
-  const canvas = document.getElementById(canvasId);
-  if (!canvas || !window.Chart) return;
-  if (canvas._chart) canvas._chart.destroy();
+window.renderAttendanceChart = (canvasId, labels, present, late, absent, onLeave) => {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas || !window.Chart) return;
+    if (canvas._chart) canvas._chart.destroy();
 
-  const style = getComputedStyle(document.documentElement);
-  const muted  = style.getPropertyValue('--clr-text-muted').trim()  || '#64748B';
-  const border  = style.getPropertyValue('--clr-border').trim()      || '#E2E8F0';
-  const surface = style.getPropertyValue('--clr-surface').trim()     || '#fff';
+    const style = getComputedStyle(document.documentElement);
+    const mutedColor  = style.getPropertyValue('--clr-text-muted').trim()  || '#64748B';
+    const borderColor = style.getPropertyValue('--clr-border').trim()      || '#E2E8F0';
+    const bg          = style.getPropertyValue('--clr-surface').trim()     || '#fff';
 
-  const makeGrad = (ctx, color) => {
-    const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
-    g.addColorStop(0, color + '33');
-    g.addColorStop(1, color + '00');
-    return g;
-  };
+    const ds = (label, data, color, dashed) => ({
+        label,
+        data,
+        borderColor: color,
+        backgroundColor: color + '18',
+        fill: true,
+        tension: 0.35,
+        borderWidth: dashed ? 1.5 : 2.5,
+        borderDash: dashed ? [5, 4] : [],
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        pointBackgroundColor: color,
+        pointBorderColor: bg,
+        pointBorderWidth: 2,
+        order: dashed ? 2 : 1
+    });
 
-  const ctx2d = canvas.getContext('2d');
+    const datasets = [
+        ds('Ирсэн',    present, '#16A34A', false),
+        ds('Хоцорсон', late,    '#D97706', false),
+        ds('Ирээгүй',  absent,  '#DC2626', true),
+    ];
 
-  canvas._chart = new Chart(canvas, {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [
-        {
-          label: 'Ирсэн',
-          data: present,
-          borderColor: '#16A34A',
-          backgroundColor: makeGrad(ctx2d, '#16A34A'),
-          fill: true,
-          tension: 0.4,
-          borderWidth: 2.5,
-          pointRadius: 4,
-          pointHoverRadius: 6,
-          pointBackgroundColor: '#16A34A',
-          pointBorderColor: surface,
-          pointBorderWidth: 2
-        },
-        {
-          label: 'Хоцорсон',
-          data: late,
-          borderColor: '#D97706',
-          backgroundColor: makeGrad(ctx2d, '#D97706'),
-          fill: true,
-          tension: 0.4,
-          borderWidth: 2,
-          pointRadius: 3,
-          pointHoverRadius: 5,
-          pointBackgroundColor: '#D97706',
-          pointBorderColor: surface,
-          pointBorderWidth: 2
-        },
-        {
-          label: 'Ирээгүй',
-          data: absent,
-          borderColor: '#DC2626',
-          backgroundColor: makeGrad(ctx2d, '#DC2626'),
-          fill: true,
-          tension: 0.4,
-          borderWidth: 2,
-          pointRadius: 3,
-          pointHoverRadius: 5,
-          pointBackgroundColor: '#DC2626',
-          pointBorderColor: surface,
-          pointBorderWidth: 2
+    if (Array.isArray(onLeave) && onLeave.some(v => v > 0))
+        datasets.push(ds('Чөлөөтэй', onLeave, '#7C3AED', true));
+
+    canvas._chart = new Chart(canvas, {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            scales: {
+                x: {
+                    grid: { display: false },
+                    border: { display: false },
+                    ticks: { color: mutedColor, font: { size: 11 } }
+                },
+                y: {
+                    beginAtZero: true,
+                    grid: { color: borderColor },
+                    border: { display: false },
+                    ticks: { color: mutedColor, font: { size: 11 }, precision: 0, stepSize: 1 }
+                }
+            },
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        color: mutedColor, boxWidth: 10, boxHeight: 10,
+                        borderRadius: 5, useBorderRadius: true,
+                        padding: 14, font: { size: 12 }
+                    }
+                },
+                tooltip: {
+                    backgroundColor: bg, titleColor: '#0F172A',
+                    bodyColor: mutedColor, borderColor: borderColor,
+                    borderWidth: 1, padding: 10, boxPadding: 4
+                }
+            }
         }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: { mode: 'index', intersect: false },
-      scales: {
-        x: {
-          grid: { display: false },
-          border: { display: false },
-          ticks: { color: muted, font: { size: 11 } }
-        },
-        y: {
-          beginAtZero: true,
-          grid: { color: border, drawBorder: false },
-          border: { display: false },
-          ticks: { color: muted, font: { size: 11 }, stepSize: 1, precision: 0 }
-        }
-      },
-      plugins: {
-        legend: {
-          position: 'bottom',
-          labels: {
-            color: muted,
-            boxWidth: 10,
-            boxHeight: 10,
-            borderRadius: 5,
-            useBorderRadius: true,
-            padding: 16,
-            font: { size: 12 }
-          }
-        },
-        tooltip: {
-          backgroundColor: surface,
-          titleColor: '#0F172A',
-          bodyColor: muted,
-          borderColor: border,
-          borderWidth: 1,
-          padding: 10,
-          boxPadding: 4
-        }
-      }
-    }
-  });
+    });
 };
+
 
 window.renderMonthlyChart = (canvasId, labels, attendanceRates, workingHours, overtime, lateMinutes) => {
   const canvas = document.getElementById(canvasId);
@@ -256,4 +220,100 @@ window.renderMonthlyChart = (canvasId, labels, attendanceRates, workingHours, ov
       plugins: { legend: { position: 'bottom' } }
     }
   });
+};
+// Donut chart for today's attendance split
+window.renderDonutChart = (canvasId, labels, data, colors) => {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas || !window.Chart) return;
+    if (canvas._chartInstance) canvas._chartInstance.destroy();
+    canvas._chartInstance = new Chart(canvas, {
+        type: 'doughnut',
+        data: {
+            labels,
+            datasets: [{
+                data,
+                backgroundColor: colors,
+                borderWidth: 0,
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            responsive: false,
+            cutout: '70%',
+            plugins: {
+                legend: { display: false },
+                tooltip: { enabled: true }
+            }
+        }
+    });
+};
+
+// CSV download helper
+window.downloadCsv = (filename, content) => {
+    const bom = '\uFEFF';
+    const blob = new Blob([bom + content], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+};
+
+window.renderDonutChart = (canvasId, labels, data, colors) => {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas || !window.Chart) return;
+    if (canvas._chartInstance) canvas._chartInstance.destroy();
+    canvas._chartInstance = new Chart(canvas, {
+        type: 'doughnut',
+        data: {
+            labels,
+            datasets: [{ data, backgroundColor: colors, borderWidth: 0, hoverOffset: 4 }]
+        },
+        options: {
+            responsive: false,
+            cutout: '70%',
+            plugins: { legend: { display: false }, tooltip: { enabled: true } }
+        }
+    });
+};
+
+window.downloadCsv = (filename, content) => {
+    const bom = '\uFEFF';
+    const blob = new Blob([bom + content], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
+};
+
+window.renderDonutChart = (canvasId, labels, data, colors) => {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas || !window.Chart) return;
+    if (canvas._chartInstance) canvas._chartInstance.destroy();
+    canvas._chartInstance = new Chart(canvas, {
+        type: 'doughnut',
+        data: {
+            labels,
+            datasets: [{ data, backgroundColor: colors, borderWidth: 0, hoverOffset: 4 }]
+        },
+        options: {
+            responsive: false,
+            cutout: '70%',
+            plugins: { legend: { display: false }, tooltip: { enabled: true } }
+        }
+    });
+};
+
+window.downloadCsv = (filename, content) => {
+    const bom = '\uFEFF';
+    const blob = new Blob([bom + content], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
 };

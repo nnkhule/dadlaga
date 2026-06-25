@@ -74,10 +74,25 @@ public class AttendanceRulesService
             return AttendanceStatus.EarlyLeave;
         }
 
+
+
         // Preserve whatever check-in already determined (Late, HalfDay, NightShift,
         // WeekendWork, etc.) instead of collapsing everything to Present/Late.
         return currentStatus;
     }
+
+            public decimal CalculateShortHours(
+            TimeSpan workDuration,
+            TimeSpan breakDuration,
+            WorkSchedule schedule)
+        {
+            var actualHours =
+                (decimal)(workDuration - breakDuration).TotalHours;
+
+            return Math.Max(
+                0,
+                schedule.StandardHoursPerDay - actualHours);
+        }
 
     /// <summary>
     /// Calculates break duration per company policy based on work hours.

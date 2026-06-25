@@ -13,6 +13,7 @@ public record AttendanceRecordDto(
     DateTime? CheckOutTime,
     AttendanceStatus Status,
     decimal OvertimeHours,
+    decimal ShortHours,
     decimal LateMinutes,
     VerificationMethod VerificationMethod,
     bool IsSuspicious,

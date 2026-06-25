@@ -74,13 +74,14 @@ public interface IEmployeeReportService
 
 public sealed class EmployeeReportService(ApplicationDbContext db) : IEmployeeReportService
 {
-    private const double StandardHours = 8.0;
     private const int AnnualLeaveTotal = 15;
 
     public async Task<EmployeeReportDto?> GetAsync(
         Guid employeeId, DateOnly from, DateOnly to, CancellationToken ct)
     {
-        var employee = await db.Employees.FirstOrDefaultAsync(e => e.Id == employeeId, ct);
+        var employee = await db.Employees
+            .Include(e => e.WorkSchedule)
+            .FirstOrDefaultAsync(e => e.Id == employeeId, ct);
         if (employee is null) return null;
 
         // ── Attendance records ──
@@ -109,8 +110,9 @@ public sealed class EmployeeReportService(ApplicationDbContext db) : IEmployeeRe
             if (r.CheckOutTime.HasValue)
             {
                 worked = (r.CheckOutTime.Value - r.CheckInTime).TotalHours;
-                var diff = worked.Value - StandardHours;
-                if (diff > 0) overtime = diff;
+                var standardHours = (double)(employee.WorkSchedule?.StandardHoursPerDay ?? 8m);
+                var diff = worked.Value - standardHours;
+                if (diff > 0) overtime = (double)r.OvertimeHours;
                 else if (diff < 0) undertime = Math.Abs(diff);
             }
 

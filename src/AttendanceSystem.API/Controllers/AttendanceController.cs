@@ -30,49 +30,6 @@ public class AttendanceController : ControllerBase
         _logger = logger;
     }
 
-    private static string StatusName(AttendanceStatus s) => s switch
-    {
-        AttendanceStatus.Present => "Present",
-        AttendanceStatus.Late => "Late",
-        AttendanceStatus.EarlyLeave => "EarlyLeave",
-        AttendanceStatus.Absent => "Absent",
-        AttendanceStatus.OnLeave => "OnLeave",
-        AttendanceStatus.Holiday => "Holiday",
-        AttendanceStatus.NightShift => "NightShift",
-        AttendanceStatus.WeekendWork => "WeekendWork",
-        AttendanceStatus.HalfDay => "HalfDay",
-        AttendanceStatus.PendingManualReview => "PendingManualReview",
-        _ => s.ToString()
-    };
-
-    private static string ComputeStatus(AttendanceStatus storedStatus, DateTime? checkInTime, DateTime? checkOutTime = null)
-    {
-        if (storedStatus is AttendanceStatus.OnLeave
-                         or AttendanceStatus.Holiday
-                         or AttendanceStatus.HalfDay
-                         or AttendanceStatus.WeekendWork
-                         or AttendanceStatus.NightShift)
-            return StatusName(storedStatus);
-
-        if (checkInTime is null)
-            return "Absent";
-
-        var checkIn = TimeOnly.FromDateTime(checkInTime.Value);
-
-        // 09:00 or earlier = Present, 09:10 or earlier = still Present, after that = Late
-        var baseStatus = checkIn <= new TimeOnly(8, 10) ? "Present" : "Late";
-
-        // Early leave check: if checkout exists and worked hours < 6 => EarlyLeave
-        if (checkOutTime.HasValue)
-        {
-            var workedHours = (checkOutTime.Value - checkInTime.Value).TotalHours;
-            if (workedHours < 6)
-                return "EarlyLeave";
-        }
-
-        return baseStatus;
-    }
-
     [HttpPost("checkin")]
     public async Task<IActionResult> CheckIn([FromBody] CheckInRequest request, CancellationToken cancellationToken )
     {
@@ -133,7 +90,7 @@ public class AttendanceController : ControllerBase
             return Ok(null);
 
         var a = result.Value;
-        var statusStr = ComputeStatus(a.Status, a.CheckInTime, a.CheckOutTime);
+        var statusStr = AttendanceStatusClassifier.ToDisplayName(a.Status);
 
         var workHours = a.CheckOutTime.HasValue
             ? Math.Round((decimal)(a.CheckOutTime.Value - a.CheckInTime).TotalHours, 2)
@@ -148,6 +105,7 @@ public class AttendanceController : ControllerBase
             workHours,
             a.OvertimeHours,
             a.OvertimeHours,
+            a.ShortHours,
             a.LateMinutes,
             a.VerificationMethod.ToString(),
             statusStr,
@@ -175,15 +133,16 @@ public class AttendanceController : ControllerBase
             .Where(a => a.EmployeeId == employeeId.Value && a.Date >= start && a.Date <= end)
             .ToListAsync(cancellationToken);
 
-        var presentDays = records.Count(a => ComputeStatus(a.Status, a.CheckInTime, a.CheckOutTime) is "Present" or "EarlyLeave" or "HalfDay");
-        var absentDays = records.Count(a => ComputeStatus(a.Status, a.CheckInTime, a.CheckOutTime) == "Absent");
-        var lateDays = records.Count(a => ComputeStatus(a.Status, a.CheckInTime, a.CheckOutTime) == "Late");
-        var leaveDays = records.Count(a => ComputeStatus(a.Status, a.CheckInTime, a.CheckOutTime) == "OnLeave");
+        var presentDays = records.Count(a => AttendanceStatusClassifier.IsPresentBucket(a.Status));
+        var absentDays = records.Count(a => AttendanceStatusClassifier.IsAbsent(a.Status));
+        var lateDays = records.Count(a => AttendanceStatusClassifier.IsLate(a.Status));
+        var leaveDays = records.Count(a => AttendanceStatusClassifier.IsOnLeave(a.Status));
         var overtimeHours = records.Sum(a => a.OvertimeHours);
-        var totalMarkedDays = presentDays + absentDays + leaveDays;
-        var attendanceRate = totalMarkedDays == 0 ? 0 : Math.Round((decimal)presentDays / totalMarkedDays * 100, 2);
+        var shortHours = records.Sum(a => a.ShortHours);
+        var totalMarkedDays = presentDays + lateDays + absentDays + leaveDays;
+        var attendanceRate = totalMarkedDays == 0 ? 0 : Math.Round((decimal)(presentDays + lateDays) / totalMarkedDays * 100, 2);
 
-        return Ok(new AttendanceStatisticsApiDto(presentDays, absentDays, lateDays, leaveDays, overtimeHours, attendanceRate));
+        return Ok(new AttendanceStatisticsApiDto(presentDays, absentDays, lateDays, leaveDays, overtimeHours, shortHours, attendanceRate));
     }
 
     [HttpGet("history")]
@@ -225,6 +184,7 @@ public class AttendanceController : ControllerBase
                 a.CheckInTime,
                 a.CheckOutTime,
                 a.OvertimeHours,
+                a.ShortHours,
                 a.LateMinutes,
                 VerificationMethod = a.VerificationMethod,
                 a.Status
@@ -233,7 +193,7 @@ public class AttendanceController : ControllerBase
 
         var items = raw.Select(a =>
         {
-            var statusStr = ComputeStatus(a.Status, a.CheckInTime, a.CheckOutTime);
+            var statusStr = AttendanceStatusClassifier.ToDisplayName(a.Status);
             var workHours = a.CheckOutTime.HasValue
                 ? Math.Round((decimal)(a.CheckOutTime.Value - a.CheckInTime).TotalHours, 2)
                 : 0;
@@ -241,7 +201,7 @@ public class AttendanceController : ControllerBase
             return new AttendanceHistoryApiDto(
                 a.Id, a.EmployeeId, a.EmployeeName, a.Date,
                 a.CheckInTime, a.CheckOutTime,
-                workHours, a.OvertimeHours, a.OvertimeHours, a.LateMinutes,
+                workHours, a.OvertimeHours, a.OvertimeHours, a.ShortHours, a.LateMinutes,
                 a.VerificationMethod.ToString(),
                 statusStr,
                 statusStr);
@@ -290,6 +250,7 @@ public class AttendanceController : ControllerBase
                 a.CheckInTime,
                 a.CheckOutTime,
                 a.OvertimeHours,
+                a.ShortHours,
                 a.LateMinutes,
                 VerificationMethod = a.VerificationMethod,
                 a.Status
@@ -298,7 +259,7 @@ public class AttendanceController : ControllerBase
 
         var items = raw.Select(a =>
         {
-            var statusStr = ComputeStatus(a.Status, a.CheckInTime, a.CheckOutTime);
+            var statusStr = AttendanceStatusClassifier.ToDisplayName(a.Status);
             var workHours = a.CheckOutTime.HasValue
                 ? Math.Round((decimal)(a.CheckOutTime.Value - a.CheckInTime).TotalHours, 2)
                 : 0;
@@ -306,7 +267,7 @@ public class AttendanceController : ControllerBase
             return new AttendanceHistoryApiDto(
                 a.Id, a.EmployeeId, a.EmployeeName, a.Date,
                 a.CheckInTime, a.CheckOutTime,
-                workHours, a.OvertimeHours, a.OvertimeHours, a.LateMinutes,
+                workHours, a.OvertimeHours, a.ShortHours, a.OvertimeHours, a.LateMinutes,
                 a.VerificationMethod.ToString(),
                 statusStr,
                 statusStr);
@@ -385,19 +346,19 @@ public record CheckOutRequest(
 
 public sealed record AttendanceStatisticsApiDto(
     int PresentDays, int AbsentDays, int LateDays, int LeaveDays,
-    decimal OvertimeHours, decimal AttendanceRate);
+    decimal OvertimeHours, decimal ShortHours, decimal AttendanceRate);
 
 public sealed record TodayAttendanceApiDto(
     Guid Id, Guid EmployeeId, DateOnly Date,
     DateTime? CheckInTime, DateTime? CheckOutTime,
-    decimal WorkHours, decimal Overtime, decimal OvertimeHours, decimal LateMinutes,
+    decimal WorkHours, decimal Overtime, decimal OvertimeHours, decimal ShortHours, decimal LateMinutes,
     string? VerificationMethod, string? AttendanceStatus, string? Status,
     bool IsSuspicious, bool IsAutoGeo);
 
 public sealed record AttendanceHistoryApiDto(
     Guid Id, Guid? EmployeeId, string? EmployeeName, DateOnly Date,
     DateTime? CheckInTime, DateTime? CheckOutTime,
-    decimal WorkHours, decimal Overtime, decimal OvertimeHours, decimal LateMinutes,
+    decimal WorkHours, decimal Overtime, decimal OvertimeHours, decimal ShortHours, decimal LateMinutes,
     string? VerificationMethod, string? AttendanceStatus, string? Status);
 
 public sealed record LocationValidationRequestApiDto(double Latitude, double Longitude);
