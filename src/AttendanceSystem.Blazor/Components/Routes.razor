@@ -5,9 +5,14 @@
     <Found Context="routeData">
         <AuthorizeRouteView RouteData="@routeData">
             <NotAuthorized>
-                <div style="padding: 2rem; text-align: center;">
-                    <p>Нэвтэрч байна...</p>
-                </div>
+                @{
+                    // Redirect unauthenticated/unauthorized users to login.
+                    // Rendering a static "loading" div here caused an infinite re-render
+                    // because CascadingAuthenticationState kept notifying state changes while
+                    // the component was mounted and the static content kept Blazor in a dirty
+                    // render cycle.  Using NavigateTo with replace:true breaks the loop.
+                    Navigation.NavigateTo("/login", replace: true);
+                }
             </NotAuthorized>
             <Authorizing>
                 <div style="padding: 2rem; text-align: center;">

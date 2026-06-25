@@ -21,7 +21,7 @@ public sealed class EmployeesApiController : ControllerBase
     /// Жагсаалт — хайлт, хэлтэс, төлөв (active/inactive), pagination дэмждэг.
     /// </summary>
     [HttpGet]
-    [Authorize(Roles = "SuperAdmin,HRManager,DepartmentHead")]
+    [Authorize(Roles = "Admin,SuperAdmin,HRManager,HR,Manager,DepartmentHead")]
     public async Task<ActionResult<PagedResponseDto<EmployeeApiDto>>> List(
         [FromQuery] int pageNumber = 1,
         [FromQuery] int pageSize = 20,

@@ -6,7 +6,9 @@
 
     protected override void OnInitialized()
     {
-        Nav.NavigateTo("/login");
+        // NavigateTo must be called during SSR with forceLoad:false and replace:true
+        // so Blazor's router does it as a client-side navigation, not a server-side redirect loop.
+        Nav.NavigateTo("/login", replace: true);
     }
 
 }

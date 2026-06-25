@@ -48,6 +48,7 @@ public static class DependencyInjection
         services.AddScoped<IEmployeeRepository, EmployeeRepository>();
         services.AddScoped<JwtTokenService>();
         services.AddScoped<PasswordService>();
+        services.AddScoped<IEmployeeReportService, EmployeeReportService>();
 
         // AI Services
         services.AddHttpClient<IAiProvider, DefaultAiProvider>();

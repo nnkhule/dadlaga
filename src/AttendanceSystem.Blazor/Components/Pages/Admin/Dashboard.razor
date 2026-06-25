@@ -1,7 +1,7 @@
 
 @page "/admin/dashboard"
 @layout AdminLayout
-@attribute [Authorize(Roles = "SuperAdmin,HRManager,DepartmentHead")]
+@attribute [Authorize(Roles = "Admin,SuperAdmin,HRManager,DepartmentHead")]
 @implements IAsyncDisposable
 @inject ApiClient Api
 @inject IJSRuntime JS

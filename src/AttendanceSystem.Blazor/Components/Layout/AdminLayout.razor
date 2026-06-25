@@ -1289,7 +1289,7 @@
     }
 
     private RenderFragment NavItem(string href, string icon, string label) =>
-        @<a class="nav-link @(Nav.Uri.Contains(href, StringComparison.OrdinalIgnoreCase) ? "active" : "")" 
+        @<a class="nav-link @(IsNavActive(Nav.Uri, href) ? "active" : "")" 
             href="@href"
             role="listitem">
             <span class="nav-icon" aria-hidden="true">@icon</span>
@@ -1350,6 +1350,17 @@
         _isLoggingOut = true;
         await Auth.LogoutAsync();
         Nav.NavigateTo("/login", replace: true);
+    }
+
+    // Active-link helper: exact segment match so /admin/reports does NOT
+    // highlight when we are on /admin/reports/employee
+    private static bool IsNavActive(string currentUri, string href)
+    {
+        // Normalise: strip query/fragment, lower-case
+        var uri  = currentUri.Split('?')[0].Split('#')[0].TrimEnd('/').ToLowerInvariant();
+        var link = href.TrimEnd('/').ToLowerInvariant();
+        // Exact match OR sub-path (href followed by another /)
+        return uri == link || uri.StartsWith(link + "/");
     }
 
     private string GetInitial()

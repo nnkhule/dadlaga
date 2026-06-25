@@ -1,6 +1,8 @@
 @page "/admin/employees"
+
+
 @layout AdminLayout
-@attribute [Authorize(Roles = "SuperAdmin,HRManager,DepartmentHead")]
+@attribute [Authorize(Roles = "Admin,SuperAdmin,HRManager,DepartmentHead")]
 @inject ApiClient Api
 @inject NavigationManager Nav
 @inject IJSRuntime JS

@@ -1,6 +1,6 @@
 @page "/admin/leave"
 @layout AdminLayout
-@attribute [Authorize(Roles = "SuperAdmin,HRManager,DepartmentHead")]
+@attribute [Authorize(Roles = "Admin,SuperAdmin,HRManager,DepartmentHead")]
 @inject ApiClient Api
 
 <PageHeader Title="Чөлөөний хүсэлтүүд" Subtitle="SQL Server-ээс ачааллагдсан чөлөөний хүсэлтүүд" Icon="☑" />

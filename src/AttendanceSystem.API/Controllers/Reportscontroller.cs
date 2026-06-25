@@ -1,13 +1,12 @@
+using AttendanceSystem.Infrastructure.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using AttendIQ.Api.Services;  // ← ADD THIS LINE
-
 
 namespace AttendIQ.Api.Controllers;
 
 [ApiController]
 [Route("api/reports")]
-[Authorize(Roles = "Admin,HR")]
+[Authorize(Roles = "Admin,SuperAdmin,HRManager,HR,Manager")]
 public class ReportsController(IEmployeeReportService reportService) : ControllerBase
 {
     [HttpGet("employee/{employeeId:guid}")]
@@ -17,9 +16,8 @@ public class ReportsController(IEmployeeReportService reportService) : Controlle
         [FromQuery] DateOnly to,
         CancellationToken ct)
     {
-        if (to < from) return BadRequest("Дуусах огноо эхлэх огнооноос өмнө байж болохгүй.");
-        if (to.ToDateTime(TimeOnly.MinValue) - from.ToDateTime(TimeOnly.MinValue) > TimeSpan.FromDays(366))
-            return BadRequest("Хамгийн ихдээ 1 жилийн тайлан гаргаж болно.");
+        var dateError = ValidateDateRange(from, to);
+        if (dateError is not null) return BadRequest(dateError);
 
         var report = await reportService.GetAsync(employeeId, from, to, ct);
         if (report is null) return NotFound();
@@ -33,9 +31,12 @@ public class ReportsController(IEmployeeReportService reportService) : Controlle
         [FromQuery] DateOnly to,
         CancellationToken ct)
     {
+        var dateError = ValidateDateRange(from, to);
+        if (dateError is not null) return BadRequest(dateError);
+
         var bytes = await reportService.ExportPdfAsync(employeeId, from, to, ct);
         if (bytes is null) return NotFound();
-        return File(bytes, "application/pdf", $"report_{employeeId}_{from:yyyyMM}.pdf");
+        return File(bytes, "text/plain; charset=utf-8", $"report_{employeeId}_{from:yyyyMM}.txt");
     }
 
     [HttpGet("employee/{employeeId:guid}/excel")]
@@ -45,10 +46,19 @@ public class ReportsController(IEmployeeReportService reportService) : Controlle
         [FromQuery] DateOnly to,
         CancellationToken ct)
     {
+        var dateError = ValidateDateRange(from, to);
+        if (dateError is not null) return BadRequest(dateError);
+
         var bytes = await reportService.ExportExcelAsync(employeeId, from, to, ct);
         if (bytes is null) return NotFound();
-        return File(bytes,
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            $"report_{employeeId}_{from:yyyyMM}.xlsx");
+        return File(bytes, "text/csv; charset=utf-8", $"report_{employeeId}_{from:yyyyMM}.csv");
+    }
+
+    private static string? ValidateDateRange(DateOnly from, DateOnly to)
+    {
+        if (to < from) return "End date cannot be before start date.";
+        return to.ToDateTime(TimeOnly.MinValue) - from.ToDateTime(TimeOnly.MinValue) > TimeSpan.FromDays(366)
+            ? "The report range cannot exceed one year."
+            : null;
     }
 }

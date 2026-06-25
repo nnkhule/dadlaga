@@ -1,17 +1,16 @@
 @page "/admin/reports/employee"
 @page "/admin/reports/employee/{EmployeeId:guid}"
-@page "/admin/employees/{EmployeeId:guid}/report"
+
 @layout AdminLayout
 @inject HttpClient Http
 @inject AuthService Auth
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 
-@attribute [Authorize(Roles = "Admin,SuperAdmin,HRManager,HR,Manager")]
 
 <PageTitle>Ажилтны тайлан — AttendIQ</PageTitle>
 
-@if (!_ready)
+@if (_showInitialSpinner)
 {
     <div class="loading-state">
         <div class="spinner"></div>
@@ -1044,7 +1043,7 @@ else
     private DateOnly _from = DateOnly.FromDateTime(DateTime.Today.AddDays(-DateTime.Today.Day + 1));
     private DateOnly _to = DateOnly.FromDateTime(DateTime.Today);
 
-    private bool _ready;
+    private bool _showInitialSpinner => false;
     private bool _loading;
     private bool _loadingEmployees;
     private bool _exporting;
@@ -1056,12 +1055,17 @@ else
     private List<EmployeeListItem> _employees = [];
     private EmployeeListItem? _employee => _employees.FirstOrDefault(e => e.Id == EmployeeId);
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (!firstRender) return;
+
+        // Set _initialized FIRST so that if OnParametersSetAsync fires
+        // concurrently (e.g. hot-reload or re-render), it won't double-load.
+        _initialized = true;
+
         await LoadEmployees();
         if (EmployeeId != default) await LoadReport();
-        _initialized = true;
-        _ready = true;
+        StateHasChanged();
     }
 
     protected override async Task OnParametersSetAsync()
@@ -1075,14 +1079,23 @@ else
         try
         {
             var token = await Auth.GetTokenAsync();
-            using var req = new HttpRequestMessage(HttpMethod.Get, "api/employees?pageSize=500");
+            using var req = new HttpRequestMessage(HttpMethod.Get, "api/employees?pageNumber=1&pageSize=100");
             req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
-            var resp = await Http.SendAsync(req);
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            var resp = await Http.SendAsync(req, cts.Token);
             if (resp.IsSuccessStatusCode)
             {
-                var result = await resp.Content.ReadFromJsonAsync<PagedResult<EmployeeListItem>>();
+                var result = await resp.Content.ReadFromJsonAsync<PagedResult<EmployeeListItem>>(cts.Token);
                 _employees = result?.Items ?? [];
             }
+            else
+            {
+                _loadError = $"Failed to load employees ({(int)resp.StatusCode}).";
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            _loadError = "Loading employees timed out. Check that the API is running.";
         }
         catch
         {
@@ -1130,11 +1143,6 @@ else
         finally { _loading = false; }
     }
 
-    private void OnEmployeeChange(ChangeEventArgs e)
-    {
-        if (Guid.TryParse(e.Value?.ToString(), out var id) && id != default)
-            Nav.NavigateTo($"/admin/reports/employee/{id}");
-    }
 
     private async Task SetPeriod(string p)
     {
@@ -1149,6 +1157,19 @@ else
             _ => (_from, _to)
         };
         await LoadReport();
+    }
+
+    private void OnEmployeeChange(ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString();
+        if (Guid.TryParse(value, out var employeeId))
+        {
+            Nav.NavigateTo($"/admin/reports/employee/{employeeId}");
+            return;
+        }
+
+        _report = null;
+        Nav.NavigateTo("/admin/reports/employee");
     }
 
     private async Task ExportPdf()
@@ -1166,7 +1187,7 @@ else
             if (resp.IsSuccessStatusCode)
             {
                 var bytes = await resp.Content.ReadAsByteArrayAsync();
-                await DownloadFile(bytes, $"report_{_employee?.EmployeeCode}_{_from:yyyyMM}.pdf", "application/pdf");
+                await DownloadFile(bytes, $"report_{_employee?.EmployeeCode}_{_from:yyyyMM}.txt", "text/plain");
             }
             else
                 _loadError = "PDF файл үүсгэхэд алдаа гарлаа";
@@ -1190,8 +1211,7 @@ else
             if (resp.IsSuccessStatusCode)
             {
                 var bytes = await resp.Content.ReadAsByteArrayAsync();
-                await DownloadFile(bytes, $"report_{_employee?.EmployeeCode}_{_from:yyyyMM}.xlsx",
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+                await DownloadFile(bytes, $"report_{_employee?.EmployeeCode}_{_from:yyyyMM}.csv", "text/csv");
             }
             else
                 _loadError = "Excel файл үүсгэхэд алдаа гарлаа";

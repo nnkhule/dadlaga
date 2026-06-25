@@ -1,57 +1,60 @@
 using AttendanceSystem.Blazor.Components;
 using AttendanceSystem.Blazor.Services;
 using Microsoft.AspNetCore.Components.Authorization;
-using Microsoft.AspNetCore.Authentication.Cookies;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+// Add Razor components with interactive server rendering
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-// Program.cs-д энэ мөрүүдийг нэмнэ үү
-builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
-    .AddCookie(options =>
-    {
-        options.LoginPath = "/login";
-        options.LogoutPath = "/logout";
-        options.ExpireTimeSpan = TimeSpan.FromHours(8);
-    });
+// ── Auth ──────────────────────────────────────────────────────────────────────
+// The original code registered BOTH AddAuthentication(CookieAuth) AND a JWT-based
+// PersistingAuthenticationStateProvider — they fought each other.
+// The Blazor app uses only JWT tokens stored in localStorage, so we only need
+// AddAuthorizationCore + the custom state provider; no cookie middleware needed.
+builder.Services.AddAuthorizationCore();
+builder.Services.AddCascadingAuthenticationState();
 
 builder.Services.AddAuthorization();
 
-
-builder.Services.AddAuthorizationCore();
-builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddScoped<PersistingAuthenticationStateProvider>();
-builder.Services.AddScoped<AuthenticationStateProvider>(sp => sp.GetRequiredService<PersistingAuthenticationStateProvider>());
+builder.Services.AddScoped<AuthenticationStateProvider>(
+    sp => sp.GetRequiredService<PersistingAuthenticationStateProvider>());
 
+// ── HTTP client pointing at the API ──────────────────────────────────────────
 builder.Services.AddScoped(sp => new HttpClient
 {
     BaseAddress = new Uri(builder.Configuration["ApiBaseUrl"] ?? "https://localhost:7000/")
 });
+
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<ApiClient>();
 
+// ─────────────────────────────────────────────────────────────────────────────
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
-app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 
-if (!app.Environment.IsDevelopment() || builder.Configuration["https_port"] is not null || builder.Configuration["HTTPS_PORT"] is not null)
+// UseStatusCodePagesWithReExecute does NOT accept a createScopeForStatusCodePages parameter.
+// Passing an unknown overload caused a compile error / startup crash that looked like
+// an infinite loading screen because Blazor never fully started.
+app.UseStatusCodePagesWithReExecute("/not-found");
+
+if (!app.Environment.IsDevelopment()
+    || builder.Configuration["https_port"] is not null
+    || builder.Configuration["HTTPS_PORT"] is not null)
 {
     app.UseHttpsRedirection();
 }
 
-app.UseAuthentication();
-app.UseAuthorization();
+// Authorization middleware (no cookie authentication needed — JWT only)
 
+app.UseAuthorization();
 app.UseAntiforgery();
 
 app.MapStaticAssets();

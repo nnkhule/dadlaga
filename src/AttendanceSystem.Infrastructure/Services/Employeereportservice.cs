@@ -1,13 +1,10 @@
-using Microsoft.EntityFrameworkCore;
-
-
-namespace AttendIQ.Api.Services;
-
-
+using System.Text;
+using AttendanceSystem.Domain.Entities;
 using AttendanceSystem.Domain.Enums;
 using AttendanceSystem.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 
-// ── DTOs ──────────────────────────────────────────────────────────────────────
+namespace AttendanceSystem.Infrastructure.Services;
 
 public sealed class EmployeeReportDto
 {
@@ -61,16 +58,12 @@ public sealed class LeaveBalanceDto
     public int Remaining { get; set; }
 }
 
-// ── Interface ────────────────────────────────────────────────────────────────
-
 public interface IEmployeeReportService
 {
     Task<EmployeeReportDto?> GetAsync(Guid employeeId, DateOnly from, DateOnly to, CancellationToken ct);
     Task<byte[]?> ExportPdfAsync(Guid employeeId, DateOnly from, DateOnly to, CancellationToken ct);
     Task<byte[]?> ExportExcelAsync(Guid employeeId, DateOnly from, DateOnly to, CancellationToken ct);
 }
-
-// ── Implementation ────────────────────────────────────────────────────────────
 
 public sealed class EmployeeReportService(ApplicationDbContext db) : IEmployeeReportService
 {
@@ -84,73 +77,72 @@ public sealed class EmployeeReportService(ApplicationDbContext db) : IEmployeeRe
             .FirstOrDefaultAsync(e => e.Id == employeeId, ct);
         if (employee is null) return null;
 
-        // ── Attendance records ──
         var records = await db.AttendanceRecords
             .Where(a => a.EmployeeId == employeeId && a.Date >= from && a.Date <= to)
             .OrderBy(a => a.Date)
             .ToListAsync(ct);
 
-        // ── Leave requests ──
         var leaves = await db.LeaveRequests
             .Where(l => l.EmployeeId == employeeId && l.StartDate <= to && l.EndDate >= from)
             .OrderByDescending(l => l.CreatedAt)
             .ToListAsync(ct);
 
-        // ── Build attendance DTOs ──
         int totalWorkDays = CountWorkDays(from, to);
         var attendanceDtos = new List<AttendanceRecordDto>();
 
-        foreach (var r in records)
+        foreach (var record in records)
         {
             double? worked = null;
             double? overtime = null;
             double? undertime = null;
 
-            // ✅ FIXED: CheckOutTime is DateTime? (nullable), CheckInTime is DateTime (not nullable)
-            if (r.CheckOutTime.HasValue)
+            if (record.CheckOutTime.HasValue)
             {
-                worked = (r.CheckOutTime.Value - r.CheckInTime).TotalHours;
+                worked = (record.CheckOutTime.Value - record.CheckInTime).TotalHours;
                 var standardHours = (double)(employee.WorkSchedule?.StandardHoursPerDay ?? 8m);
                 var diff = worked.Value - standardHours;
-                if (diff > 0) overtime = (double)r.OvertimeHours;
+                if (diff > 0) overtime = (double)record.OvertimeHours;
                 else if (diff < 0) undertime = Math.Abs(diff);
             }
 
             attendanceDtos.Add(new AttendanceRecordDto
             {
-                Date = r.Date,
-                CheckIn = TimeOnly.FromDateTime(r.CheckInTime),  // ✅ CheckInTime is always present
-                CheckOut = r.CheckOutTime.HasValue ? TimeOnly.FromDateTime(r.CheckOutTime.Value) : null,  // ✅ CheckOutTime is nullable
+                Date = record.Date,
+                CheckIn = TimeOnly.FromDateTime(record.CheckInTime),
+                CheckOut = record.CheckOutTime.HasValue
+                    ? TimeOnly.FromDateTime(record.CheckOutTime.Value)
+                    : null,
                 WorkedHours = worked,
                 OvertimeHours = overtime,
                 UndertimeHours = undertime,
-                Status = r.Status.ToString(),  // ✅ Status is enum, not nullable
-                Note = r.Notes  // ✅ Property is "Notes" not "Note"
+                Status = record.Status.ToString(),
+                Note = record.Notes
             });
         }
 
-        // ── Summary stats ──
-        int presentDays = records.Count(r => r.Status != AttendanceStatus.Absent);
-        int lateDays = records.Count(r => r.LateMinutes > 0);  // ✅ LateMinutes is decimal, not nullable
-        int absentDays = totalWorkDays - presentDays;
-
-        double overtimeTotal = records.Sum(r => (double)r.OvertimeHours);  // ✅ OvertimeHours is decimal, not nullable
+        int presentDays = records.Count(r => r.Status is AttendanceStatus.Present
+            or AttendanceStatus.Late
+            or AttendanceStatus.EarlyLeave
+            or AttendanceStatus.NightShift
+            or AttendanceStatus.WeekendWork
+            or AttendanceStatus.HalfDay);
+        int lateDays = records.Count(r => r.Status == AttendanceStatus.Late || r.LateMinutes > 0);
+        int absentDays = Math.Max(0, totalWorkDays - presentDays);
+        double overtimeTotal = records.Sum(r => (double)r.OvertimeHours);
         double undertimeTotal = attendanceDtos.Sum(r => r.UndertimeHours ?? 0);
 
-        // ✅ Use RequestStatus enum
         int approvedLeaveDays = leaves
             .Where(l => l.Status == RequestStatus.Approved)
-            .Sum(l => CalculateLeaveDays(l));
+            .Sum(CalculateLeaveDays);
 
         double attendanceRate = totalWorkDays > 0 ? (double)presentDays / totalWorkDays * 100 : 0;
         double punctualityRate = presentDays > 0 ? (double)(presentDays - lateDays) / presentDays * 100 : 0;
 
-        // Avg check-in / check-out
         var checkins = records
             .Select(r => TimeOnly.FromDateTime(r.CheckInTime))
             .ToList();
         var checkouts = records
-            .Where(r => r.CheckOutTime.HasValue)  // ✅ Only nullable CheckOutTime
+            .Where(r => r.CheckOutTime.HasValue)
             .Select(r => TimeOnly.FromDateTime(r.CheckOutTime!.Value))
             .ToList();
 
@@ -161,26 +153,23 @@ public sealed class EmployeeReportService(ApplicationDbContext db) : IEmployeeRe
             ? TimeOnly.FromTimeSpan(TimeSpan.FromMinutes(checkouts.Average(t => t.ToTimeSpan().TotalMinutes))).ToString(@"HH\:mm")
             : null;
 
-        // Max late minutes
         int maxLate = records
-            .Select(r => (int)r.LateMinutes)  // ✅ LateMinutes is decimal, convert to int
+            .Select(r => (int)r.LateMinutes)
             .DefaultIfEmpty(0)
             .Max();
 
-        // Consecutive present days (current streak up to today)
         int streak = 0;
-        foreach (var r in attendanceDtos.OrderByDescending(x => x.Date))
+        foreach (var record in attendanceDtos.OrderByDescending(x => x.Date))
         {
-            if (r.Status != AttendanceStatus.Absent.ToString())
+            if (record.Status != AttendanceStatus.Absent.ToString())
                 streak++;
             else
                 break;
         }
 
-        // ── Leave balance DTOs ──
         var balanceDtos = new List<LeaveBalanceDto>
         {
-            new LeaveBalanceDto
+            new()
             {
                 LeaveType = LeaveType.Annual.ToString(),
                 Total = AnnualLeaveTotal,
@@ -223,48 +212,99 @@ public sealed class EmployeeReportService(ApplicationDbContext db) : IEmployeeRe
     }
 
     public Task<byte[]?> ExportPdfAsync(Guid employeeId, DateOnly from, DateOnly to, CancellationToken ct)
-    {
-        throw new NotImplementedException("PDF export хэрэгжүүлэгдээгүй байна.");
-    }
+        => ExportTextAsync(employeeId, from, to, ct);
 
     public Task<byte[]?> ExportExcelAsync(Guid employeeId, DateOnly from, DateOnly to, CancellationToken ct)
+        => ExportCsvAsync(employeeId, from, to, ct);
+
+    private async Task<byte[]?> ExportCsvAsync(Guid employeeId, DateOnly from, DateOnly to, CancellationToken ct)
     {
-        throw new NotImplementedException("Excel export хэрэгжүүлэгдээгүй байна.");
+        var report = await GetAsync(employeeId, from, to, ct);
+        if (report is null) return null;
+
+        var builder = new StringBuilder();
+        builder.AppendLine("Date,CheckIn,CheckOut,WorkedHours,OvertimeHours,UndertimeHours,Status,Note");
+        foreach (var record in report.AttendanceRecords)
+        {
+            builder.AppendLine(string.Join(",", new[]
+            {
+                EscapeCsv(record.Date.ToString("yyyy-MM-dd")),
+                EscapeCsv(record.CheckIn?.ToString(@"HH\:mm")),
+                EscapeCsv(record.CheckOut?.ToString(@"HH\:mm")),
+                EscapeCsv(record.WorkedHours?.ToString("F1")),
+                EscapeCsv(record.OvertimeHours?.ToString("F1")),
+                EscapeCsv(record.UndertimeHours?.ToString("F1")),
+                EscapeCsv(record.Status),
+                EscapeCsv(record.Note)
+            }));
+        }
+
+        return WithUtf8Bom(builder.ToString());
     }
 
-   
-    // ── Helpers ──────────────────────────────────────────────────────────
+    private async Task<byte[]?> ExportTextAsync(Guid employeeId, DateOnly from, DateOnly to, CancellationToken ct)
+    {
+        var report = await GetAsync(employeeId, from, to, ct);
+        if (report is null) return null;
+
+        var builder = new StringBuilder();
+        builder.AppendLine($"Employee report: {from:yyyy-MM-dd} - {to:yyyy-MM-dd}");
+        builder.AppendLine($"Work days: {report.TotalWorkDays}");
+        builder.AppendLine($"Present: {report.PresentDays}");
+        builder.AppendLine($"Late: {report.LateDays}");
+        builder.AppendLine($"Absent: {report.AbsentDays}");
+        builder.AppendLine($"Overtime hours: {report.OvertimeHours:F1}");
+        builder.AppendLine($"Undertime hours: {report.UndertimeHours:F1}");
+        builder.AppendLine();
+        builder.AppendLine("Date\tCheck in\tCheck out\tWorked\tOvertime\tUndertime\tStatus\tNote");
+
+        foreach (var record in report.AttendanceRecords)
+        {
+            builder.AppendLine(string.Join('\t', new[]
+            {
+                record.Date.ToString("yyyy-MM-dd"),
+                record.CheckIn?.ToString(@"HH\:mm") ?? "",
+                record.CheckOut?.ToString(@"HH\:mm") ?? "",
+                record.WorkedHours?.ToString("F1") ?? "",
+                record.OvertimeHours?.ToString("F1") ?? "",
+                record.UndertimeHours?.ToString("F1") ?? "",
+                record.Status,
+                record.Note ?? ""
+            }));
+        }
+
+        return WithUtf8Bom(builder.ToString());
+    }
 
     private static int CountWorkDays(DateOnly from, DateOnly to)
     {
         int count = 0;
-        for (var d = from; d <= to; d = d.AddDays(1))
-            if (d.DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday)
+        for (var date = from; date <= to; date = date.AddDays(1))
+            if (date.DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday)
                 count++;
         return count;
     }
 
-    private static int CalculateLeaveDays(dynamic leaveRequest)
+    private static int CalculateLeaveDays(LeaveRequest leaveRequest)
     {
-        try
-        {
-            var startDate = (DateOnly)leaveRequest.StartDate;
-            var endDate = (DateOnly)leaveRequest.EndDate;
-
-            if (leaveRequest.LeaveMode != null && leaveRequest.LeaveMode == "Hourly" && leaveRequest.Hours != null)
-            {
-                return 0;
-            }
-
-            int days = 0;
-            for (var d = startDate; d <= endDate; d = d.AddDays(1))
-                if (d.DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday)
-                    days++;
-            return days;
-        }
-        catch
+        if (leaveRequest.LeaveMode == "Hourly" && leaveRequest.Hours.HasValue)
         {
             return 0;
         }
+
+        int days = 0;
+        for (var date = leaveRequest.StartDate; date <= leaveRequest.EndDate; date = date.AddDays(1))
+            if (date.DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday)
+                days++;
+        return days;
     }
+
+    private static string EscapeCsv(string? value)
+    {
+        value ??= string.Empty;
+        return "\"" + value.Replace("\"", "\"\"") + "\"";
+    }
+
+    private static byte[] WithUtf8Bom(string value)
+        => Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(value)).ToArray();
 }
