@@ -5,6 +5,15 @@ namespace AttendanceSystem.API.Dtos
 {
     public class EmployeeStatisticsDto
     {
+        public EmployeeStatisticsDto()
+        {
+            Summary = new SummaryDto();
+            AttendanceAnalytics = new AttendanceAnalyticsDto();
+            AttendanceHistory = new List<AttendanceHistoryDto>();
+            LeaveStatistics = new LeaveStatisticsDto();
+            GpsStatistics = new GpsStatisticsDto();
+        }
+
         public SummaryDto Summary { get; set; }
         public AttendanceAnalyticsDto AttendanceAnalytics { get; set; }
         public List<AttendanceHistoryDto> AttendanceHistory { get; set; }
@@ -35,6 +44,11 @@ namespace AttendanceSystem.API.Dtos
 
     public class AttendanceAnalyticsDto
     {
+        public AttendanceAnalyticsDto()
+        {
+            MonthlyChartData = new List<MonthlyAttendanceChartDto>();
+        }
+
         public double MonthlyAttendanceRate { get; set; }
         public double MonthlyWorkingHours { get; set; }
         public double MonthlyOvertime { get; set; }
@@ -44,7 +58,7 @@ namespace AttendanceSystem.API.Dtos
 
     public class MonthlyAttendanceChartDto
     {
-        public string Month { get; set; }
+        public string? Month { get; set; }
         public double AttendanceRate { get; set; }
         public double WorkingHours { get; set; }
         public double Overtime { get; set; }
@@ -59,12 +73,17 @@ namespace AttendanceSystem.API.Dtos
         public double WorkHours { get; set; }
         public double OvertimeHours { get; set; }
         public int LateMinutes { get; set; }
-        public string Status { get; set; }
-        public string VerificationMethod { get; set; }
+        public string? Status { get; set; }
+        public string? VerificationMethod { get; set; }
     }
 
     public class LeaveStatisticsDto
     {
+        public LeaveStatisticsDto()
+        {
+            LeaveHistory = new List<LeaveHistoryDto>();
+        }
+
         public int TotalRequests { get; set; }
         public int Approved { get; set; }
         public int Rejected { get; set; }
@@ -77,13 +96,18 @@ namespace AttendanceSystem.API.Dtos
         public Guid LeaveRequestId { get; set; }
         public DateTime StartDate { get; set; }
         public DateTime EndDate { get; set; }
-        public string LeaveType { get; set; }
-        public string Status { get; set; }
+        public string? LeaveType { get; set; }
+        public string? Status { get; set; }
         public DateTime RequestDate { get; set; }
     }
 
     public class GpsStatisticsDto
     {
+        public GpsStatisticsDto()
+        {
+            GpsHistory = new List<GpsHistoryDto>();
+        }
+
         public int TotalGpsRecords { get; set; }
         public DateTime LastGpsActivity { get; set; }
         public int OfficeCheckins { get; set; }
@@ -98,6 +122,6 @@ namespace AttendanceSystem.API.Dtos
         public double Latitude { get; set; }
         public double Longitude { get; set; }
         public bool IsOfficeCheckin { get; set; }
-        public string Location { get; set; }
+        public string? Location { get; set; }
     }
 }

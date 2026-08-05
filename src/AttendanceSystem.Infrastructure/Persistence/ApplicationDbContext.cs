@@ -30,6 +30,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<GpsPing> GpsPings => Set<GpsPing>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
+    public DbSet<WorkShiftPlan> WorkShiftPlans => Set<WorkShiftPlan>();
+    public DbSet<TaskItem> TaskItems => Set<TaskItem>();
+    public DbSet<TaskComment> TaskComments => Set<TaskComment>();
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder builder)

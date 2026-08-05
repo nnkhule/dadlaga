@@ -14,19 +14,19 @@ public class WorkSchedule : BaseEntity
     public int GraceMinutes { get; private set; } = 10;
     public WorkDays WorkDays { get; private set; } = WorkDays.Weekdays;
     public int BreakDurationMinutes { get; private set; } = 60;
-    public decimal StandardHoursPerDay { get; private set; } = 9;
+    public decimal StandardHoursPerDay { get; private set; } = 8;
     public bool IsNightShift { get; private set; }
     public decimal NightShiftMultiplier { get; private set; } = 1.5m;
     public decimal WeekendMultiplier { get; private set; } = 2.0m;
 
     private WorkSchedule() { }
 
-    public static WorkSchedule CreateStandard(string name = "Standard 08-12,13-17")
+    public static WorkSchedule CreateStandard(string name = "Standard 09-13,14-18")
         => new()
         {
             Name = name,
-            ShiftStart = new TimeOnly(8, 0),
-            ShiftEnd = new TimeOnly(17, 0),
+            ShiftStart = new TimeOnly(9, 0),
+            ShiftEnd = new TimeOnly(18, 0),
             GraceMinutes = 10,
             WorkDays = WorkDays.Weekdays,
             BreakDurationMinutes = 60,

@@ -31,15 +31,15 @@
   /* Surface */
   --clr-bg:             #F0F4F8;
   --clr-surface:        #FFFFFF;
-  --clr-surface-2:      #F8FAFC;
+  --clr-surface-2:      #FFFFFF;
   --clr-border:         #E2E8F0;
-  --clr-border-light:   #F1F5F9;
+  --clr-border-light:   #F0F4F8;
 
   /* Text */
   --clr-text:           #0F172A;
-  --clr-text-2:         #1E293B;
+  --clr-text-2:         #0F172A;
   --clr-text-muted:     #64748B;
-  --clr-text-hint:      #94A3B8;
+  --clr-text-hint:      #64748B;
 
   /* Sidebar */
   --sidebar-bg:         #FFFFFF;
@@ -65,23 +65,31 @@
   /* Spacing */
   --topbar-h:    64px;
   --content-p:   24px;
+
+  /* Design System Variables */
+  --bg-primary:    var(--clr-bg);
+  --bg-secondary:  var(--clr-surface);
+  --card-bg:       var(--clr-surface);
+  --text-primary:  var(--clr-text);
+  --text-secondary:var(--clr-text-muted);
+  --border-color:  var(--clr-border);
 }
 
-/* Dark mode */
+/* Dark mode overridden to force light theme */
 @media (prefers-color-scheme: dark) {
   :root {
-    --clr-bg:             #0F172A;
-    --clr-surface:        #1E293B;
-    --clr-surface-2:      #162032;
-    --clr-border:         #334155;
-    --clr-border-light:   #1E293B;
-    --clr-text:           #F1F5F9;
-    --clr-text-2:         #E2E8F0;
-    --clr-text-muted:     #94A3B8;
-    --sidebar-bg:         #1E293B;
-    --clr-primary-light:  #1e3a5f;
-    --shadow-sm:          0 1px 3px rgba(0,0,0,0.3);
-    --shadow:             0 4px 6px rgba(0,0,0,0.25);
+    --clr-bg:             #F0F4F8;
+    --clr-surface:        #FFFFFF;
+    --clr-surface-2:      #FFFFFF;
+    --clr-border:         #E2E8F0;
+    --clr-border-light:   #F0F4F8;
+    --clr-text:           #0F172A;
+    --clr-text-2:         #0F172A;
+    --clr-text-muted:     #64748B;
+    --sidebar-bg:         #FFFFFF;
+    --clr-primary-light:  #EFF6FF;
+    --shadow-sm:          0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+    --shadow:             0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -1px rgba(0,0,0,0.04);
   }
 }
 
