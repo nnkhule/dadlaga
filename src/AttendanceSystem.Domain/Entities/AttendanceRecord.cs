@@ -52,10 +52,8 @@ public class AttendanceRecord : AggregateRoot
         string? photoUrl,
         string? notes)
     {
-        // Convert UTC check-in time to local time (Ulaanbaatar, UTC+8) for date storage.
-        const double UtcOffsetHours = 8;
-        var checkInLocal = checkInTime.AddHours(UtcOffsetHours);
-        var dateLocal = DateOnly.FromDateTime(checkInLocal);
+        // checkInTime is expected to be local time (Ulaanbaatar, UTC+8)
+        var dateLocal = DateOnly.FromDateTime(checkInTime);
 
         var record = new AttendanceRecord
         {

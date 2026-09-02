@@ -1,4 +1,5 @@
 using AttendanceSystem.Application.DTOs.AI;
+using AttendanceSystem.Application.Common;
 using AttendanceSystem.Application.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using AttendanceSystem.Infrastructure.Persistence;
@@ -8,15 +9,17 @@ namespace AttendanceSystem.Infrastructure.Services;
 
 public class AiChatService : IAiChatService
 {
-    private const int MaxHistoryMessages = 120; 
+    private const int MaxHistoryMessages = 120;
 
     private readonly IAiProvider _aiProvider;
     private readonly ApplicationDbContext _dbContext;
+    private readonly IClock _clock;
 
-    public AiChatService(IAiProvider aiProvider, ApplicationDbContext dbContext)
+    public AiChatService(IAiProvider aiProvider, ApplicationDbContext dbContext, IClock clock)
     {
         _aiProvider = aiProvider;
         _dbContext = dbContext;
+        _clock = clock;
     }
 
     public async Task<ChatResponseDto> GetAdminResponseAsync(
@@ -26,7 +29,7 @@ public class AiChatService : IAiChatService
         var systemPrompt = BuildAdminSystemPrompt(context);
         var messages = BuildMessageHistory(request);
         var reply = await _aiProvider.GenerateReplyAsync(systemPrompt, messages, cancellationToken);
-        return new ChatResponseDto { Reply = reply, Timestamp = DateTime.UtcNow };
+        return new ChatResponseDto { Reply = reply, Timestamp = _clock.UtcNow };
     }
 
     public async Task<ChatResponseDto> GetEmployeeResponseAsync(
@@ -36,14 +39,14 @@ public class AiChatService : IAiChatService
         var systemPrompt = BuildEmployeeSystemPrompt(context);
         var messages = BuildMessageHistory(request);
         var reply = await _aiProvider.GenerateReplyAsync(systemPrompt, messages, cancellationToken);
-        return new ChatResponseDto { Reply = reply, Timestamp = DateTime.UtcNow };
+        return new ChatResponseDto { Reply = reply, Timestamp = _clock.UtcNow };
     }
 
     // ──────────────────────────────────────────────────────────
     //  PROMPT BUILDERS
     // ──────────────────────────────────────────────────────────
 
-    private static string BuildAdminSystemPrompt(AdminAiContextDto ctx)
+    private string BuildAdminSystemPrompt(AdminAiContextDto ctx)
     {
         var deptBreakdown = ctx.DepartmentBreakdown.Count > 0
             ? string.Join("\n", ctx.DepartmentBreakdown.Select(d =>
@@ -74,7 +77,7 @@ public class AiChatService : IAiChatService
             ХҮРЭЭНИЙ ГАДНА АСУУЛТ ИРВЭЛ (компанитай хамаагүй ерөнхий мэдлэг, зугаа цэнгэл, хувийн зөвлөгөө гэх мэт):
             - Эелдэгээр "Энэ асуулт миний хариуцдаг ирц/HR-ийн хүрээнээс гадуур байна" гэж тайлбарлаад, тухайн зорилгод тохирох ерөнхий AI ашиглахыг санал болго.
 
-            === ӨНӨӨДРИЙН ТОЙМ ({DateTime.UtcNow:yyyy-MM-dd}) ===
+            === ӨНӨӨДРИЙН ТОЙМ ({_clock.TodayLocal:yyyy-MM-dd}) ===
             • Нийт ажилтан: {ctx.TotalEmployees}
             • Өнөөдөр ирсэн: {ctx.PresentToday + ctx.LateTodayCount}
             • Өнөөдөр хоцорсон: {ctx.LateTodayCount}
@@ -225,7 +228,7 @@ public class AiChatService : IAiChatService
 
     private async Task<AdminAiContextDto> BuildAdminContextAsync(CancellationToken cancellationToken)
     {
-        var today        = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today        = _clock.TodayLocal;
         var firstOfMonth = new DateOnly(today.Year, today.Month, 1);
         var sevenDaysAgo = today.AddDays(-6);
 
@@ -357,7 +360,7 @@ public class AiChatService : IAiChatService
     private async Task<EmployeeAiContextDto> BuildEmployeeContextAsync(
         Guid employeeId, CancellationToken cancellationToken)
     {
-        var today        = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today        = _clock.TodayLocal;
         var firstOfMonth = new DateOnly(today.Year, today.Month, 1);
         var sevenDaysAgo = today.AddDays(-7);
         var fourteenDaysAgo = today.AddDays(-14);

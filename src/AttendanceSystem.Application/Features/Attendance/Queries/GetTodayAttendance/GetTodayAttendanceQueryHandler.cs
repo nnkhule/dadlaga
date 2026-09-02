@@ -11,13 +11,18 @@ namespace AttendanceSystem.Application.Features.Attendance.Queries.GetTodayAtten
 public class GetTodayAttendanceQueryHandler : IRequestHandler<GetTodayAttendanceQuery, Result<AttendanceRecordDto?>>
 {
     private readonly IAttendanceRepository _repository;
+    private readonly IClock _clock;
 
-    public GetTodayAttendanceQueryHandler(IAttendanceRepository repository) => _repository = repository;
+    public GetTodayAttendanceQueryHandler(IAttendanceRepository repository, IClock clock)
+    {
+        _repository = repository;
+        _clock = clock;
+    }
 
     /// <inheritdoc />
     public async Task<Result<AttendanceRecordDto?>> Handle(GetTodayAttendanceQuery request, CancellationToken cancellationToken)
     {
-        var today = DateOnly.FromDateTime(DateTime.Now);
+        var today = _clock.TodayLocal;
         var record = await _repository.GetTodayRecordAsync(request.EmployeeId, today, cancellationToken);
         if (record is null)
             return Result<AttendanceRecordDto?>.Success(null);

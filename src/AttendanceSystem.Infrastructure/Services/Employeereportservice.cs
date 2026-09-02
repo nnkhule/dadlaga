@@ -1,9 +1,12 @@
-
 using System.Text;
 using AttendanceSystem.Domain.Entities;
 using AttendanceSystem.Domain.Enums;
 using AttendanceSystem.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using QuestPDF.Fluent;
+using QuestPDF.Helpers;
+using QuestPDF.Infrastructure;
+using ClosedXML.Excel;
 
 namespace AttendanceSystem.Infrastructure.Services;
 
@@ -213,10 +216,10 @@ public sealed class EmployeeReportService(ApplicationDbContext db) : IEmployeeRe
     }
 
     public Task<byte[]?> ExportPdfAsync(Guid employeeId, DateOnly from, DateOnly to, CancellationToken ct)
-        => ExportTextAsync(employeeId, from, to, ct);
+        => GeneratePdfAsync(employeeId, from, to, ct);
 
     public Task<byte[]?> ExportExcelAsync(Guid employeeId, DateOnly from, DateOnly to, CancellationToken ct)
-        => ExportCsvAsync(employeeId, from, to, ct);
+        => GenerateExcelAsync(employeeId, from, to, ct);
 
     private async Task<byte[]?> ExportCsvAsync(Guid employeeId, DateOnly from, DateOnly to, CancellationToken ct)
     {
@@ -308,4 +311,506 @@ public sealed class EmployeeReportService(ApplicationDbContext db) : IEmployeeRe
 
     private static byte[] WithUtf8Bom(string value)
         => Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(value)).ToArray();
+
+    private async Task<byte[]?> GeneratePdfAsync(Guid employeeId, DateOnly from, DateOnly to, CancellationToken ct)
+    {
+        var report = await GetAsync(employeeId, from, to, ct);
+        if (report is null) return null;
+
+        return Document.Create(container =>
+        {
+            container.Page(page =>
+            {
+                page.Size(PageSizes.A4);
+                page.Margin(2, Unit.Centimetre);
+                page.PageColor(Colors.White);
+                page.DefaultTextStyle(x => x.FontSize(10));
+
+                page.Header()
+                    .PaddingBottom(10)
+                    .Text($"Employee Report: {from:yyyy-MM-dd} - {to:yyyy-MM-dd}")
+                    .SemiBold().FontSize(16).AlignCenter();
+
+                page.Content()
+                    .PaddingVertical(10)
+                    .Column(column =>
+                    {
+                        column.Item().Row(row =>
+                        {
+                            row.RelativeItem(2).Column(col =>
+                            {
+                                col.Item().Text("Summary").SemiBold().FontSize(12);
+                                col.Item().Text($"Work Days: {report.TotalWorkDays}");
+                                col.Item().Text($"Present: {report.PresentDays}");
+                                col.Item().Text($"Late: {report.LateDays}");
+                                col.Item().Text($"Absent: {report.AbsentDays}");
+                                col.Item().Text($"Overtime Hours: {report.OvertimeHours:F1}");
+                                col.Item().Text($"Undertime Hours: {report.UndertimeHours:F1}");
+                                col.Item().Text($"Leave Days: {report.LeaveDays}");
+                                col.Item().Text($"Leave Balance: {report.LeaveBalance}");
+                                col.Item().Text($"Attendance Rate: {report.AttendanceRate:F1}%");
+                                col.Item().Text($"Punctuality Rate: {report.PunctualityRate:F1}%");
+                            });
+
+                            row.RelativeItem(3).Column(col =>
+                            {
+                                col.Item().Text("Average Times").SemiBold().FontSize(12);
+                                col.Item().Text($"Check-in: {report.AvgCheckIn ?? "N/A"}");
+                                col.Item().Text($"Check-out: {report.AvgCheckOut ?? "N/A"}");
+                                col.Item().Text($"Max Late Minutes: {report.MaxLateMinutes}");
+                                col.Item().Text($"Consecutive Present Days: {report.ConsecutivePresentDays}");
+                            });
+                        });
+
+                        column.Item().Text("Attendance Records").SemiBold().FontSize(12);
+                        if (report.AttendanceRecords.Any())
+                        {
+                            // Define cell styles
+                            IContainer HeaderCellStyle(IContainer container) =>
+                                container.Background(Colors.Grey.Lighten2)
+                                    .PaddingHorizontal(4)
+                                    .PaddingVertical(2)
+                                    .AlignLeft()
+                                    .AlignMiddle();
+
+                            IContainer CellStyle(IContainer container) =>
+                                container.BorderBottom(0.5f)
+                                    .BorderColor(Colors.Grey.Lighten3)
+                                    .PaddingHorizontal(4)
+                                    .PaddingVertical(2)
+                                    .AlignLeft()
+                                    .AlignMiddle();
+
+                            column.Item().Table(table =>
+                            {
+                                // Columns definition
+                                table.ColumnsDefinition(columns =>
+                                {
+                                    columns.RelativeColumn(2); // Date
+                                    columns.RelativeColumn(2); // Check In
+                                    columns.RelativeColumn(2); // Check Out
+                                    columns.RelativeColumn(2); // Worked Hours
+                                    columns.RelativeColumn(2); // Overtime Hours
+                                    columns.RelativeColumn(2); // Undertime Hours
+                                    columns.RelativeColumn(2); // Status
+                                    columns.RelativeColumn(3); // Note
+                                });
+
+                                // Header
+                                table.Header(header =>
+                                {
+                                    header.Cell().Element(HeaderCellStyle).Text("Date");
+                                    header.Cell().Element(HeaderCellStyle).Text("Check In");
+                                    header.Cell().Element(HeaderCellStyle).Text("Check Out");
+                                    header.Cell().Element(HeaderCellStyle).Text("Worked Hours");
+                                    header.Cell().Element(HeaderCellStyle).Text("Overtime Hours");
+                                    header.Cell().Element(HeaderCellStyle).Text("Undertime Hours");
+                                    header.Cell().Element(HeaderCellStyle).Text("Status");
+                                    header.Cell().Element(HeaderCellStyle).Text("Note");
+                                });
+
+                                // Data rows
+                                foreach (var record in report.AttendanceRecords)
+                                {
+                                    table.Cell().Element(CellStyle).Text($"{record.Date:yyyy-MM-dd}");
+                                    table.Cell().Element(CellStyle).Text(record.CheckIn?.ToString(@"HH\:mm") ?? "");
+                                    table.Cell().Element(CellStyle).Text(record.CheckOut?.ToString(@"HH\:mm") ?? "");
+                                    table.Cell().Element(CellStyle).Text(record.WorkedHours?.ToString("F1") ?? "");
+                                    table.Cell().Element(CellStyle).Text(record.OvertimeHours?.ToString("F1") ?? "");
+                                    table.Cell().Element(CellStyle).Text(record.UndertimeHours?.ToString("F1") ?? "");
+                                    table.Cell().Element(CellStyle).Text(record.Status);
+                                    table.Cell().Element(CellStyle).Text(record.Note ?? "");
+                                }
+                            });
+                        }
+                        else
+                        {
+                            column.Item().Text("No attendance records found for this period.")
+                                .Italic()
+                                .AlignCenter();
+                        }
+
+                        column.Item().Text("Leave Requests").SemiBold().FontSize(12);
+                        if (report.LeaveRequests.Any())
+                        {
+                            // Define cell styles
+                            IContainer HeaderCellStyle(IContainer container) =>
+                                container.Background(Colors.Grey.Lighten2)
+                                    .PaddingHorizontal(4)
+                                    .PaddingVertical(2)
+                                    .AlignLeft()
+                                    .AlignMiddle();
+
+                            IContainer CellStyle(IContainer container) =>
+                                container.BorderBottom(0.5f)
+                                    .BorderColor(Colors.Grey.Lighten3)
+                                    .PaddingHorizontal(4)
+                                    .PaddingVertical(2)
+                                    .AlignLeft()
+                                    .AlignMiddle();
+
+                            column.Item().Table(table =>
+                            {
+                                // Columns definition
+                                table.ColumnsDefinition(columns =>
+                                {
+                                    columns.RelativeColumn(2); // Requested At
+                                    columns.RelativeColumn(2); // Leave Type
+                                    columns.RelativeColumn(2); // Start Date
+                                    columns.RelativeColumn(2); // End Date
+                                    columns.RelativeColumn(2); // Days
+                                    columns.RelativeColumn(3); // Reason
+                                    columns.RelativeColumn(2); // Status
+                                });
+
+                                // Header
+                                table.Header(header =>
+                                {
+                                    header.Cell().Element(HeaderCellStyle).Text("Requested At");
+                                    header.Cell().Element(HeaderCellStyle).Text("Leave Type");
+                                    header.Cell().Element(HeaderCellStyle).Text("Start Date");
+                                    header.Cell().Element(HeaderCellStyle).Text("End Date");
+                                    header.Cell().Element(HeaderCellStyle).Text("Days");
+                                    header.Cell().Element(HeaderCellStyle).Text("Reason");
+                                    header.Cell().Element(HeaderCellStyle).Text("Status");
+                                });
+
+                                // Data rows
+                                foreach (var leave in report.LeaveRequests)
+                                {
+                                    table.Cell().Element(CellStyle).Text($"{leave.RequestedAt:yyyy-MM-dd HH:mm}");
+                                    table.Cell().Element(CellStyle).Text(leave.LeaveType);
+                                    table.Cell().Element(CellStyle).Text($"{leave.StartDate:yyyy-MM-dd}");
+                                    table.Cell().Element(CellStyle).Text($"{leave.EndDate:yyyy-MM-dd}");
+                                    table.Cell().Element(CellStyle).Text(leave.Days.ToString());
+                                    table.Cell().Element(CellStyle).Text(leave.Reason ?? "");
+                                    table.Cell().Element(CellStyle).Text(leave.Status);
+                                }
+                            });
+                        }
+                        else
+                        {
+                            column.Item().Text("No leave requests found for this period.")
+                                .Italic()
+                                .AlignCenter();
+                        }
+
+                        column.Item().Text("Leave Balances").SemiBold().FontSize(12);
+                        if (report.LeaveBalances.Any())
+                        {
+                            // Define cell styles
+                            IContainer HeaderCellStyle(IContainer container) =>
+                                container.Background(Colors.Grey.Lighten2)
+                                    .PaddingHorizontal(4)
+                                    .PaddingVertical(2)
+                                    .AlignLeft()
+                                    .AlignMiddle();
+
+                            IContainer CellStyle(IContainer container) =>
+                                container.BorderBottom(0.5f)
+                                    .BorderColor(Colors.Grey.Lighten3)
+                                    .PaddingHorizontal(4)
+                                    .PaddingVertical(2)
+                                    .AlignLeft()
+                                    .AlignMiddle();
+
+                            column.Item().Table(table =>
+                            {
+                                // Columns definition
+                                table.ColumnsDefinition(columns =>
+                                {
+                                    columns.RelativeColumn(3); // Leave Type
+                                    columns.RelativeColumn(2); // Total
+                                    columns.RelativeColumn(2); // Used
+                                    columns.RelativeColumn(2); // Remaining
+                                });
+
+                                // Header
+                                table.Header(header =>
+                                {
+                                    header.Cell().Element(HeaderCellStyle).Text("Leave Type");
+                                    header.Cell().Element(HeaderCellStyle).Text("Total");
+                                    header.Cell().Element(HeaderCellStyle).Text("Used");
+                                    header.Cell().Element(HeaderCellStyle).Text("Remaining");
+                                });
+
+                                // Data rows
+                                foreach (var balance in report.LeaveBalances)
+                                {
+                                    table.Cell().Element(CellStyle).Text(balance.LeaveType);
+                                    table.Cell().Element(CellStyle).Text(balance.Total.ToString());
+                                    table.Cell().Element(CellStyle).Text(balance.Used.ToString());
+                                    table.Cell().Element(CellStyle).Text(balance.Remaining.ToString());
+                                }
+                            });
+                        }
+                        else
+                        {
+                            column.Item().Text("No leave balances found.")
+                                .Italic()
+                                .AlignCenter();
+                        }
+                    });
+
+                page.Footer()
+                    .AlignCenter()
+                    .Text(x =>
+                    {
+                        x.CurrentPageNumber();
+                        x.Span(" / ");
+                        x.TotalPages();
+                    });
+            });
+        })
+        .GeneratePdf();
+    }
+
+    private async Task<byte[]?> GenerateExcelAsync(Guid employeeId, DateOnly from, DateOnly to, CancellationToken ct)
+    {
+        var report = await GetAsync(employeeId, from, to, ct);
+        if (report is null) return null;
+
+        using var workbook = new XLWorkbook();
+        var worksheet = workbook.AddWorksheet("Employee Report");
+
+        // Set up styles
+        var headerStyle = worksheet.Style;
+        headerStyle.Font.Bold = true;
+        headerStyle.Fill.BackgroundColor = XLColor.LightGray;
+        headerStyle.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+        headerStyle.Border.BottomBorder = XLBorderStyleValues.Thin;
+
+        var dataStyle = worksheet.Style;
+        dataStyle.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
+        dataStyle.Border.BottomBorder = XLBorderStyleValues.Thin;
+
+        int currentRow = 1;
+
+        // Title
+        worksheet.Cell(currentRow, 1).SetValue($"Employee Report: {from:yyyy-MM-dd} - {to:yyyy-MM-dd}");
+        worksheet.Range(worksheet.Cell(currentRow, 1), worksheet.Cell(currentRow, 8)).Merge();
+        worksheet.Cell(currentRow, 1).Style.Font.Bold = true;
+        worksheet.Cell(currentRow, 1).Style.Font.FontSize = 16;
+        worksheet.Cell(currentRow, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+        currentRow += 2;
+
+        // Summary section
+        worksheet.Cell(currentRow, 1).SetValue("Summary");
+        worksheet.Cell(currentRow, 1).Style.Font.Bold = true;
+        worksheet.Cell(currentRow, 1).Style.Font.FontSize = 12;
+        currentRow++;
+
+        worksheet.Cell(currentRow, 1).SetValue("Work Days:");
+        worksheet.Cell(currentRow, 2).SetValue(report.TotalWorkDays);
+        currentRow++;
+
+        worksheet.Cell(currentRow, 1).SetValue("Present:");
+        worksheet.Cell(currentRow, 2).SetValue(report.PresentDays);
+        currentRow++;
+
+        worksheet.Cell(currentRow, 1).SetValue("Late:");
+        worksheet.Cell(currentRow, 2).SetValue(report.LateDays);
+        currentRow++;
+
+        worksheet.Cell(currentRow, 1).SetValue("Absent:");
+        worksheet.Cell(currentRow, 2).SetValue(report.AbsentDays);
+        currentRow++;
+
+        worksheet.Cell(currentRow, 1).SetValue("Overtime Hours:");
+        worksheet.Cell(currentRow, 2).SetValue(report.OvertimeHours);
+        currentRow++;
+
+        currentRow++;
+
+        worksheet.Cell(currentRow, 1).SetValue("Undertime Hours:");
+        worksheet.Cell(currentRow, 2).SetValue(report.UndertimeHours);
+        currentRow++;
+
+        worksheet.Cell(currentRow, 1).SetValue("Leave Days:");
+        worksheet.Cell(currentRow, 2).SetValue(report.LeaveDays);
+        currentRow++;
+
+        worksheet.Cell(currentRow, 1).SetValue("Leave Balance:");
+        worksheet.Cell(currentRow, 2).SetValue(report.LeaveBalance);
+        currentRow++;
+
+        worksheet.Cell(currentRow, 1).SetValue("Attendance Rate:");
+        worksheet.Cell(currentRow, 2).SetValue($"{report.AttendanceRate:F1}%");
+        currentRow++;
+
+        worksheet.Cell(currentRow, 1).SetValue("Punctuality Rate:");
+        worksheet.Cell(currentRow, 2).SetValue($"{report.PunctualityRate:F1}%");
+        currentRow += 2;
+
+        // Average times
+        worksheet.Cell(currentRow, 1).SetValue("Average Times");
+        worksheet.Cell(currentRow, 1).Style.Font.Bold = true;
+        worksheet.Cell(currentRow, 1).Style.Font.FontSize = 12;
+        currentRow++;
+
+        worksheet.Cell(currentRow, 1).SetValue("Average Check-in:");
+        worksheet.Cell(currentRow, 2).SetValue(report.AvgCheckIn ?? "N/A");
+        currentRow++;
+
+        worksheet.Cell(currentRow, 1).SetValue("Average Check-out:");
+        worksheet.Cell(currentRow, 2).SetValue(report.AvgCheckOut ?? "N/A");
+        currentRow++;
+
+        worksheet.Cell(currentRow, 1).SetValue("Max Late Minutes:");
+        worksheet.Cell(currentRow, 2).SetValue(report.MaxLateMinutes);
+        currentRow++;
+
+        worksheet.Cell(currentRow, 1).SetValue("Consecutive Present Days:");
+        worksheet.Cell(currentRow, 2).SetValue(report.ConsecutivePresentDays);
+        currentRow += 2;
+
+        // Attendance Records
+        if (report.AttendanceRecords.Any())
+        {
+            worksheet.Cell(currentRow, 1).SetValue("Attendance Records");
+            worksheet.Cell(currentRow, 1).Style.Font.Bold = true;
+            worksheet.Cell(currentRow, 1).Style.Font.FontSize = 12;
+            currentRow++;
+
+            // Headers
+            var headers = new[] { "Date", "Check In", "Check Out", "Worked Hours", "Overtime Hours", "Undertime Hours", "Status", "Note" };
+            for (int i = 0; i < headers.Length; i++)
+            {
+                worksheet.Cell(currentRow, i + 1).SetValue(headers[i]);
+                worksheet.Cell(currentRow, i + 1).Style = headerStyle;
+            }
+            currentRow++;
+
+            // Data rows
+            foreach (var record in report.AttendanceRecords)
+            {
+                worksheet.Cell(currentRow, 1).SetValue($"{record.Date:yyyy-MM-dd}");
+                worksheet.Cell(currentRow, 2).SetValue(record.CheckIn?.ToString(@"HH\:mm") ?? "");
+                worksheet.Cell(currentRow, 3).SetValue(record.CheckOut?.ToString(@"HH\:mm") ?? "");
+                worksheet.Cell(currentRow, 4).SetValue(record.WorkedHours?.ToString("F1") ?? "");
+                worksheet.Cell(currentRow, 5).SetValue(record.OvertimeHours?.ToString("F1") ?? "");
+                worksheet.Cell(currentRow, 6).SetValue(record.UndertimeHours?.ToString("F1") ?? "");
+                worksheet.Cell(currentRow, 7).SetValue(record.Status);
+                worksheet.Cell(currentRow, 8).SetValue(record.Note ?? "");
+
+                // Apply data style to all cells in the row
+                for (int i = 1; i <= 8; i++)
+                {
+                    worksheet.Cell(currentRow, i).Style = dataStyle;
+                }
+                currentRow++;
+            }
+        }
+        else
+        {
+            worksheet.Cell(currentRow, 1).SetValue("No attendance records found for this period.");
+            worksheet.Range(worksheet.Cell(currentRow, 1), worksheet.Cell(currentRow, 8)).Merge();
+            worksheet.Cell(currentRow, 1).Style.Font.Italic = true;
+            worksheet.Cell(currentRow, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            currentRow++;
+        }
+
+        currentRow += 2;
+
+        // Leave Requests
+        if (report.LeaveRequests.Any())
+        {
+            worksheet.Cell(currentRow, 1).SetValue("Leave Requests");
+            worksheet.Cell(currentRow, 1).Style.Font.Bold = true;
+            worksheet.Cell(currentRow, 1).Style.Font.FontSize = 12;
+            currentRow++;
+
+            // Headers
+            var leaveHeaders = new[] { "Requested At", "Leave Type", "Start Date", "End Date", "Days", "Reason", "Status" };
+            for (int i = 0; i < leaveHeaders.Length; i++)
+            {
+                worksheet.Cell(currentRow, i + 1).SetValue(leaveHeaders[i]);
+                worksheet.Cell(currentRow, i + 1).Style = headerStyle;
+            }
+            currentRow++;
+
+            // Data rows
+            foreach (var leave in report.LeaveRequests)
+            {
+                worksheet.Cell(currentRow, 1).SetValue($"{leave.RequestedAt:yyyy-MM-dd HH:mm}");
+                worksheet.Cell(currentRow, 2).SetValue(leave.LeaveType);
+                worksheet.Cell(currentRow, 3).SetValue($"{leave.StartDate:yyyy-MM-dd}");
+                worksheet.Cell(currentRow, 4).SetValue($"{leave.EndDate:yyyy-MM-dd}");
+                worksheet.Cell(currentRow, 5).SetValue(leave.Days.ToString());
+                worksheet.Cell(currentRow, 6).SetValue(leave.Reason ?? "");
+                worksheet.Cell(currentRow, 7).SetValue(leave.Status);
+
+                // Apply data style to all cells in the row
+                for (int i = 1; i <= 7; i++)
+                {
+                    worksheet.Cell(currentRow, i).Style = dataStyle;
+                }
+                currentRow++;
+            }
+        }
+        else
+        {
+            worksheet.Cell(currentRow, 1).SetValue("No leave requests found for this period.");
+            worksheet.Range(worksheet.Cell(currentRow, 1), worksheet.Cell(currentRow, 7)).Merge();
+            worksheet.Cell(currentRow, 1).Style.Font.Italic = true;
+            worksheet.Cell(currentRow, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            currentRow++;
+        }
+
+        currentRow += 2;
+
+        // Leave Balances
+        if (report.LeaveBalances.Any())
+        {
+            worksheet.Cell(currentRow, 1).SetValue("Leave Balances");
+            worksheet.Cell(currentRow, 1).Style.Font.Bold = true;
+            worksheet.Cell(currentRow, 1).Style.Font.FontSize = 12;
+            currentRow++;
+
+            // Headers
+            var balanceHeaders = new[] { "Leave Type", "Total", "Used", "Remaining" };
+            for (int i = 0; i < balanceHeaders.Length; i++)
+            {
+                worksheet.Cell(currentRow, i + 1).SetValue(balanceHeaders[i]);
+                worksheet.Cell(currentRow, i + 1).Style = headerStyle;
+            }
+            currentRow++;
+
+            // Data rows
+            foreach (var balance in report.LeaveBalances)
+            {
+                worksheet.Cell(currentRow, 1).SetValue(balance.LeaveType);
+                worksheet.Cell(currentRow, 2).SetValue(balance.Total.ToString());
+                worksheet.Cell(currentRow, 3).SetValue(balance.Used.ToString());
+                worksheet.Cell(currentRow, 4).SetValue(balance.Remaining.ToString());
+
+                // Apply data style to all cells in the row
+                for (int i = 1; i <= 4; i++)
+                {
+                    worksheet.Cell(currentRow, i).Style = dataStyle;
+                }
+                currentRow++;
+            }
+        }
+        else
+        {
+            worksheet.Cell(currentRow, 1).SetValue("No leave balances found.");
+            worksheet.Range(worksheet.Cell(currentRow, 1), worksheet.Cell(currentRow, 4)).Merge();
+            worksheet.Cell(currentRow, 1).Style.Font.Italic = true;
+            worksheet.Cell(currentRow, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            currentRow++;
+        }
+
+        // Auto-fit columns
+        worksheet.Columns().AdjustToContents();
+
+        using var memoryStream = new MemoryStream();
+        workbook.SaveAs(memoryStream);
+        return memoryStream.ToArray();
+    }
+
+    private static IXLCell GetCell(IXLWorksheet worksheet, int row, int column)
+    {
+        return worksheet.Cell(row, column);
+    }
 }

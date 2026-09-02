@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using AttendanceSystem.Application.Common;
 using AttendanceSystem.Application.DTOs.Attendance;
 using AttendanceSystem.Domain.Entities;
 using AttendanceSystem.Domain.Enums;
@@ -17,13 +18,15 @@ namespace AttendanceSystem.API.Services
     public class EmployeeStatisticsService : IEmployeeStatisticsService
     {
         private readonly ApplicationDbContext _db;
+        private readonly IClock _clock;
 
         /// <summary>
         /// Creates a new instance of <see cref="EmployeeStatisticsService"/>.
         /// </summary>
-        public EmployeeStatisticsService(ApplicationDbContext db)
+        public EmployeeStatisticsService(ApplicationDbContext db, IClock clock)
         {
             _db = db;
+            _clock = clock;
         }
 
         /// <summary>
@@ -32,7 +35,7 @@ namespace AttendanceSystem.API.Services
         public async Task<EmployeeStatisticsDto> GetEmployeeStatisticsAsync(Guid employeeId)
         {
             // Define the period as the current month (from first day to today)
-            var today = DateOnly.FromDateTime(DateTime.Now);
+            var today = _clock.TodayLocal;
             var startOfMonth = new DateOnly(today.Year, today.Month, 1);
             var endOfMonth = today; // We want up to today
 
@@ -336,7 +339,7 @@ namespace AttendanceSystem.API.Services
         private async Task<List<MonthlyAttendanceChartDto>> GetMonthlyChartDataAsync(Guid employeeId, int months)
         {
             var chartData = new List<MonthlyAttendanceChartDto>();
-            var today = DateOnly.FromDateTime(DateTime.Now);
+            var today = _clock.TodayLocal;
 
             for (int i = 0; i < months; i++)
             {

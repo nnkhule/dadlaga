@@ -2,7 +2,7 @@
 
 
 @layout AdminLayout
-@attribute [Authorize(Roles = "Admin,SuperAdmin,HRManager,DepartmentHead")]
+@attribute [Authorize(Roles = AppRoles.SuperAdmin + "," + AppRoles.HrManager + "," + AppRoles.DepartmentHead)]
 @inject ApiClient Api
 @inject NavigationManager Nav
 @inject IJSRuntime JS

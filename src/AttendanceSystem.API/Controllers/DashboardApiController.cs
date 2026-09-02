@@ -1,5 +1,6 @@
 using AttendanceSystem.Domain.Enums;
 using AttendanceSystem.Infrastructure.Persistence;
+using AttendanceSystem.Application.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -12,13 +13,18 @@ namespace AttendanceSystem.API.Controllers;
 public sealed class DashboardApiController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
+    private readonly IClock _clock;
 
-    public DashboardApiController(ApplicationDbContext db) => _db = db;
+    public DashboardApiController(ApplicationDbContext db, IClock clock)
+    {
+        _db = db;
+        _clock = clock;
+    }
 
     [HttpGet("summary")]
     public async Task<ActionResult<DashboardSummaryApiDto>> Summary([FromQuery] DateOnly? date, CancellationToken cancellationToken)
     {
-        var targetDate = date ?? DateOnly.FromDateTime(DateTime.Now);
+        var targetDate = date ?? _clock.TodayLocal;
         var totalEmployees = await _db.Employees.AsNoTracking().CountAsync(cancellationToken);
         var activeEmployees = await _db.Employees.AsNoTracking().CountAsync(e => e.IsActive, cancellationToken);
 
@@ -110,7 +116,7 @@ if (absentToday < 0)
     public async Task<ActionResult<AttendanceTrendApiDto>> Statistics([FromQuery] int days = 7, CancellationToken cancellationToken = default)
     {
         days = Math.Clamp(days, 1, 31);
-        var today = DateOnly.FromDateTime(DateTime.Now);
+        var today = _clock.TodayLocal;
         var from = today.AddDays(-(days - 1));
         var activeEmployees = await _db.Employees.AsNoTracking().CountAsync(e => e.IsActive, cancellationToken);
         var records = await _db.AttendanceRecords

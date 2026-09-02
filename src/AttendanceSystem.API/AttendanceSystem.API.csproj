@@ -5,6 +5,7 @@
     <Nullable>enable</Nullable>
     <RootNamespace>AttendanceSystem.API</RootNamespace>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <BuildInParallel>false</BuildInParallel>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\AttendanceSystem.Infrastructure\AttendanceSystem.Infrastructure.csproj" />

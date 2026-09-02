@@ -1,6 +1,6 @@
 @page "/admin/departments"
 @layout AdminLayout
-@attribute [Authorize(Roles = "Admin,SuperAdmin,HRManager")]
+@attribute [Authorize(Roles = AppRoles.SuperAdmin + "," + AppRoles.HrManager)]
 @inject ApiClient Api
 @inject IJSRuntime JS
 

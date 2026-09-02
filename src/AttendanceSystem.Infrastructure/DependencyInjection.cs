@@ -1,4 +1,5 @@
 using AttendanceSystem.Application;
+using AttendanceSystem.Application.Common;
 using AttendanceSystem.Application.Configuration;
 using AttendanceSystem.Application.Interfaces;
 using AttendanceSystem.Application.Interfaces.Repositories;
@@ -33,19 +34,22 @@ public static class DependencyInjection
                 b => b.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)));
 
         services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
-            {
-                options.Password.RequireDigit = true;
-                options.Password.RequireLowercase = true;
-                options.Password.RequireUppercase = true;
-                options.Password.RequiredLength = 8;
-                options.User.RequireUniqueEmail = true;
-            })
+                {
+                    options.Password.RequireDigit = true;
+                    options.Password.RequireLowercase = true;
+                    options.Password.RequireUppercase = true;
+                    options.Password.RequiredLength = 8;
+                    options.User.RequireUniqueEmail = true;
+                    options.Lockout.MaxFailedAccessAttempts = 5;
+                    options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+                })
             .AddEntityFrameworkStores<ApplicationDbContext>()
             .AddDefaultTokenProviders();
 
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IAttendanceRepository, AttendanceRepository>();
         services.AddScoped<IEmployeeRepository, EmployeeRepository>();
+        services.AddScoped<IHolidayRepository, HolidayRepository>();
         services.AddScoped<JwtTokenService>();
         services.AddScoped<PasswordService>();
         services.AddScoped<IEmployeeReportService, EmployeeReportService>();
@@ -53,6 +57,9 @@ public static class DependencyInjection
         // AI Services
         services.AddHttpClient<IAiProvider, DefaultAiProvider>();
         services.AddScoped<IAiChatService, AiChatService>();
+
+        // Clock service
+        services.AddSingleton<IClock, SystemClock>();
 
         var redis = configuration.GetConnectionString("Redis");
         if (!string.IsNullOrWhiteSpace(redis))

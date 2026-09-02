@@ -1,4 +1,5 @@
 using AttendanceSystem.Application.Configuration;
+using AttendanceSystem.Application.Interfaces.Repositories;
 using AttendanceSystem.Domain.Entities;
 using AttendanceSystem.Domain.Enums;
 using Microsoft.Extensions.Options;
@@ -11,20 +12,35 @@ namespace AttendanceSystem.Application.Services;
 public class AttendanceRulesService
 {
     private readonly AttendanceRulesOptions _options;
+    private readonly IHolidayRepository _holidayRepository;
     private const double UtcOffsetHours = 8; // Ulaanbaatar Time (UTC+8)
 
-    public AttendanceRulesService(IOptions<AttendanceRulesOptions> options)
-        => _options = options.Value;
+    public AttendanceRulesService(IOptions<AttendanceRulesOptions> options, IHolidayRepository holidayRepository)
+        => (_options, _holidayRepository) = (options.Value, holidayRepository);
+
+    /// <summary>
+    /// Checks if a given date is a holiday (either recurring yearly or fixed date).
+    /// </summary>
+    /// <param name="date">The date to check</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>True if the date is a holiday, false otherwise</returns>
+    private async Task<bool> IsHolidayAsync(DateOnly date, CancellationToken cancellationToken = default)
+    {
+        return await _holidayRepository.IsHolidayAsync(date, cancellationToken);
+    }
 
     /// <summary>
     /// Evaluates check-in time against schedule and returns status and late minutes.
     /// </summary>
-    public (AttendanceStatus Status, decimal LateMinutes, bool IsVeryEarly, bool IsHalfDay) EvaluateCheckIn(
+    public async Task<(AttendanceStatus Status, decimal LateMinutes, bool IsVeryEarly, bool IsHalfDay)> EvaluateCheckIn(
         DateTime checkInTime, WorkSchedule schedule)
     {
         // Treat input as local time
         var checkInLocal = checkInTime;
         var localDate = DateOnly.FromDateTime(checkInLocal);
+
+        // Check if today is a holiday (highest priority)
+        bool isHoliday = await IsHolidayAsync(localDate);
 
         // For night shifts that cross midnight, adjust the date if check-in is before shift start
         DateTime shiftStart;
@@ -46,16 +62,73 @@ public class AttendanceRulesService
         var isVeryEarly = checkInLocal < earlyThreshold;
         if (checkInLocal <= graceEnd)
         {
-            return (AttendanceStatus.Present, 0, isVeryEarly, false);
+            // Determine status based on priority: Holiday > NightShift > WeekendWork > Present
+            AttendanceStatus status;
+            if (isHoliday)
+            {
+                status = AttendanceStatus.Holiday;
+            }
+            else if (schedule.IsNightShift)
+            {
+                status = AttendanceStatus.NightShift;
+            }
+            else if (!schedule.IsWorkDay(localDate.DayOfWeek))
+            {
+                status = AttendanceStatus.WeekendWork;
+            }
+            else
+            {
+                status = AttendanceStatus.Present;
+            }
+
+            return (status, 0, isVeryEarly, false);
         }
 
         var lateMinutes = (decimal)(checkInLocal - shiftStart).TotalMinutes;
         if (checkInLocal >= halfDayThreshold)
         {
-            return (AttendanceStatus.HalfDay, lateMinutes, isVeryEarly, true);
+            // Determine status based on priority: Holiday > NightShift > WeekendWork > HalfDay
+            AttendanceStatus status;
+            if (isHoliday)
+            {
+                status = AttendanceStatus.Holiday;
+            }
+            else if (schedule.IsNightShift)
+            {
+                status = AttendanceStatus.NightShift;
+            }
+            else if (!schedule.IsWorkDay(localDate.DayOfWeek))
+            {
+                status = AttendanceStatus.WeekendWork;
+            }
+            else
+            {
+                status = AttendanceStatus.HalfDay;
+            }
+
+            return (status, lateMinutes, isVeryEarly, true);
         }
 
-        return (AttendanceStatus.Late, lateMinutes, isVeryEarly, false);
+        // Determine status based on priority: Holiday > NightShift > WeekendWork > Late
+        AttendanceStatus finalStatus;
+        if (isHoliday)
+        {
+            finalStatus = AttendanceStatus.Holiday;
+        }
+        else if (schedule.IsNightShift)
+        {
+            finalStatus = AttendanceStatus.NightShift;
+        }
+        else if (!schedule.IsWorkDay(localDate.DayOfWeek))
+        {
+            finalStatus = AttendanceStatus.WeekendWork;
+        }
+        else
+        {
+            finalStatus = AttendanceStatus.Late;
+        }
+
+        return (finalStatus, lateMinutes, isVeryEarly, false);
     }
 
     /// <summary>

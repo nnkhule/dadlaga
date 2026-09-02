@@ -6,6 +6,7 @@ using AttendanceSystem.Application.Interfaces.Repositories;
 using AttendanceSystem.Application.Services;
 using AttendanceSystem.Domain.Entities;
 using AttendanceSystem.Domain.Enums;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using MediatR;
 
@@ -21,9 +22,8 @@ public class CheckInCommandHandler : IRequestHandler<CheckInCommand, Result<Atte
     private readonly IUnitOfWork _unitOfWork;
     private readonly IGeofenceService _geofenceService;
     private readonly AttendanceRulesService _rulesService;
-    private readonly AttendanceRulesOptions _options;
-
-    private const double UtcOffsetHours = 8; // Ulaanbaatar Time (UTC+8)
+    private readonly IOptions<AttendanceRulesOptions> _options;
+    private readonly IClock _clock;
 
     public CheckInCommandHandler(
         IAttendanceRepository attendanceRepository,
@@ -31,14 +31,16 @@ public class CheckInCommandHandler : IRequestHandler<CheckInCommand, Result<Atte
         IUnitOfWork unitOfWork,
         IGeofenceService geofenceService,
         AttendanceRulesService rulesService,
-        IOptions<AttendanceRulesOptions> options)
+        IOptions<AttendanceRulesOptions> options,
+        IClock clock)
     {
         _attendanceRepository = attendanceRepository;
         _employeeRepository = employeeRepository;
         _unitOfWork = unitOfWork;
         _geofenceService = geofenceService;
         _rulesService = rulesService;
-        _options = options.Value;
+        _options = options;
+        _clock = clock;
     }
 
     /// <inheritdoc />
@@ -48,7 +50,7 @@ public class CheckInCommandHandler : IRequestHandler<CheckInCommand, Result<Atte
         if (employee is null || !employee.IsActive)
             return Result<AttendanceRecordDto>.Failure("Employee not found.", "EMPLOYEE_NOT_FOUND");
 
-        var todayLocal = DateOnly.FromDateTime(DateTime.Now.AddHours(UtcOffsetHours));
+        var todayLocal = _clock.TodayLocal;
         var existing = await _attendanceRepository.GetTodayRecordAsync(request.EmployeeId, todayLocal, cancellationToken);
         if (existing is not null)
             return Result<AttendanceRecordDto>.Failure("Already checked in today.", "ALREADY_CHECKED_IN");
@@ -58,7 +60,8 @@ public class CheckInCommandHandler : IRequestHandler<CheckInCommand, Result<Atte
         if (schedule is null || office is null)
             return Result<AttendanceRecordDto>.Failure("Employee schedule or office not configured.", "CONFIG_MISSING");
 
-        var checkInTime = DateTime.Now;
+        var nowLocal = _clock.LocalNow;
+        var checkInTime = nowLocal;
         var status = AttendanceStatus.Present;
         decimal lateMinutes = 0;
         var isSuspicious = false;
@@ -77,13 +80,13 @@ public class CheckInCommandHandler : IRequestHandler<CheckInCommand, Result<Atte
         {
             var distance = _geofenceService.CalculateDistanceMeters(
                 request.Latitude.Value, request.Longitude.Value, office.Latitude, office.Longitude);
-            if (distance > _options.SuspiciousDistanceMeters)
+            if (distance > _options.Value.SuspiciousDistanceMeters)
                 isSuspicious = true;
             return Result<AttendanceRecordDto>.Failure("Та ажлын байрнаас хол байна", "OUT_OF_RANGE");
         }
         else
         {
-            var evaluation = _rulesService.EvaluateCheckIn(checkInTime, schedule);
+            var evaluation = await _rulesService.EvaluateCheckIn(checkInTime, schedule);
             status = evaluation.Status;
             lateMinutes = evaluation.LateMinutes;
             if (evaluation.IsVeryEarly)
@@ -108,7 +111,14 @@ public class CheckInCommandHandler : IRequestHandler<CheckInCommand, Result<Atte
             notes: null);
 
         await _attendanceRepository.AddAsync(record, cancellationToken);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            return Result<AttendanceRecordDto>.Failure("Already checked in today.", "ALREADY_CHECKED_IN");
+        }
 
         return Result<AttendanceRecordDto>.Success(MapToDto(record));
     }

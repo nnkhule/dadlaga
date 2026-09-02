@@ -1,21 +1,10 @@
 using AttendanceSystem.Application.DTOs.Auth;
+using AttendanceSystem.Domain;
 using AttendanceSystem.Infrastructure.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AttendanceSystem.API.Controllers;
-
-internal static class Roles
-{
-    public const string Employee = "Employee";
-    public const string Manager = "Manager";
-    public const string Hr = "HR";
-    public const string Admin = "Admin";
-    public const string SuperAdmin = "SuperAdmin";
-    public const string HrOrAdmin = $"{Hr},{Admin}";
-    public const string ManagerHrOrAdmin = $"{Manager},{Hr},{Admin}";
-    public const string AdminOrSuperAdmin = $"{Admin},{SuperAdmin}";
-}
 
 public abstract class ContractControllerBase : ControllerBase
 {
@@ -102,17 +91,17 @@ public sealed record ResetPasswordRequestDto(string Email, string Token, string 
 public sealed class EmployeesController : ContractControllerBase
 {
     [HttpPost]
-    [Authorize(Roles = Roles.HrOrAdmin)]
+    [Authorize(Roles = AppRoles.HrOrAdmin)]
     public IActionResult Create([FromBody] CreateEmployeeRequestDto request)
         => Contract("MVP", "Create employee master data and optionally link a user account.", nameof(CreateEmployeeRequestDto), nameof(EmployeeDetailsResponseDto), "HR, Admin", "Employee code, full name, email, department, work schedule, office location, and hire date are required.", "Employee code and email must be unique.");
 
     [HttpPut("{id:guid}")]
-    [Authorize(Roles = Roles.HrOrAdmin)]
+    [Authorize(Roles = AppRoles.HrOrAdmin)]
     public IActionResult Update(Guid id, [FromBody] UpdateEmployeeRequestDto request)
         => Contract("MVP", "Update employee master data.", nameof(UpdateEmployeeRequestDto), nameof(EmployeeDetailsResponseDto), "HR, Admin", "Employee must exist.", "Email must remain unique.");
 
     [HttpDelete("{id:guid}")]
-    [Authorize(Roles = Roles.HrOrAdmin)]
+    [Authorize(Roles = AppRoles.HrOrAdmin)]
     public IActionResult Delete(Guid id)
         => Contract("MVP", "Deactivate an employee.", "None", nameof(MessageResponseDto), "HR, Admin", "Employee must exist.", "Use soft delete to preserve attendance history.");
 
@@ -121,7 +110,7 @@ public sealed class EmployeesController : ContractControllerBase
         => Contract("MVP", "Get employee details.", "None", nameof(EmployeeDetailsResponseDto), "HR, Admin, Manager, Self", "Employee must exist.", "Managers may only access employees in scope.");
 
     [HttpGet]
-    [Authorize(Roles = Roles.ManagerHrOrAdmin)]
+    [Authorize(Roles = AppRoles.ManagerHrOrAdmin)]
     public IActionResult List([FromQuery] EmployeeQueryDto query)
         => Contract("MVP", "Get paged employee list.", nameof(EmployeeQueryDto), "PagedResponse<EmployeeListItemResponseDto>", "Manager, HR, Admin", "Page number and page size must be valid.");
 
@@ -148,7 +137,7 @@ public sealed record EmployeeAttendanceSummaryResponseDto(Guid EmployeeId, int P
 public sealed class DepartmentsController : ContractControllerBase
 {
     [HttpPost]
-    [Authorize(Roles = Roles.HrOrAdmin)]
+    [Authorize(Roles = AppRoles.HrOrAdmin)]
     public IActionResult Create([FromBody] CreateDepartmentRequestDto request)
         => Contract("MVP", "Create department.", nameof(CreateDepartmentRequestDto), nameof(DepartmentResponseDto), "HR, Admin", "Name is required.", "Name must be unique.");
 
@@ -161,12 +150,12 @@ public sealed class DepartmentsController : ContractControllerBase
         => Contract("MVP", "Get department details.", "None", nameof(DepartmentResponseDto), "Authenticated", "Department must exist.");
 
     [HttpPut("{id:guid}")]
-    [Authorize(Roles = Roles.HrOrAdmin)]
+    [Authorize(Roles = AppRoles.HrOrAdmin)]
     public IActionResult Update(Guid id, [FromBody] UpdateDepartmentRequestDto request)
         => Contract("MVP", "Update department.", nameof(UpdateDepartmentRequestDto), nameof(DepartmentResponseDto), "HR, Admin", "Department must exist.", "Name must be unique.");
 
     [HttpDelete("{id:guid}")]
-    [Authorize(Roles = Roles.Admin)]
+    [Authorize(Roles = AppRoles.Admin)]
     public IActionResult Delete(Guid id)
         => Contract("MVP", "Deactivate department.", "None", nameof(MessageResponseDto), "Admin", "Department must exist.", "Department must have no active employees or a reassignment plan.");
 }
@@ -206,7 +195,7 @@ public sealed class AttendanceV1Controller : ContractControllerBase
         => Contract("Recommended", "Get monthly attendance statistics.", nameof(MonthlyStatisticsQueryDto), nameof(MonthlyAttendanceStatisticsResponseDto), "Employee, Manager, HR, Admin", "Month must be 1-12.", "Year must be valid.");
 
     [HttpGet("employees/{employeeId:guid}/records")]
-    [Authorize(Roles = Roles.ManagerHrOrAdmin)]
+    [Authorize(Roles = AppRoles.ManagerHrOrAdmin)]
     public IActionResult EmployeeRecords(Guid employeeId, [FromQuery] DateRangeQueryDto query)
         => Contract("Recommended", "Get attendance records for one employee.", nameof(DateRangeQueryDto), "PagedResponse<AttendanceRecordResponseDto>", "Manager, HR, Admin", "Employee must exist.", "Manager must be in approval scope.");
 
@@ -215,22 +204,22 @@ public sealed class AttendanceV1Controller : ContractControllerBase
         => Contract("Recommended", "Request correction for an attendance record.", nameof(CreateAttendanceCorrectionRequestDto), nameof(AttendanceCorrectionResponseDto), "Employee", "Attendance record must exist.", "Reason is required.", "Requested times must be logical.");
 
     [HttpGet("corrections")]
-    [Authorize(Roles = Roles.ManagerHrOrAdmin)]
+    [Authorize(Roles = AppRoles.ManagerHrOrAdmin)]
     public IActionResult Corrections([FromQuery] CorrectionQueryDto query)
         => Contract("Enterprise", "List attendance correction requests.", nameof(CorrectionQueryDto), "PagedResponse<AttendanceCorrectionResponseDto>", "Manager, HR, Admin", "Filters must be valid.");
 
     [HttpPost("corrections/{id:guid}/approve")]
-    [Authorize(Roles = Roles.ManagerHrOrAdmin)]
+    [Authorize(Roles = AppRoles.ManagerHrOrAdmin)]
     public IActionResult ApproveCorrection(Guid id, [FromBody] ApprovalRequestDto request)
         => Contract("Enterprise", "Approve an attendance correction request.", nameof(ApprovalRequestDto), nameof(AttendanceCorrectionResponseDto), "Manager, HR, Admin", "Request must be pending.", "Approver must be authorized.");
 
     [HttpPost("corrections/{id:guid}/reject")]
-    [Authorize(Roles = Roles.ManagerHrOrAdmin)]
+    [Authorize(Roles = AppRoles.ManagerHrOrAdmin)]
     public IActionResult RejectCorrection(Guid id, [FromBody] RejectionRequestDto request)
         => Contract("Enterprise", "Reject an attendance correction request.", nameof(RejectionRequestDto), nameof(AttendanceCorrectionResponseDto), "Manager, HR, Admin", "Request must be pending.", "Reason is required.");
 
     [HttpGet("approvals/pending")]
-    [Authorize(Roles = Roles.ManagerHrOrAdmin)]
+    [Authorize(Roles = AppRoles.ManagerHrOrAdmin)]
     public IActionResult PendingApprovals([FromQuery] ApprovalQueryDto query)
         => Contract("Enterprise", "List pending attendance approvals.", nameof(ApprovalQueryDto), "PagedResponse<AttendanceApprovalResponseDto>", "Manager, HR, Admin", "Filters must be valid.");
 
@@ -285,7 +274,7 @@ public sealed record GeofenceEventResponseDto(Guid Id, string EventType, DateTim
 
 [ApiController]
 [Route("api/dashboard-v2")]
-[Authorize(Roles = Roles.ManagerHrOrAdmin)]
+[Authorize(Roles = AppRoles.ManagerHrOrAdmin)]
 public sealed class DashboardController : ContractControllerBase
 {
     [HttpGet("summary-v2")]
@@ -332,17 +321,17 @@ public sealed class LeavesV1Controller : ContractControllerBase
         => Contract("MVP", "Get current user's leave history.", nameof(DateRangeQueryDto), "PagedResponse<LeaveRequestResponseDto>", "Employee", "Date range must be valid.");
 
     [HttpPost("{id:guid}/approve")]
-    [Authorize(Roles = Roles.ManagerHrOrAdmin)]
+    [Authorize(Roles = AppRoles.ManagerHrOrAdmin)]
     public IActionResult Approve(Guid id, [FromBody] ApprovalRequestDto request)
         => Contract("MVP", "Approve leave request.", nameof(ApprovalRequestDto), nameof(LeaveRequestResponseDto), "Manager, HR, Admin", "Leave request must be pending.", "Approver must be authorized.");
 
     [HttpPost("{id:guid}/reject")]
-    [Authorize(Roles = Roles.ManagerHrOrAdmin)]
+    [Authorize(Roles = AppRoles.ManagerHrOrAdmin)]
     public IActionResult Reject(Guid id, [FromBody] RejectionRequestDto request)
         => Contract("MVP", "Reject leave request.", nameof(RejectionRequestDto), nameof(LeaveRequestResponseDto), "Manager, HR, Admin", "Leave request must be pending.", "Reason is required.");
 
     [HttpGet]
-    [Authorize(Roles = Roles.ManagerHrOrAdmin)]
+    [Authorize(Roles = AppRoles.ManagerHrOrAdmin)]
     public IActionResult List([FromQuery] LeaveQueryDto query)
         => Contract("Recommended", "List leave requests.", nameof(LeaveQueryDto), "PagedResponse<LeaveRequestResponseDto>", "Manager, HR, Admin", "Filters must be valid.");
 
@@ -358,20 +347,20 @@ public sealed record LeaveStatisticsResponseDto(decimal TotalAllocated, decimal 
 
 [ApiController]
 [Route("api/v1/reports")]
-[Authorize(Roles = Roles.ManagerHrOrAdmin)]
-public sealed class ReportsController : ContractControllerBase
+[Authorize(Roles = AppRoles.ManagerHrOrAdmin)]
+public sealed class ReportsV1Controller : ContractControllerBase
 {
     [HttpGet("attendance")]
     public IActionResult Attendance([FromQuery] FileExportQueryDto query)
         => Contract("MVP", "Generate attendance report.", nameof(FileExportQueryDto), "PagedResponse<AttendanceReportRowDto>", "Manager, HR, Admin", "Date range is required.", "Reporting scope must be authorized.");
 
     [HttpGet("employees")]
-    [Authorize(Roles = Roles.HrOrAdmin)]
+    [Authorize(Roles = AppRoles.HrOrAdmin)]
     public IActionResult Employees([FromQuery] EmployeeReportQueryDto query)
         => Contract("Recommended", "Generate employee report.", nameof(EmployeeReportQueryDto), "PagedResponse<EmployeeReportRowDto>", "HR, Admin", "Filters must be valid.");
 
     [HttpGet("departments")]
-    [Authorize(Roles = Roles.HrOrAdmin)]
+    [Authorize(Roles = AppRoles.HrOrAdmin)]
     public IActionResult Departments([FromQuery] DepartmentReportQueryDto query)
         => Contract("Recommended", "Generate department report.", nameof(DepartmentReportQueryDto), "PagedResponse<DepartmentReportRowDto>", "HR, Admin", "Filters must be valid.");
 
@@ -384,12 +373,12 @@ public sealed class ReportsController : ContractControllerBase
         => Contract("Recommended", "Export attendance report as PDF.", nameof(FileExportQueryDto), "FileResult", "Manager, HR, Admin", "Date range must be within export limit.");
 
     [HttpPost("scheduled")]
-    [Authorize(Roles = Roles.HrOrAdmin)]
+    [Authorize(Roles = AppRoles.HrOrAdmin)]
     public IActionResult CreateScheduled([FromBody] CreateScheduledReportRequestDto request)
         => Contract("Enterprise", "Create scheduled report delivery.", nameof(CreateScheduledReportRequestDto), nameof(ScheduledReportResponseDto), "HR, Admin", "Frequency, report type, and recipients are required.");
 
     [HttpGet("audit-log")]
-    [Authorize(Roles = Roles.AdminOrSuperAdmin)]
+    [Authorize(Roles = AppRoles.AdminOrSuperAdmin)]
     public IActionResult AuditLog([FromQuery] DateRangeQueryDto query)
         => Contract("Enterprise", "Generate audit log report.", nameof(DateRangeQueryDto), "PagedResponse<AuditLogResponseDto>", "Admin, SuperAdmin", "Date range must be valid.");
 }
@@ -422,7 +411,7 @@ public sealed class NotificationsController : ContractControllerBase
         => Contract("Recommended", "Mark all current user's notifications as read.", "None", nameof(MessageResponseDto), "Authenticated", "Authenticated user is required.");
 
     [HttpPost("broadcast")]
-    [Authorize(Roles = Roles.HrOrAdmin)]
+    [Authorize(Roles = AppRoles.HrOrAdmin)]
     public IActionResult Broadcast([FromBody] BroadcastNotificationRequestDto request)
         => Contract("Enterprise", "Broadcast notification to a target audience.", nameof(BroadcastNotificationRequestDto), nameof(MessageResponseDto), "HR, Admin", "Title, message, and audience are required.");
 }
@@ -434,11 +423,11 @@ public sealed record UnreadNotificationCountResponseDto(int Count);
 
 [ApiController]
 [Route("api/v1/work-schedules")]
-[Authorize(Roles = Roles.ManagerHrOrAdmin)]
+[Authorize(Roles = AppRoles.ManagerHrOrAdmin)]
 public sealed class WorkSchedulesController : ContractControllerBase
 {
     [HttpPost]
-    [Authorize(Roles = Roles.HrOrAdmin)]
+    [Authorize(Roles = AppRoles.HrOrAdmin)]
     public IActionResult Create([FromBody] CreateWorkScheduleRequestDto request)
         => Contract("Recommended", "Create work schedule.", nameof(CreateWorkScheduleRequestDto), nameof(WorkScheduleResponseDto), "HR, Admin", "Name, start time, end time, and working days are required.");
 
@@ -451,17 +440,17 @@ public sealed class WorkSchedulesController : ContractControllerBase
         => Contract("Recommended", "Get work schedule details.", "None", nameof(WorkScheduleResponseDto), "Manager, HR, Admin", "Schedule must exist.");
 
     [HttpPut("{id:guid}")]
-    [Authorize(Roles = Roles.HrOrAdmin)]
+    [Authorize(Roles = AppRoles.HrOrAdmin)]
     public IActionResult Update(Guid id, [FromBody] UpdateWorkScheduleRequestDto request)
         => Contract("Recommended", "Update work schedule.", nameof(UpdateWorkScheduleRequestDto), nameof(WorkScheduleResponseDto), "HR, Admin", "Schedule must exist.", "Working hours must be valid.");
 
     [HttpDelete("{id:guid}")]
-    [Authorize(Roles = Roles.HrOrAdmin)]
+    [Authorize(Roles = AppRoles.HrOrAdmin)]
     public IActionResult Delete(Guid id)
         => Contract("Recommended", "Deactivate work schedule.", "None", nameof(MessageResponseDto), "HR, Admin", "Schedule must exist.", "Assigned employees require reassignment or policy override.");
 
     [HttpPost("{id:guid}/assign")]
-    [Authorize(Roles = Roles.HrOrAdmin)]
+    [Authorize(Roles = AppRoles.HrOrAdmin)]
     public IActionResult Assign(Guid id, [FromBody] AssignWorkScheduleRequestDto request)
         => Contract("Recommended", "Assign schedule to employees.", nameof(AssignWorkScheduleRequestDto), nameof(MessageResponseDto), "HR, Admin", "Employees must exist.", "Effective date is required.");
 
@@ -470,7 +459,7 @@ public sealed class WorkSchedulesController : ContractControllerBase
         => Contract("Enterprise", "Get shift/schedule statistics.", nameof(DateRangeQueryDto), nameof(WorkScheduleStatisticsResponseDto), "HR, Admin", "Date range must be valid.");
 
     [HttpPost("bulk-assign")]
-    [Authorize(Roles = Roles.HrOrAdmin)]
+    [Authorize(Roles = AppRoles.HrOrAdmin)]
     public IActionResult BulkAssign([FromBody] AssignWorkScheduleRequestDto request)
         => Contract("Enterprise", "Bulk assign schedules.", nameof(AssignWorkScheduleRequestDto), nameof(BulkOperationResultDto), "HR, Admin", "Employee IDs and schedule ID are required.");
 }
@@ -489,7 +478,7 @@ public sealed record BulkOperationResultDto(int Requested, int Succeeded, int Fa
 public sealed class HolidaysController : ContractControllerBase
 {
     [HttpPost]
-    [Authorize(Roles = Roles.HrOrAdmin)]
+    [Authorize(Roles = AppRoles.HrOrAdmin)]
     public IActionResult Create([FromBody] CreateHolidayRequestDto request)
         => Contract("Recommended", "Create holiday.", nameof(CreateHolidayRequestDto), nameof(HolidayResponseDto), "HR, Admin", "Name and date are required.");
 
@@ -502,17 +491,17 @@ public sealed class HolidaysController : ContractControllerBase
         => Contract("Recommended", "Get holiday details.", "None", nameof(HolidayResponseDto), "Authenticated", "Holiday must exist.");
 
     [HttpPut("{id:guid}")]
-    [Authorize(Roles = Roles.HrOrAdmin)]
+    [Authorize(Roles = AppRoles.HrOrAdmin)]
     public IActionResult Update(Guid id, [FromBody] UpdateHolidayRequestDto request)
         => Contract("Recommended", "Update holiday.", nameof(UpdateHolidayRequestDto), nameof(HolidayResponseDto), "HR, Admin", "Holiday must exist.", "Date must be valid.");
 
     [HttpDelete("{id:guid}")]
-    [Authorize(Roles = Roles.HrOrAdmin)]
+    [Authorize(Roles = AppRoles.HrOrAdmin)]
     public IActionResult Delete(Guid id)
         => Contract("Recommended", "Delete holiday.", "None", nameof(MessageResponseDto), "HR, Admin", "Holiday must exist.");
 
     [HttpPost("import")]
-    [Authorize(Roles = Roles.HrOrAdmin)]
+    [Authorize(Roles = AppRoles.HrOrAdmin)]
     public IActionResult Import([FromForm] ImportHolidayRequestDto request)
         => Contract("Enterprise", "Import holidays from a file.", nameof(ImportHolidayRequestDto), nameof(BulkOperationResultDto), "HR, Admin", "File and year are required.", "File type must be allowed.");
 }
@@ -552,7 +541,7 @@ public sealed record ProfilePhotoResponseDto(string Url);
 
 [ApiController]
 [Route("api/v1/settings")]
-[Authorize(Roles = Roles.HrOrAdmin)]
+[Authorize(Roles = AppRoles.HrOrAdmin)]
 public sealed class SettingsController : ContractControllerBase
 {
     [HttpGet("company")]
@@ -560,7 +549,7 @@ public sealed class SettingsController : ContractControllerBase
         => Contract("Recommended", "Get company settings.", "None", nameof(CompanySettingsResponseDto), "HR, Admin", "Settings must exist.");
 
     [HttpPut("company")]
-    [Authorize(Roles = Roles.Admin)]
+    [Authorize(Roles = AppRoles.Admin)]
     public IActionResult UpdateCompany([FromBody] UpdateCompanySettingsRequestDto request)
         => Contract("Recommended", "Update company settings.", nameof(UpdateCompanySettingsRequestDto), nameof(CompanySettingsResponseDto), "Admin", "Company name and timezone are required.", "Formats must be valid.");
 
@@ -577,17 +566,17 @@ public sealed class SettingsController : ContractControllerBase
         => Contract("MVP", "Get GPS settings.", "None", nameof(GpsSettingsResponseDto), "HR, Admin", "Settings must exist.");
 
     [HttpPut("gps")]
-    [Authorize(Roles = Roles.Admin)]
+    [Authorize(Roles = AppRoles.Admin)]
     public IActionResult UpdateGps([FromBody] UpdateGpsSettingsRequestDto request)
         => Contract("MVP", "Update GPS settings.", nameof(UpdateGpsSettingsRequestDto), nameof(GpsSettingsResponseDto), "Admin", "Allowed radius must be positive.", "Coordinates must be valid.");
 
     [HttpGet("security")]
-    [Authorize(Roles = Roles.AdminOrSuperAdmin)]
+    [Authorize(Roles = AppRoles.AdminOrSuperAdmin)]
     public IActionResult Security()
         => Contract("Enterprise", "Get security settings.", "None", nameof(SecuritySettingsResponseDto), "Admin, SuperAdmin", "Settings must exist.");
 
     [HttpPut("security")]
-    [Authorize(Roles = Roles.SuperAdmin)]
+    [Authorize(Roles = AppRoles.SuperAdmin)]
     public IActionResult UpdateSecurity([FromBody] UpdateSecuritySettingsRequestDto request)
         => Contract("Enterprise", "Update security settings.", nameof(UpdateSecuritySettingsRequestDto), nameof(SecuritySettingsResponseDto), "SuperAdmin", "Password, lockout, and MFA policies must be valid.");
 }

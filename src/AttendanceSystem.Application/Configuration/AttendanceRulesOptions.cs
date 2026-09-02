@@ -8,6 +8,10 @@ public class AttendanceRulesOptions
     public const string SectionName = "AttendanceRules";
 
     public int DefaultGraceMinutes { get; set; } = 10;
+    public bool RequireGpsForCheckIn { get; set; } = true;
+    public bool RequireGpsForCheckOut { get; set; } = true;
+    public bool AllowRemoteCheckIn { get; set; } = false;
+    public bool OvertimeEnabled { get; set; } = true;
     public int AutoGeoRadiusMeters { get; set; } = 100;
     public int AutoGeoMinMinutes { get; set; } = 60;
     public int MissedCheckoutAlertRadiusMeters { get; set; } = 200;

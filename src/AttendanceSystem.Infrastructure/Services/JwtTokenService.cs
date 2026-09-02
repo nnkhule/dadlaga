@@ -21,15 +21,18 @@ public class JwtTokenService
 {
     private readonly JwtSettings _settings;
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly SignInManager<ApplicationUser> _signInManager;
     private readonly ApplicationDbContext _dbContext;
 
     public JwtTokenService(
         IOptions<JwtSettings> settings,
         UserManager<ApplicationUser> userManager,
+        SignInManager<ApplicationUser> signInManager,
         ApplicationDbContext dbContext)
     {
         _settings = settings.Value;
         _userManager = userManager;
+        _signInManager = signInManager;
         _dbContext = dbContext;
     }
 
@@ -39,8 +42,29 @@ public class JwtTokenService
     public async Task<TokenResponseDto?> LoginAsync(string email, string password, CancellationToken cancellationToken = default)
     {
         var user = await _userManager.FindByEmailAsync(email);
-        if (user is null || !await _userManager.CheckPasswordAsync(user, password))
+        if (user is null)
             return null;
+
+        // Check password and lockout
+        var result = await _signInManager.CheckPasswordSignInAsync(user, password, lockoutOnFailure: true);
+        if (result.IsLockedOut)
+        {
+            // Throw a specific exception for locked account
+            throw new AccountLockedException();
+        }
+
+        if (!result.Succeeded)
+            return null;
+
+        // If user is linked to an employee, ensure the employee is active
+        if (user.EmployeeId.HasValue)
+        {
+            var employee = await _dbContext.Employees
+                .AsNoTracking()
+                .FirstOrDefaultAsync(e => e.Id == user.EmployeeId.Value, cancellationToken);
+            if (employee == null || !employee.IsActive)
+                return null;
+        }
 
         return await GenerateTokensAsync(user, cancellationToken);
     }
@@ -66,6 +90,16 @@ public class JwtTokenService
         var user = await _userManager.FindByIdAsync(stored.UserId);
         if (user is null)
             return null;
+
+        // If user is linked to an employee, ensure the employee is active
+        if (user.EmployeeId.HasValue)
+        {
+            var employee = await _dbContext.Employees
+                .AsNoTracking()
+                .FirstOrDefaultAsync(e => e.Id == user.EmployeeId.Value, cancellationToken);
+            if (employee == null || !employee.IsActive)
+                return null;
+        }
 
         var result = await GenerateTokensAsync(user, cancellationToken);
         stored.Revoke(result.RefreshToken);
@@ -126,5 +160,9 @@ public class JwtTokenService
     {
         var bytes = RandomNumberGenerator.GetBytes(64);
         return Convert.ToBase64String(bytes);
+    }
+
+    public class AccountLockedException : Exception
+    {
     }
 }

@@ -4,9 +4,9 @@ using AttendanceSystem.Infrastructure.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using System;
 
 namespace AttendanceSystem.API.Controllers;
-
 /// <summary>
 /// Authentication endpoints for JWT login and refresh.
 /// </summary>
@@ -35,10 +35,17 @@ public class AuthController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> Login([FromBody] LoginRequestDto request, CancellationToken cancellationToken)
     {
-        var result = await _jwtTokenService.LoginAsync(request.Email, request.Password, cancellationToken);
-        if (result is null)
-            return Unauthorized(new { message = "Invalid credentials." });
-        return Ok(result);
+        try
+        {
+            var result = await _jwtTokenService.LoginAsync(request.Email, request.Password, cancellationToken);
+            if (result is null)
+                return Unauthorized(new { message = "Invalid credentials." });
+            return Ok(result);
+        }
+        catch (JwtTokenService.AccountLockedException)
+        {
+            return Unauthorized(new { message = "Хэт олон буруу оролдлого. Дараа дахин оролдоно уу." });
+        }
     }
 
     /// <summary>Refreshes access token using refresh token.</summary>

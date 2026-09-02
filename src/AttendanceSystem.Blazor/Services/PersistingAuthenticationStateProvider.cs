@@ -108,6 +108,8 @@ public class PersistingAuthenticationStateProvider : AuthenticationStateProvider
         if (p.TryGetProperty("sub",   out var sub)   && sub.ValueKind   == JsonValueKind.String) Add(ClaimTypes.NameIdentifier, sub.GetString());
         if (p.TryGetProperty("name",  out var name)  && name.ValueKind  == JsonValueKind.String) Add(ClaimTypes.Name,           name.GetString());
         if (p.TryGetProperty("email", out var email) && email.ValueKind == JsonValueKind.String) Add(ClaimTypes.Email,          email.GetString());
+        if (p.TryGetProperty("employee_id", out var employeeId) && employeeId.ValueKind == JsonValueKind.String) Add("employee_id", employeeId.GetString());
+        if (p.TryGetProperty("department_id", out var departmentId) && departmentId.ValueKind == JsonValueKind.String) Add("department_id", departmentId.GetString());
 
         // Role claim-ууд — ASP.NET Identity-н урт нэр болон богино нэр хоёуланг дэмжих
         foreach (var key in new[]

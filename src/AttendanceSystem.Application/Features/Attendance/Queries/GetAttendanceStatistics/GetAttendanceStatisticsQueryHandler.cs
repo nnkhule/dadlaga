@@ -14,13 +14,16 @@ public class GetAttendanceStatisticsQueryHandler : IRequestHandler<GetAttendance
 {
     private readonly IAttendanceRepository _attendanceRepository;
     private readonly IEmployeeRepository _employeeRepository;
+    private readonly IClock _clock;
 
     public GetAttendanceStatisticsQueryHandler(
         IAttendanceRepository attendanceRepository,
-        IEmployeeRepository employeeRepository)
+        IEmployeeRepository employeeRepository,
+        IClock clock)
     {
         _attendanceRepository = attendanceRepository;
         _employeeRepository = employeeRepository;
+        _clock = clock;
     }
 
     public async Task<Result<AttendanceStatisticsDto>> Handle(GetAttendanceStatisticsQuery request, CancellationToken cancellationToken)
@@ -32,7 +35,7 @@ public class GetAttendanceStatisticsQueryHandler : IRequestHandler<GetAttendance
         if (employee.WorkSchedule is null)
             return Result<AttendanceStatisticsDto>.Failure("Employee work schedule not configured.", "SCHEDULE_MISSING");
 
-        var today = DateOnly.FromDateTime(DateTime.Now);
+        var today = _clock.TodayLocal;
         var startOfMonth = new DateOnly(today.Year, today.Month, 1);
         var records = await _attendanceRepository.GetByEmployeeAsync(request.EmployeeId, startOfMonth, today, cancellationToken);
 

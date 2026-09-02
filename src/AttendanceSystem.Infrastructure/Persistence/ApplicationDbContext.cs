@@ -53,5 +53,24 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             .HasForeignKey(x => x.EmployeeId)
             .OnDelete(DeleteBehavior.SetNull)
             .HasConstraintName("FK_AspNetUsers_Employees");
+
+        // Unique index to prevent duplicate check-ins for the same employee on the same date
+        builder.Entity<AttendanceRecord>()
+            .HasIndex(a => new { a.EmployeeId, a.Date })
+            .IsUnique();
+
+        // Configure RolePermission composite primary key
+        builder.Entity<RolePermission>()
+            .HasKey(rp => new { rp.RoleId, rp.PermissionId });
+
+        // Configure relationships for RolePermission (optional, but good practice)
+        builder.Entity<RolePermission>()
+            .HasOne(rp => rp.Permission)
+            .WithMany()
+            .HasForeignKey(rp => rp.PermissionId);
+
+        // Note: RoleId is a foreign key to AspNetRoles (Identity role). We don't have a Role entity in our domain,
+        // so we just treat it as a foreign key to the Identity role table.
+        // We don't need to configure the relationship to IdentityRole because it's handled by Identity.
     }
 }

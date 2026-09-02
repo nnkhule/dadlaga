@@ -2,7 +2,7 @@
 @layout AdminLayout
 @inject HttpClient Http
 @inject IJSRuntime JS
-@attribute [Authorize(Roles = "SuperAdmin,HRManager,DepartmentHead")]
+@attribute [Authorize(Roles = AppRoles.SuperAdmin + "," + AppRoles.HrManager + "," + AppRoles.DepartmentHead)]
 
 <PageHeader Title="AI Туслах" Subtitle="Систем дотроос асуулт асуу, шуурхай хариулт ав" />
 

@@ -133,6 +133,25 @@ public static class ApplicationDbSeeder
 
             IF OBJECT_ID(N'dbo.Employees', N'U') IS NOT NULL
                AND COL_LENGTH(N'dbo.Employees', N'EmployeeCode') IS NOT NULL
+               AND EXISTS (
+                    SELECT 1
+                    FROM sys.columns c
+                    INNER JOIN sys.types t ON c.user_type_id = t.user_type_id
+                    WHERE c.object_id = OBJECT_ID(N'dbo.Employees')
+                      AND c.name = N'EmployeeCode'
+                      AND t.name = N'nvarchar'
+                      AND c.max_length = -1
+               )
+            BEGIN
+                UPDATE dbo.Employees
+                SET EmployeeCode = LEFT(EmployeeCode, 450)
+                WHERE LEN(EmployeeCode) > 450;
+
+                ALTER TABLE dbo.Employees ALTER COLUMN EmployeeCode nvarchar(450) NOT NULL;
+            END
+
+            IF OBJECT_ID(N'dbo.Employees', N'U') IS NOT NULL
+               AND COL_LENGTH(N'dbo.Employees', N'EmployeeCode') IS NOT NULL
                AND NOT EXISTS (
                     SELECT 1
                     FROM sys.indexes
