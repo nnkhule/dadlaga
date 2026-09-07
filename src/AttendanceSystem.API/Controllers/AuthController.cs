@@ -4,6 +4,7 @@ using AttendanceSystem.Infrastructure.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using System;
 
 namespace AttendanceSystem.API.Controllers;
@@ -56,10 +57,21 @@ public class AuthController : ControllerBase
         if (request is null || string.IsNullOrWhiteSpace(request.RefreshToken))
             return Unauthorized();
 
-        var result = await _jwtTokenService.RefreshAsync(request.RefreshToken, cancellationToken);
-        if (result is null)
+        try
+        {
+            var result = await _jwtTokenService.RefreshAsync(request.RefreshToken, cancellationToken);
+            if (result is null)
+                return Unauthorized();
+            return Ok(result);
+        }
+        catch (OperationCanceledException)
+        {
             return Unauthorized();
-        return Ok(result);
+        }
+        catch (DbUpdateException)
+        {
+            return Unauthorized();
+        }
     }
 
     /// <summary>Sends password reset link to user email.</summary>
@@ -115,6 +127,29 @@ public class AuthController : ControllerBase
 
         await _userManager.AddToRoleAsync(newUser, "Employee");
         return Ok(new { message = "Employee account created successfully." });
+    }
+
+    /// <summary>Resets an employee password from the admin employee screen.</summary>
+    [HttpPost("admin-reset-password")]
+    [Authorize(Roles = "SuperAdmin,HRManager")]
+    public async Task<IActionResult> AdminResetPassword([FromBody] AdminResetPasswordDto request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password))
+            return BadRequest(new { message = "Email and password are required." });
+
+        var user = await _userManager.FindByEmailAsync(request.Email);
+        if (user is null)
+            return NotFound(new { message = "User account was not found." });
+
+        if (request.Password.Length < 8)
+            return BadRequest(new { message = "Password must be at least 8 characters." });
+
+        var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+        var result = await _userManager.ResetPasswordAsync(user, token, request.Password);
+        if (!result.Succeeded)
+            return BadRequest(new { message = string.Join(", ", result.Errors.Select(e => e.Description)) });
+
+        return Ok(new { message = "Password reset successfully." });
     }
 }
 

@@ -141,6 +141,7 @@ public sealed record LoginResponseDto(
 
 public sealed record MessageDto(string Message);
 
+// Employee Statistics DTOs - must match API DTOs exactly
 public sealed record EmployeeStatisticsDto
 {
     public SummaryDto Summary { get; set; }
@@ -190,7 +191,7 @@ public sealed record MonthlyAttendanceChartDto
 
 public sealed record AttendanceHistoryDto
 {
-    public DateTime Date { get; set; }
+    public DateOnly Date { get; set; }
     public DateTime? CheckInTime { get; set; }
     public DateTime? CheckOutTime { get; set; }
     public double WorkHours { get; set; }
@@ -206,14 +207,14 @@ public sealed record LeaveStatisticsDto
     public int Approved { get; set; }
     public int Rejected { get; set; }
     public int Pending { get; set; }
-    public List<LeaveHistoryDto> LeaveHistory { get; set; }
+    public List<LeaveHistoryDto> LeaveHistory { get; init; }
 }
 
 public sealed record LeaveHistoryDto
 {
     public Guid LeaveRequestId { get; set; }
-    public DateTime StartDate { get; set; }
-    public DateTime EndDate { get; set; }
+    public DateOnly StartDate { get; set; }
+    public DateOnly EndDate { get; set; }
     public string LeaveType { get; set; }
     public string Status { get; set; }
     public DateTime RequestDate { get; set; }

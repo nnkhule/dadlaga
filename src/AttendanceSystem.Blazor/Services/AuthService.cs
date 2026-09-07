@@ -13,6 +13,7 @@ public sealed class AuthService
     private readonly HttpClient _http;
     private readonly IJSRuntime _js;
     private readonly PersistingAuthenticationStateProvider _authenticationStateProvider;
+    private readonly SemaphoreSlim _refreshLock = new(1, 1);
 
     public AuthService(HttpClient http, IJSRuntime js, PersistingAuthenticationStateProvider authenticationStateProvider)
     {
@@ -48,28 +49,30 @@ public sealed class AuthService
 
     public async Task<bool> RefreshTokenAsync()
     {
-        var refreshToken = await _js.InvokeAsync<string?>("localStorage.getItem", RefreshTokenKey);
-        if (string.IsNullOrWhiteSpace(refreshToken))
-            return false;
-
-        var response = await _http.PostAsJsonAsync("api/auth/refresh", new { RefreshToken = refreshToken });
-        if (!response.IsSuccessStatusCode)
+        await _refreshLock.WaitAsync();
+        try
         {
-            await LogoutAsync();
-            return false;
-        }
+            var refreshToken = await _js.InvokeAsync<string?>("localStorage.getItem", RefreshTokenKey);
+            if (string.IsNullOrWhiteSpace(refreshToken))
+                return false;
 
-        var result = await response.Content.ReadFromJsonAsync<LoginResponseDto>();
-        if (result is null || string.IsNullOrWhiteSpace(result.AccessToken) || string.IsNullOrWhiteSpace(result.RefreshToken))
+            var response = await _http.PostAsJsonAsync("api/auth/refresh", new { RefreshToken = refreshToken });
+            if (!response.IsSuccessStatusCode)
+                return false;
+
+            var result = await response.Content.ReadFromJsonAsync<LoginResponseDto>();
+            if (result is null || string.IsNullOrWhiteSpace(result.AccessToken) || string.IsNullOrWhiteSpace(result.RefreshToken))
+                return false;
+
+            await _js.InvokeVoidAsync("localStorage.setItem", TokenKey, result.AccessToken);
+            await _js.InvokeVoidAsync("localStorage.setItem", RefreshTokenKey, result.RefreshToken);
+            await _authenticationStateProvider.NotifyUserAuthenticationAsync();
+            return true;
+        }
+        finally
         {
-            await LogoutAsync();
-            return false;
+            _refreshLock.Release();
         }
-
-        await _js.InvokeVoidAsync("localStorage.setItem", TokenKey, result.AccessToken);
-        await _js.InvokeVoidAsync("localStorage.setItem", RefreshTokenKey, result.RefreshToken);
-        await _authenticationStateProvider.NotifyUserAuthenticationAsync();
-        return true;
     }
 
     public async Task LogoutAsync()

@@ -415,37 +415,41 @@ textarea {
 
 /* Dark Mode Support */
 @media (prefers-color-scheme: dark) {
+    :root {
+        color-scheme: light;
+    }
+
     .card {
-        background: #2a2a2a;
-        border-color: #444;
-        color: #e0e0e0;
+        background: #ffffff;
+        border-color: #e2e8f0;
+        color: #0f172a;
     }
     
     .form-control {
-        background: #333;
-        border-color: #555;
-        color: #e0e0e0;
+        background: #ffffff;
+        border-color: #cbd5e1;
+        color: #0f172a;
     }
     
     .form-control:focus {
-        border-color: #4a9eff;
-        box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.2);
+        border-color: #2563eb;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
     }
     
     .card h2 {
-        color: #e0e0e0;
+        color: #0f172a;
     }
     
     .form-group label {
-        color: #b0b0b0;
+        color: #334155;
     }
     
     .muted {
-        color: #999;
+        color: #64748b;
     }
     
     .history-card {
-        background: rgba(255, 255, 255, 0.05);
+        background: #ffffff;
     }
 }
 

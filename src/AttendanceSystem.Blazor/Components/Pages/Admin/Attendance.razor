@@ -501,19 +501,28 @@
         try
         {
             var query = $"api/attendance/records?from={date:yyyy-MM-dd}&to={date:yyyy-MM-dd}&pageSize=300";
+            Guid? selectedDepartmentId = null;
             if (Guid.TryParse(departmentId, out var deptGuid))
+            {
+                selectedDepartmentId = deptGuid;
                 query += $"&departmentId={deptGuid}";
+            }
 
-            var result = await Api.GetAsync<PagedResponse<AttendanceDto>>(query);
-            records = result?.Items?.ToList() ?? [];
+            var recordsTask = Api.GetAsync<PagedResponse<AttendanceDto>>(query);
+            var summaryTask = Api.GetDashboardSummaryAsync(date, selectedDepartmentId);
+
+            await Task.WhenAll(recordsTask, summaryTask);
+
+            records = recordsTask.Result?.Items?.ToList() ?? [];
+            ApplySummaryKpi(summaryTask.Result);
         }
         catch (Exception ex)
         {
             error = ex.Message;
             records = [];
+            kpi = new KpiSnapshot();
         }
 
-        ComputeKpi();
         ApplyFilters();
         isLoading = false;
         StateHasChanged();
@@ -582,7 +591,25 @@
     private IEnumerable<AttendanceDto> PagedDisplayed => displayed.Skip((currentPage - 1) * PageSize).Take(PageSize);
 
     // ── KPI ────────────────────────────────────────────────────────────────
-    private void ComputeKpi()
+    private void ApplySummaryKpi(DashboardSummaryDto? summary)
+    {
+        if (summary is null)
+        {
+            ComputeKpiFromRecords();
+            return;
+        }
+
+        kpi = new KpiSnapshot
+        {
+            Present = summary.PresentToday,
+            Late = summary.LateEmployees,
+            Absent = summary.AbsentToday,
+            OnLeave = summary.OnLeaveEmployees,
+            TotalOvertimeH = summary.TotalOvertimeHours
+        };
+    }
+
+    private void ComputeKpiFromRecords()
     {
         var k = new KpiSnapshot();
         foreach (var r in records)

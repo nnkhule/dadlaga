@@ -41,8 +41,14 @@ public sealed class ApiClient
         return await SendWithRefreshAsync(() => _http.DeleteAsync(url, cancellationToken));
     }
 
-    public Task<DashboardSummaryDto?> GetDashboardSummaryAsync()
-        => GetAsync<DashboardSummaryDto>("api/dashboard/summary");
+    public Task<DashboardSummaryDto?> GetDashboardSummaryAsync(DateOnly? date = null, Guid? departmentId = null)
+    {
+        var values = new List<string>();
+        if (date.HasValue) values.Add($"date={date:yyyy-MM-dd}");
+        if (departmentId.HasValue) values.Add($"departmentId={departmentId.Value}");
+        var query = values.Count == 0 ? string.Empty : "?" + string.Join("&", values);
+        return GetAsync<DashboardSummaryDto>($"api/dashboard/summary{query}");
+    }
 
     public async Task<IReadOnlyList<RecentActivityDto>?> GetRecentActivitiesAsync()
     {
@@ -126,7 +132,7 @@ public sealed class ApiClient
 
     public async Task<ChatResponseDto?> PostChatAsync(ChatRequestDto request, CancellationToken cancellationToken = default)
     {
-        var response = await PostAsync("api/ai/chat", request, cancellationToken);
+        var response = await PostAsync("api/ai/employee/chat", request, cancellationToken);
         return await response.Content.ReadFromJsonAsync<ChatResponseDto>(cancellationToken: cancellationToken);
     }
 
@@ -175,8 +181,6 @@ public sealed class ApiClient
             response.Dispose();
         }
 
-        await _auth.LogoutAsync();
-        _navigation.NavigateTo("/login", forceLoad: true);
         throw new UnauthorizedAccessException("Your session has expired. Please sign in again.");
     }
 
@@ -208,7 +212,7 @@ public sealed class ApiClient
     private sealed record ApiErrorResponse(string? Message, string? Error, string? Detail, string? Code);
 
     public Task<EmployeeStatisticsDto?> GetEmployeeStatisticsAsync()
-        => GetAsync<EmployeeStatisticsDto>("api/statistics/employee");
+        => GetAsync<EmployeeStatisticsDto>("api/v1/statistics/employee");
 
     private sealed record RecentActivityResponse(Guid Id, string Type, string Title, string? Description, DateTime CreatedAt);
     private sealed record AttendanceTrendResponse(IReadOnlyList<string> Labels, IReadOnlyList<int> PresentCounts, IReadOnlyList<int> AbsentCounts, IReadOnlyList<int> LateCounts, IReadOnlyList<int>? OnLeaveCounts);

@@ -4,6 +4,7 @@
 @inject NavigationManager Nav
 @inject ApiClient Api
 @inject IJSRuntime JS
+@inject IConfiguration Config
 
 <PageHeader Title="Тайлан" Subtitle="Ирц, илүү цаг, хэлтсийн дүн — нэг дор" Icon="▤">
     <Actions>
@@ -55,6 +56,21 @@
                     }
                 </button>
             </div>
+        </div>
+
+        @* ── Period comparison toggle ── *@
+        <div class="rpt-comparison-row">
+            <label class="rpt-comparison-toggle">
+                <input type="checkbox" @bind="showComparison" @bind:after="OnComparisonToggle" />
+                <span>Өмнөх мөчлөгтэй харьцуулах</span>
+            </label>
+            @if (showComparison)
+            {
+                <div class="rpt-comparison-info">
+                    <span class="rpt-comparison-label">Өмнөх мөчлөг:</span>
+                    <span class="rpt-comparison-dates">@comparisonFrom.ToString("yyyy-MM-dd") – @comparisonTo.ToString("yyyy-MM-dd")</span>
+                </div>
+            }
         </div>
 
         @* ── Employee filter ── *@
@@ -148,7 +164,7 @@
             <div class="rpt-kpi-icon">✗</div>
             <div>
                 <div class="rpt-kpi-val">@totalAbsent</div>
-                <div class="rpt-kpi-lbl">Чөлөөтэй</div>
+                <div class="rpt-kpi-lbl">Ирээгүй</div>
             </div>
         </div>
         <div class="rpt-kpi rpt-kpi--ot">
@@ -215,12 +231,29 @@
             }
             else
             {
+                @* ── Department Chart ── *@
+                <div class="rpt-chart-section">
+                    <div class="rpt-chart-header">
+                        <h3 class="rpt-chart-title">Хэлтсүүдийн ирцийн харьцаа</h3>
+                        <div class="rpt-chart-legend">
+                            <div class="rpt-legend-item"><span class="rpt-legend-color" style="background:var(--clr-success)"></span>Ирсэн</div>
+                            <div class="rpt-legend-item"><span class="rpt-legend-color" style="background:var(--clr-warning)"></span>Хоцорсон</div>
+                            <div class="rpt-legend-item"><span class="rpt-legend-color" style="background:var(--clr-danger)"></span>Ирээгүй</div>
+                            <div class="rpt-legend-item"><span class="rpt-legend-color" style="background:var(--clr-info)"></span>Чөлөөтэй</div>
+                        </div>
+                    </div>
+                    <div class="rpt-chart-scroll">
+                        <canvas id="departmentChart" class="rpt-bar-chart"></canvas>
+                    </div>
+                </div>
+
                 <table class="data-table rpt-table">
                     <thead>
                         <tr>
                             <th class="rpt-th-sort @SortCls("dept","name")"    @onclick='() => SetSummarySort("name")'>Хэлтэс @SortArrow("dept","name")</th>
                             <th class="rpt-th-sort @SortCls("dept","present")" @onclick='() => SetSummarySort("present")'>Ирсэн @SortArrow("dept","present")</th>
                             <th class="rpt-th-sort @SortCls("dept","late")"    @onclick='() => SetSummarySort("late")'>Хоцорсон @SortArrow("dept","late")</th>
+                            <th class="rpt-th-sort @SortCls("dept","absent")"  @onclick='() => SetSummarySort("absent")'>Ирээгүй @SortArrow("dept","absent")</th>
                             <th class="rpt-th-sort @SortCls("dept","leave")"   @onclick='() => SetSummarySort("leave")'>Чөлөөтэй @SortArrow("dept","leave")</th>
                             <th>Ирцийн хувь</th>
                         </tr>
@@ -228,14 +261,60 @@
                     <tbody>
                         @foreach (var row in FilteredSummaries)
                         {
-                            var total    = row.Present + row.Leave;
-                            var pct      = total == 0 ? 0 : (int)Math.Round(row.Present * 100.0 / total);
+                            var total    = row.Present + row.Late + row.Absent + row.Leave;
+                            var pct      = total == 0 ? 0 : (int)Math.Round((row.Present + row.Late) * 100.0 / total);
                             var barColor = pct >= 90 ? "var(--clr-success)" : pct >= 70 ? "var(--clr-warning)" : "var(--clr-danger)";
+                            
+                            // Get comparison data if enabled
+                            var comparisonRow = showComparison ? comparisonSummaries.FirstOrDefault(c => c.DepartmentId == row.DepartmentId) : null;
+                            var pctChange = comparisonRow != null ? (pct - (comparisonRow.Present + comparisonRow.Late + comparisonRow.Absent + comparisonRow.Leave == 0 ? 0 : (int)Math.Round((comparisonRow.Present + comparisonRow.Late) * 100.0 / (comparisonRow.Present + comparisonRow.Late + comparisonRow.Absent + comparisonRow.Leave)))) : 0;
+                            
                             <tr class="rpt-row">
-                                <td><strong>@row.DepartmentName</strong></td>
-                                <td><span class="badge badge-present">@row.Present</span></td>
-                                <td><span class="badge badge-late">@row.Late</span></td>
-                                <td><span class="badge badge-absent">@row.Leave</span></td>
+                                <td>
+                                    <strong>@row.DepartmentName</strong>
+                                    @if (showComparison && comparisonRow != null)
+                                    {
+                                        <div class="rpt-comparison-badge @(pctChange > 0 ? "rpt-comparison-badge--up" : pctChange < 0 ? "rpt-comparison-badge--down" : "rpt-comparison-badge--same")">
+                                            @(pctChange > 0 ? "↑" : pctChange < 0 ? "↓" : "→") @Math.Abs(pctChange)%
+                                        </div>
+                                    }
+                                </td>
+                                <td>
+                                    <span class="badge badge-present">@row.Present</span>
+                                    @if (showComparison && comparisonRow != null)
+                                    {
+                                        <span class="rpt-comparison-diff @(row.Present > comparisonRow.Present ? "text-green" : row.Present < comparisonRow.Present ? "text-red" : "text-muted")">
+                                            @(row.Present > comparisonRow.Present ? "+" : "")@(row.Present - comparisonRow.Present)
+                                        </span>
+                                    }
+                                </td>
+                                <td>
+                                    <span class="badge badge-late">@row.Late</span>
+                                    @if (showComparison && comparisonRow != null)
+                                    {
+                                        <span class="rpt-comparison-diff @(row.Late < comparisonRow.Late ? "text-green" : row.Late > comparisonRow.Late ? "text-red" : "text-muted")">
+                                            @(row.Late > comparisonRow.Late ? "+" : "")@(row.Late - comparisonRow.Late)
+                                        </span>
+                                    }
+                                </td>
+                                <td>
+                                    <span class="badge badge-absent">@row.Absent</span>
+                                    @if (showComparison && comparisonRow != null)
+                                    {
+                                        <span class="rpt-comparison-diff @(row.Absent < comparisonRow.Absent ? "text-green" : row.Absent > comparisonRow.Absent ? "text-red" : "text-muted")">
+                                            @(row.Absent > comparisonRow.Absent ? "+" : "")@(row.Absent - comparisonRow.Absent)
+                                        </span>
+                                    }
+                                </td>
+                                <td>
+                                    <span class="badge badge-absent">@row.Leave</span>
+                                    @if (showComparison && comparisonRow != null)
+                                    {
+                                        <span class="rpt-comparison-diff @(row.Leave < comparisonRow.Leave ? "text-green" : row.Leave > comparisonRow.Leave ? "text-red" : "text-muted")">
+                                            @(row.Leave > comparisonRow.Leave ? "+" : "")@(row.Leave - comparisonRow.Leave)
+                                        </span>
+                                    }
+                                </td>
                                 <td>
                                     <div class="rpt-bar-cell">
                                         <div class="rpt-bar-wrap"><div class="rpt-bar" style="width:@(pct)%;background:@barColor"></div></div>
@@ -291,6 +370,14 @@
                             <span class="rpt-emp-stat-val">@_empStats.AttendanceRate%</span>
                             <span class="rpt-emp-stat-lbl">Ирцийн %</span>
                         </div>
+                        <div class="rpt-emp-stat rpt-emp-stat--hours">
+                            <span class="rpt-emp-stat-val">@($"{_empStats.TotalWorkingHours:0.#}")ц</span>
+                            <span class="rpt-emp-stat-lbl">Нийт цаг</span>
+                        </div>
+                        <div class="rpt-emp-stat rpt-emp-stat--avg">
+                            <span class="rpt-emp-stat-val">@($"{_empStats.AvgWorkingHours:0.##}")ц</span>
+                            <span class="rpt-emp-stat-lbl">Өдөр дундаж</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -312,6 +399,13 @@
                         <option value="Late">Хоцорсон</option>
                         <option value="Absent">Ирээгүй</option>
                         <option value="OnLeave">Чөлөөтэй</option>
+                    </select>
+                    <select class="rpt-select-mini" @bind="_attDepartmentFilter">
+                        <option value="">Бүх хэлтэс</option>
+                        @foreach (var dept in _departments)
+                        {
+                            <option value="@dept.Id">@dept.Name</option>
+                        }
                     </select>
                 </div>
             </div>
@@ -420,23 +514,87 @@
                 <div class="rpt-ot-sub">Илүү цагтай өдрүүд</div>
             </div>
         </div>
+        
         @if (overtimeSummary is not null && overtimeSummary.TotalOvertimeHours > 0)
         {
             var avg = (double)overtimeSummary.AverageOvertimeHours;
             var max = (double)overtimeSummary.HighestOvertimeHours;
             var pct = max == 0 ? 0 : (int)(avg / max * 100);
-            <div class="card rpt-card">
-                <div class="rpt-card-header"><h2 class="rpt-card-title">Дундаж / Хамгийн их харьцаа</h2></div>
-                <div style="padding:16px 20px">
-                    <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--clr-text-muted);margin-bottom:8px">
-                        <span>Дундаж: @($"{avg:0.##}")ц</span>
-                        <span>Хамгийн их: @($"{max:0.##}")ц</span>
+            
+            <div class="rpt-ot-details">
+                <div class="card rpt-card">
+                    <div class="rpt-card-header"><h2 class="rpt-card-title">Илүү цагийн дүн шинжилгээ</h2></div>
+                    <div style="padding:16px 20px">
+                        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--clr-text-muted);margin-bottom:8px">
+                            <span>Дундаж: @($"{avg:0.##}")ц</span>
+                            <span>Хамгийн их: @($"{max:0.##}")ц</span>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar" style="width:@pct%;background:linear-gradient(135deg,var(--clr-warning),var(--clr-danger))"></div>
+                        </div>
+                        <div style="font-size:12px;color:var(--clr-text-muted);margin-top:8px">Дундаж нь хамгийн их-ийн @pct% байна</div>
                     </div>
-                    <div class="progress">
-                        <div class="progress-bar" style="width:@pct%;background:linear-gradient(135deg,var(--clr-warning),var(--clr-danger))"></div>
-                    </div>
-                    <div style="font-size:12px;color:var(--clr-text-muted);margin-top:8px">Дундаж нь хамгийн их-ийн @pct% байна</div>
                 </div>
+
+                <div class="card rpt-card">
+                    <div class="rpt-card-header"><h2 class="rpt-card-title">Илүү цагийн хуваарилалт</h2></div>
+                    <div class="rpt-chart-section">
+                        <div class="rpt-chart-scroll">
+                            <canvas id="overtimeChart" class="rpt-bar-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card rpt-card">
+                    <div class="rpt-card-header">
+                        <h2 class="rpt-card-title">Илүү цагтай ажилтнууд</h2>
+                        <button class="rpt-export-btn" @onclick='() => ExportCsvAsync("overtime")'>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                            Excel
+                        </button>
+                    </div>
+                    <div class="rpt-table-wrap">
+                        <table class="data-table rpt-table">
+                            <thead>
+                                <tr>
+                                    <th>Ажилтан</th>
+                                    <th>Хэлтэс</th>
+                                    <th>Нийт илүү цаг</th>
+                                    <th>Илүү цагтай өдөр</th>
+                                    <th>Дундаж / өдөр</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var row in attendanceRows.Where(r => 
+                                    decimal.TryParse(Val(r, "OvertimeHours"), out var ot) && ot > 0)
+                                    .GroupBy(r => Val(r, "Employee"))
+                                    .Select(g => new { 
+                                        Employee = g.Key, 
+                                        Department = g.First().TryGetValue("Department", out var dept) ? Val(g.First(), "Department") : "",
+                                        TotalOvertime = g.Sum(r => decimal.TryParse(Val(r, "OvertimeHours"), out var ot) ? ot : 0),
+                                        DaysWithOvertime = g.Count(r => decimal.TryParse(Val(r, "OvertimeHours"), out var ot) && ot > 0)
+                                    })
+                                    .OrderByDescending(x => x.TotalOvertime)
+                                    .Take(10))
+                                {
+                                    <tr class="rpt-row">
+                                        <td><strong>@row.Employee</strong></td>
+                                        <td class="rpt-muted-cell">@row.Department</td>
+                                        <td><span class="rpt-chip-ot">@($"{row.TotalOvertime:0.##}")ц</span></td>
+                                        <td>@row.DaysWithOvertime өдөр</td>
+                                        <td>@($"{row.TotalOvertime / Math.Max(1, row.DaysWithOvertime):0.##}")ц</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="card rpt-card">
+                <div class="rpt-empty"><div class="rpt-empty-icon">⏱</div><div>Илүү цагийн мэдээлэл олдсонгүй.</div></div>
             </div>
         }
     }
@@ -453,7 +611,7 @@
                 <div class="rpt-card-actions">
                     <input class="rpt-search-mini" type="search" placeholder="Нэр хайх…"
                            value="@_empSearch"
-                           @oninput="OnEmpSearchInput" />
+                           @oninput="OnEmployeeListSearchInput" />
                     <button class="rpt-export-btn" @onclick='() => ExportCsvAsync("employees")'>
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                         CSV
@@ -551,6 +709,22 @@
 .rpt-emp-avatar--sm    { width: 28px !important; height: 28px !important; font-size: 10px !important; }
 .rpt-selected-emp-chip { display: flex; align-items: center; gap: 10px; padding: 8px 14px; background: var(--clr-primary-light); border: 1px solid var(--clr-primary); border-radius: var(--radius-sm); flex-shrink: 0; }
 
+/* Period comparison */
+.rpt-comparison-row { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--clr-border); }
+.rpt-comparison-toggle { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.rpt-comparison-toggle input { cursor: pointer; }
+.rpt-comparison-info { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--clr-text-muted); }
+.rpt-comparison-label { font-weight: 600; }
+.rpt-comparison-dates { font-family: monospace; }
+.rpt-comparison-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: var(--radius-full); font-size: 11px; font-weight: 700; }
+.rpt-comparison-badge--up { background: var(--clr-success-light); color: var(--clr-success); }
+.rpt-comparison-badge--down { background: var(--clr-danger-light); color: var(--clr-danger); }
+.rpt-comparison-badge--same { background: var(--clr-surface-2); color: var(--clr-text-muted); }
+.rpt-comparison-diff { font-size: 11px; font-weight: 600; margin-left: 4px; }
+.text-green { color: var(--clr-success); }
+.text-red { color: var(--clr-danger); }
+.text-muted { color: var(--clr-text-muted); }
+
 /* Employee report summary card */
 .rpt-emp-report-card   { border-left: 4px solid var(--clr-primary) !important; }
 .rpt-emp-stats-row     { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -562,6 +736,8 @@
 .rpt-emp-stat--absent  { background: var(--clr-danger-light);  color: var(--clr-danger);  }
 .rpt-emp-stat--ot      { background: var(--clr-primary-light); color: var(--clr-primary); }
 .rpt-emp-stat--rate    { background: var(--clr-info-light);    color: var(--clr-info);    }
+.rpt-emp-stat--hours   { background: var(--clr-surface-2);     color: var(--clr-text);    }
+.rpt-emp-stat--avg     { background: #ede9fe;                  color: #7c3aed;            }
 
 /* Progress bar */
 .rpt-progress       { height: 3px; border-radius: 99px; background: var(--clr-border); margin-top: 12px; overflow: hidden; }
@@ -628,8 +804,14 @@
 .rpt-bar-pct { font-size: 12px; color: var(--clr-text-muted); font-weight: 600; min-width: 32px; text-align: right; }
 
 /* Chart */
-.rpt-chart-scroll { overflow-x: auto; padding: 16px 20px 20px; }
-.rpt-bar-chart { width: 100%; min-width: 300px; height: 220px; }
+.rpt-chart-section { padding: 20px; border-bottom: 1px solid var(--clr-border); }
+.rpt-chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.rpt-chart-title { margin: 0; font-size: 14px; font-weight: 700; }
+.rpt-chart-legend { display: flex; gap: 12px; flex-wrap: wrap; }
+.rpt-legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--clr-text-muted); }
+.rpt-legend-color { width: 10px; height: 10px; border-radius: 2px; }
+.rpt-chart-scroll { overflow-x: auto; padding: 0; }
+.rpt-bar-chart { width: 100%; min-width: 400px; height: 250px; }
 
 /* Employee cell */
 .rpt-emp-cell { display: flex; align-items: center; gap: 10px; }
@@ -656,6 +838,8 @@
 .rpt-ot-val  { font-size: 32px; font-weight: 800; line-height: 1; letter-spacing: -.03em; }
 .rpt-ot-lbl  { font-size: 13px; font-weight: 600; opacity: .9; }
 .rpt-ot-sub  { font-size: 11px; opacity: .75; }
+.rpt-ot-details { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@@media (max-width: 1100px) { .rpt-ot-details { grid-template-columns: 1fr; } }
 
 /* Pagination */
 .rpt-pagination { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 14px 18px; border-top: 1px solid var(--clr-border); }
@@ -687,6 +871,10 @@
     private DateOnly from = new(DateTime.Today.Year, DateTime.Today.Month, 1);
     private DateOnly to   = DateOnly.FromDateTime(DateTime.Today);
     private string _quick = "month";
+    private bool showComparison = false;
+    private DateOnly comparisonFrom;
+    private DateOnly comparisonTo;
+    private IReadOnlyList<DepartmentSummaryDto> comparisonSummaries = [];
 
     // ─── UI state ──────────────────────────────────────────────────────────
     private string _tab     = "summary";
@@ -695,6 +883,7 @@
 
     // ─── Data ──────────────────────────────────────────────────────────────
     private IReadOnlyList<DepartmentSummaryDto> summaries     = [];
+    private IReadOnlyList<DepartmentDto>         _departments  = [];
     private List<Dictionary<string, object?>>   attendanceRows = [];
     private List<Dictionary<string, object?>>   employeeRows   = [];
     private int _attendanceTotal;
@@ -712,12 +901,13 @@
 
     private sealed record EmpSuggestion(Guid Id, string FullName, string Department);
     private sealed record EmpStats(int Present = 0, int Late = 0, int Absent = 0,
-        decimal OvertimeHours = 0, int AttendanceRate = 0);
+        decimal OvertimeHours = 0, int AttendanceRate = 0, decimal TotalWorkingHours = 0, decimal AvgWorkingHours = 0);
 
     // ─── Filters / search / sort ───────────────────────────────────────────
     private string _summarySearch   = string.Empty;
     private string _attSearch       = string.Empty;
     private string _attStatusFilter = string.Empty;
+    private string _attDepartmentFilter = string.Empty;
     private string _empSearch       = string.Empty;
 
     private string _sortGroup = string.Empty;
@@ -736,7 +926,7 @@
         : summaries.Sum(s => s.Late);
     private int totalAbsent => _selectedEmployee is not null
         ? _empStats.Absent
-        : summaries.Sum(s => s.Leave);
+        : summaries.Sum(s => s.Absent);
     private int AttendanceRate
     {
         get
@@ -761,6 +951,7 @@
                 "name"    => _sortAsc ? list.OrderBy(s => s.DepartmentName).ToList() : list.OrderByDescending(s => s.DepartmentName).ToList(),
                 "present" => _sortAsc ? list.OrderBy(s => s.Present).ToList()        : list.OrderByDescending(s => s.Present).ToList(),
                 "late"    => _sortAsc ? list.OrderBy(s => s.Late).ToList()           : list.OrderByDescending(s => s.Late).ToList(),
+                "absent"  => _sortAsc ? list.OrderBy(s => s.Absent).ToList()         : list.OrderByDescending(s => s.Absent).ToList(),
                 "leave"   => _sortAsc ? list.OrderBy(s => s.Leave).ToList()          : list.OrderByDescending(s => s.Leave).ToList(),
                 _         => list
             };
@@ -773,10 +964,12 @@
         {
             var q  = _attSearch.Trim().ToLowerInvariant();
             var sf = _attStatusFilter;
+            var df = _attDepartmentFilter;
             var list = attendanceRows
                 .Where(r =>
                     (string.IsNullOrEmpty(q)  || Val(r, "Employee").ToLowerInvariant().Contains(q)) &&
-                    (string.IsNullOrEmpty(sf) || Val(r, "Status") == sf))
+                    (string.IsNullOrEmpty(sf) || Val(r, "Status") == sf) &&
+                    (string.IsNullOrEmpty(df) || Val(r, "DepartmentId") == df))
                 .ToList();
             list = (_sortGroup == "att" ? _sortField : "date") switch
             {
@@ -818,6 +1011,21 @@
     // ─── Lifecycle ─────────────────────────────────────────────────────────
     protected override Task OnInitializedAsync() => LoadAsync();
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender && !_loading)
+        {
+            if (_tab == "summary")
+            {
+                await RenderDepartmentChartAsync();
+            }
+            else if (_tab == "overtime" && overtimeSummary?.TotalOvertimeHours > 0)
+            {
+                await RenderOvertimeChartAsync();
+            }
+        }
+    }
+
     // ─── Load ──────────────────────────────────────────────────────────────
     private async Task LoadAsync()
     {
@@ -831,6 +1039,7 @@
             var summaryTask  = Api.GetAsync<IReadOnlyList<DepartmentSummaryDto>>(
                 $"api/reports/summary?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}");
             var overtimeTask = Api.GetOvertimeSummaryAsync(from, to);
+            var departmentsTask = Api.GetAsync<IReadOnlyList<DepartmentDto>>("api/departments");
 
             // ажилтан сонгосон бол employeeId filter нэмнэ
             var attUrl = _selectedEmployee is not null
@@ -838,10 +1047,11 @@
                 : $"api/reports/attendance?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}&pageNumber=1&pageSize=50";
 
             var attendanceTask = Api.GetAsync<PagedResponse<Dictionary<string, object?>>>(attUrl);
-            await Task.WhenAll(summaryTask, overtimeTask, attendanceTask);
+            await Task.WhenAll(summaryTask, overtimeTask, attendanceTask, departmentsTask);
 
             summaries        = summaryTask.Result  ?? [];
             overtimeSummary  = overtimeTask.Result;
+            _departments    = departmentsTask.Result ?? [];
             var ar           = attendanceTask.Result;
             attendanceRows   = ar?.Items?.ToList() ?? [];
             _attendanceTotal = ar?.TotalCount ?? 0;
@@ -897,6 +1107,14 @@
             if (r?.Items is not null) employeeRows.AddRange(r.Items);
         }
         catch (Exception ex) { error = ex.Message; }
+    }
+
+    private async Task OnEmployeeListSearchInput(ChangeEventArgs e)
+    {
+        _empSearch = e.Value?.ToString() ?? string.Empty;
+        _empPage = 1;
+        employeeRows = [];
+        await SwitchEmployeesTab();
     }
 
     // ─── Employee filter ───────────────────────────────────────────────────
@@ -963,9 +1181,18 @@
         var ot       = attendanceRows
             .Where(r => decimal.TryParse(Val(r, "OvertimeHours"), out _))
             .Sum(r   => decimal.Parse(Val(r, "OvertimeHours")));
+        
+        // Calculate total working hours
+        var totalHours = attendanceRows
+            .Where(r => decimal.TryParse(Val(r, "WorkHours"), out _))
+            .Sum(r => decimal.Parse(Val(r, "WorkHours")));
+        
+        var workingDays = attendanceRows.Count(r => Val(r, "Status") is "Present" or "Late");
+        var avgHours = workingDays > 0 ? totalHours / workingDays : 0;
+        
         var total    = present + absent;
         var rate     = total == 0 ? 0 : (int)Math.Round(present * 100.0 / total);
-        _empStats    = new EmpStats(present, lateOnly, absent, ot, rate);
+        _empStats    = new EmpStats(present, lateOnly, absent, ot, rate, totalHours, avgHours);
     }
 
     // ─── Quick date presets ────────────────────────────────────────────────
@@ -987,8 +1214,45 @@
             "year"  => (new DateOnly(today.Year, 1,  1),  new DateOnly(today.Year, 12, 31)),
             _       => (from, to)
         };
+        UpdateComparisonDates();
+        _ = LoadAsync();
     }
     private bool IsQuick(string key) => _quick == key;
+
+    // ─── Period comparison ────────────────────────────────────────────────
+    private void UpdateComparisonDates()
+    {
+        var daysDiff = (to.ToDateTime(TimeOnly.MinValue) - from.ToDateTime(TimeOnly.MinValue)).Days;
+        comparisonTo = from.AddDays(-1);
+        comparisonFrom = comparisonTo.AddDays(-daysDiff);
+    }
+
+    private async Task OnComparisonToggle()
+    {
+        if (showComparison)
+        {
+            UpdateComparisonDates();
+            await LoadComparisonDataAsync();
+        }
+        else
+        {
+            comparisonSummaries = [];
+        }
+    }
+
+    private async Task LoadComparisonDataAsync()
+    {
+        try
+        {
+            var comparisonTask = await Api.GetAsync<IReadOnlyList<DepartmentSummaryDto>>(
+                $"api/reports/summary?from={comparisonFrom:yyyy-MM-dd}&to={comparisonTo:yyyy-MM-dd}");
+            comparisonSummaries = comparisonTask ?? [];
+        }
+        catch (Exception ex)
+        {
+            error = $"Comparison data failed: {ex.Message}";
+        }
+    }
 
     // ─── Sort helpers ──────────────────────────────────────────────────────
     private void SetSummarySort(string f) { if (_sortGroup == "dept" && _sortField == f) _sortAsc = !_sortAsc; else { _sortGroup = "dept"; _sortField = f; _sortAsc = true; } }
@@ -1004,8 +1268,10 @@
         try
         {
             var empParam = _selectedEmployee is not null ? $"&employeeId={_selectedEmployee.Id}" : "";
+            var apiBaseUrl = Config["ApiBaseUrl"] ?? "http://localhost:5000/";
+            var exportUrl = new Uri(new Uri(apiBaseUrl), $"api/reports/{type}/export/excel?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}{empParam}");
             await JS.InvokeVoidAsync("open",
-                $"/api/reports/{type}/export/excel?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}{empParam}", "_blank");
+                exportUrl.ToString(), "_blank");
         }
         catch (Exception ex) { error = ex.Message; }
     }
@@ -1074,5 +1340,43 @@
     }
 }
 
-    private sealed record DepartmentSummaryDto(Guid DepartmentId, string DepartmentName, int Present, int Late, int Leave);
+    // ─── Chart Rendering ───────────────────────────────────────────────────
+    private async Task RenderDepartmentChartAsync()
+    {
+        if (FilteredSummaries.Count == 0) return;
+
+        var labels = FilteredSummaries.Select(s => s.DepartmentName).ToArray();
+        var presentData = FilteredSummaries.Select(s => s.Present).ToArray();
+        var lateData = FilteredSummaries.Select(s => s.Late).ToArray();
+        var absentData = FilteredSummaries.Select(s => s.Absent).ToArray();
+        var leaveData = FilteredSummaries.Select(s => s.Leave).ToArray();
+
+        await JS.InvokeVoidAsync("renderDepartmentChart", "departmentChart", labels, presentData, lateData, absentData, leaveData);
+    }
+
+    private async Task RenderOvertimeChartAsync()
+    {
+        if (attendanceRows.Count == 0) return;
+
+        // Group overtime by date
+        var overtimeByDate = attendanceRows
+            .Where(r => decimal.TryParse(Val(r, "OvertimeHours"), out var ot) && ot > 0)
+            .GroupBy(r => Val(r, "Date"))
+            .Select(g => new { 
+                Date = g.Key, 
+                TotalOvertime = g.Sum(r => decimal.TryParse(Val(r, "OvertimeHours"), out var ot) ? ot : 0)
+            })
+            .OrderBy(x => x.Date)
+            .Take(30) // Last 30 days with overtime
+            .ToList();
+
+        if (overtimeByDate.Count == 0) return;
+
+        var labels = overtimeByDate.Select(x => x.Date).ToArray();
+        var overtimeData = overtimeByDate.Select(x => (double)x.TotalOvertime).ToArray();
+
+        await JS.InvokeVoidAsync("renderOvertimeChart", "overtimeChart", labels, overtimeData);
+    }
+
+    private sealed record DepartmentSummaryDto(Guid DepartmentId, string DepartmentName, int Present, int Late, int Absent, int Leave);
 }

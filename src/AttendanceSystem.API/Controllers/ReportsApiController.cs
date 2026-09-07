@@ -20,6 +20,7 @@ public sealed class ReportsApiController : ControllerBase
     public async Task<ActionResult<PagedResponseDto<Dictionary<string, object?>>>> Attendance(
         [FromQuery] DateOnly from,
         [FromQuery] DateOnly to,
+        [FromQuery] Guid? employeeId,
         [FromQuery] int pageNumber = 1,
         [FromQuery] int pageSize = 50,
         CancellationToken cancellationToken = default)
@@ -31,7 +32,12 @@ public sealed class ReportsApiController : ControllerBase
             .AsNoTracking()
             .Include(a => a.Employee)
             .ThenInclude(e => e!.Department)
-            .Where(a => a.Date >= from && a.Date <= to)
+            .Where(a => a.Date >= from && a.Date <= to);
+
+        if (employeeId.HasValue)
+            query = query.Where(a => a.EmployeeId == employeeId.Value);
+
+        query = query
             .OrderByDescending(a => a.Date)
             .ThenBy(a => a.Employee == null ? null : a.Employee.FullName);
 
@@ -66,6 +72,7 @@ public sealed class ReportsApiController : ControllerBase
 
     [HttpGet("employees")]
     public async Task<ActionResult<PagedResponseDto<Dictionary<string, object?>>>> Employees(
+        [FromQuery] string? search,
         [FromQuery] int pageNumber = 1,
         [FromQuery] int pageSize = 50,
         CancellationToken cancellationToken = default)
@@ -73,11 +80,22 @@ public sealed class ReportsApiController : ControllerBase
         pageNumber = Math.Max(1, pageNumber);
         pageSize = Math.Clamp(pageSize, 1, 200);
 
-        var query = _db.Employees.AsNoTracking().Include(e => e.Department).OrderBy(e => e.FullName);
+        var query = _db.Employees.AsNoTracking().Include(e => e.Department).AsQueryable();
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            query = query.Where(e =>
+                e.FullName.Contains(term) ||
+                e.EmployeeCode.Contains(term) ||
+                e.Email.Contains(term));
+        }
+
+        query = query.OrderBy(e => e.FullName);
         var total = await query.CountAsync(cancellationToken);
         var data = await query.Skip((pageNumber - 1) * pageSize).Take(pageSize)
             .Select(e => new
             {
+                e.Id,
                 e.EmployeeCode,
                 e.FullName,
                 e.Email,
@@ -89,6 +107,7 @@ public sealed class ReportsApiController : ControllerBase
             .ToListAsync(cancellationToken);
         var rows = data.Select(e => new Dictionary<string, object?>
         {
+            ["Id"] = e.Id,
             ["EmployeeCode"] = e.EmployeeCode,
             ["FullName"] = e.FullName,
             ["Email"] = e.Email,
@@ -149,9 +168,16 @@ public sealed class ReportsApiController : ControllerBase
                     lr.Status == RequestStatus.Approved &&
                     lr.StartDate <= to &&
                     lr.EndDate >= from &&
-                    d.Employees.Any(e => e.Id == lr.EmployeeId))
+                    d.Employees.Any(e => e.Id == lr.EmployeeId)),
+                EmployeeCount = d.Employees.Count(e => e.IsActive)
             })
-            .Select(d => new DepartmentReportSummaryApiDto(d.Id, d.Name, d.Present, d.Late, d.Leave))
+            .Select(d => new DepartmentReportSummaryApiDto(
+                d.Id,
+                d.Name,
+                d.Present,
+                d.Late,
+                Math.Max(d.EmployeeCount - d.Present - d.Late - d.Leave, 0),
+                d.Leave))
             .ToListAsync(cancellationToken);
 
         return Ok(departments);
@@ -173,20 +199,30 @@ public sealed class ReportsApiController : ControllerBase
     }
 
     [HttpGet("{reportType}/export/excel")]
-    public async Task<IActionResult> ExportExcel(string reportType, [FromQuery] DateOnly from, [FromQuery] DateOnly to, CancellationToken cancellationToken)
-        => File(await BuildCsvAsync(reportType, from, to, cancellationToken), "text/csv", $"{reportType}-{from:yyyyMMdd}-{to:yyyyMMdd}.csv");
+    public async Task<IActionResult> ExportExcel(
+        string reportType,
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        [FromQuery] Guid? employeeId,
+        CancellationToken cancellationToken)
+        => File(await BuildCsvAsync(reportType, from, to, employeeId, cancellationToken), "text/csv", $"{reportType}-{from:yyyyMMdd}-{to:yyyyMMdd}.csv");
 
     [HttpGet("{reportType}/export/pdf")]
-    public async Task<IActionResult> ExportPdf(string reportType, [FromQuery] DateOnly from, [FromQuery] DateOnly to, CancellationToken cancellationToken)
-        => File(await BuildCsvAsync(reportType, from, to, cancellationToken), "text/csv", $"{reportType}-{from:yyyyMMdd}-{to:yyyyMMdd}.csv");
+    public async Task<IActionResult> ExportPdf(
+        string reportType,
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        [FromQuery] Guid? employeeId,
+        CancellationToken cancellationToken)
+        => File(await BuildCsvAsync(reportType, from, to, employeeId, cancellationToken), "text/csv", $"{reportType}-{from:yyyyMMdd}-{to:yyyyMMdd}.csv");
 
-    private async Task<byte[]> BuildCsvAsync(string reportType, DateOnly from, DateOnly to, CancellationToken cancellationToken)
+    private async Task<byte[]> BuildCsvAsync(string reportType, DateOnly from, DateOnly to, Guid? employeeId, CancellationToken cancellationToken)
     {
         var rows = reportType.ToLowerInvariant() switch
         {
-            "employees" => (await Employees(1, 10000, cancellationToken)).Value?.Items ?? [],
+            "employees" => (await Employees(null, 1, 10000, cancellationToken)).Value?.Items ?? [],
             "departments" => (await Departments(1, 10000, cancellationToken)).Value?.Items ?? [],
-            _ => (await Attendance(from, to, 1, 10000, cancellationToken)).Value?.Items ?? []
+            _ => (await Attendance(from, to, employeeId, 1, 10000, cancellationToken)).Value?.Items ?? []
         };
 
         var columns = rows.SelectMany(r => r.Keys).Distinct().ToList();
@@ -207,5 +243,5 @@ public sealed class ReportsApiController : ControllerBase
     }
 }
 
-public sealed record DepartmentReportSummaryApiDto(Guid DepartmentId, string DepartmentName, int Present, int Late, int Leave);
+public sealed record DepartmentReportSummaryApiDto(Guid DepartmentId, string DepartmentName, int Present, int Late, int Absent, int Leave);
 public sealed record OvertimeSummaryApiDto(decimal TotalOvertimeHours, decimal AverageOvertimeHours, decimal HighestOvertimeHours, int RecordCount);

@@ -105,8 +105,11 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseSerilogRequestLogging();
-app.UseHttpsRedirection();
-app.UseHsts();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+    app.UseHsts();
+}
 app.UseIpRateLimiting();
 app.UseCors("Default");
 app.UseAuthentication();

@@ -67,7 +67,7 @@ namespace AttendanceSystem.API.Dtos
 
     public class AttendanceHistoryDto
     {
-        public DateTime Date { get; set; }
+        public DateOnly Date { get; set; }
         public DateTime? CheckInTime { get; set; }
         public DateTime? CheckOutTime { get; set; }
         public double WorkHours { get; set; }
@@ -94,8 +94,8 @@ namespace AttendanceSystem.API.Dtos
     public class LeaveHistoryDto
     {
         public Guid LeaveRequestId { get; set; }
-        public DateTime StartDate { get; set; }
-        public DateTime EndDate { get; set; }
+        public DateOnly StartDate { get; set; }
+        public DateOnly EndDate { get; set; }
         public string? LeaveType { get; set; }
         public string? Status { get; set; }
         public DateTime RequestDate { get; set; }

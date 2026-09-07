@@ -5,12 +5,16 @@ window.scrollElementToBottom = (elementId) => {
     }
 };
 
-window.renderDonutChart = (canvasId, values, colors) => {
+window.renderDonutChart = (canvasId, labelsOrValues, valuesOrColors, maybeColors) => {
     const canvas = document.getElementById(canvasId);
     if (!canvas || !window.Chart) return;
     const ctx = canvas.getContext('2d');
     if (canvas._chartInstance) canvas._chartInstance.destroy();
 
+    const hasLabels = Array.isArray(maybeColors);
+    const labels = hasLabels ? labelsOrValues : [];
+    const values = hasLabels ? valuesOrColors : labelsOrValues;
+    const colors = hasLabels ? maybeColors : valuesOrColors;
     const total = values.reduce((a, b) => a + b, 0);
 
     // Center-text plugin
@@ -36,6 +40,7 @@ window.renderDonutChart = (canvasId, values, colors) => {
     canvas._chartInstance = new Chart(ctx, {
         type: 'doughnut',
         data: {
+            labels,
             datasets: [{
                 data: values,
                 backgroundColor: colors,

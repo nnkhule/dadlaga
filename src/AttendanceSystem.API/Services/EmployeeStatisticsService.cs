@@ -86,7 +86,9 @@ namespace AttendanceSystem.API.Services
             for (var date = startOfMonth; date <= endOfMonth; date = date.AddDays(1))
             {
                 var dayOfWeek = date.DayOfWeek;
-                if (employee.WorkSchedule?.IsWorkDay(dayOfWeek) == true && !holidays.Contains(date))
+                var isWorkDay = employee.WorkSchedule?.IsWorkDay(dayOfWeek) ?? 
+                               (dayOfWeek != DayOfWeek.Saturday && dayOfWeek != DayOfWeek.Sunday);
+                if (isWorkDay && !holidays.Contains(date))
                 {
                     totalWorkingDays++;
                 }
@@ -113,7 +115,8 @@ namespace AttendanceSystem.API.Services
                     totalWorkingHours += Math.Max(0, netWorkHours); // Ensure non-negative
                 }
 
-                overtimeHours += (double)record.OvertimeHours;
+                // Use the stored overtime hours which should already be calculated correctly
+                overtimeHours += record.OvertimeHours > 0 ? (double)record.OvertimeHours : 0;
             }
 
             // Leave requests counts
@@ -196,7 +199,7 @@ namespace AttendanceSystem.API.Services
                 .OrderByDescending(a => a.Date)
                 .Select(a => new AttendanceHistoryDto
                 {
-                    Date = a.Date.ToDateTime(TimeOnly.MinValue),
+                    Date = a.Date,
                     CheckInTime = a.CheckInTime,
                     CheckOutTime = a.CheckOutTime,
                     WorkHours = a.CheckOutTime.HasValue ? 
@@ -241,8 +244,8 @@ namespace AttendanceSystem.API.Services
                 .Select(l => new LeaveHistoryDto
                 {
                     LeaveRequestId = l.Id,
-                    StartDate = l.StartDate.ToDateTime(TimeOnly.MinValue),
-                    EndDate = l.EndDate.ToDateTime(TimeOnly.MinValue),
+                    StartDate = l.StartDate,
+                    EndDate = l.EndDate,
                     LeaveType = l.LeaveType.ToString(),
                     Status = l.Status.ToString(),
                     RequestDate = l.CreatedAt
@@ -346,7 +349,7 @@ namespace AttendanceSystem.API.Services
                 // Calculate the month for i months ago
                 var month = today.AddMonths(-i);
                 var startOfMonth = new DateOnly(month.Year, month.Month, 1);
-                var endOfMonth = startOfMonth.AddMonths(1).AddDays(-1); // last day of the month
+                var endOfMonth = new DateOnly(month.Year, month.Month, DateTime.DaysInMonth(month.Year, month.Month));
 
                 // Get holidays for this month
                 var holidays = await _db.Holidays
@@ -382,7 +385,9 @@ namespace AttendanceSystem.API.Services
                 for (var date = startOfMonth; date <= endOfMonth; date = date.AddDays(1))
                 {
                     var dayOfWeek = date.DayOfWeek;
-                    if (employee.WorkSchedule?.IsWorkDay(dayOfWeek) == true && !holidays.Contains(date))
+                    var isWorkDay = employee.WorkSchedule?.IsWorkDay(dayOfWeek) ?? 
+                                   (dayOfWeek != DayOfWeek.Saturday && dayOfWeek != DayOfWeek.Sunday);
+                    if (isWorkDay && !holidays.Contains(date))
                     {
                         totalWorkingDays++;
                     }
@@ -391,7 +396,6 @@ namespace AttendanceSystem.API.Services
                 // Calculate present days, late days, overtime hours, late minutes for the month
                 int presentDays = attendanceRecords.Count(a => AttendanceStatusClassifier.IsPresentBucket(a.Status));
                 int lateDays = attendanceRecords.Count(a => AttendanceStatusClassifier.IsLate(a.Status));
-                double overtimeHours = (double)attendanceRecords.Sum(a => a.OvertimeHours);
                 double lateMinutes = (double)attendanceRecords.Sum(a => a.LateMinutes);
 
                 // Calculate attendance rate
@@ -413,6 +417,9 @@ namespace AttendanceSystem.API.Services
                         workingHours += Math.Max(0, netWorkHours);
                     }
                 }
+
+                // Use the stored overtime hours which should already be calculated correctly
+                double overtimeHours = attendanceRecords.Sum(a => a.OvertimeHours > 0 ? (double)a.OvertimeHours : 0);
 
                 chartData.Add(new MonthlyAttendanceChartDto
                 {

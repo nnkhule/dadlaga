@@ -22,13 +22,23 @@ public sealed class DashboardApiController : ControllerBase
     }
 
     [HttpGet("summary")]
-    public async Task<ActionResult<DashboardSummaryApiDto>> Summary([FromQuery] DateOnly? date, CancellationToken cancellationToken)
+    public async Task<ActionResult<DashboardSummaryApiDto>> Summary(
+        [FromQuery] DateOnly? date,
+        [FromQuery] Guid? departmentId,
+        CancellationToken cancellationToken)
     {
         var targetDate = date ?? _clock.TodayLocal;
-        var totalEmployees = await _db.Employees.AsNoTracking().CountAsync(cancellationToken);
-        var activeEmployees = await _db.Employees.AsNoTracking().CountAsync(e => e.IsActive, cancellationToken);
+        var employees = _db.Employees.AsNoTracking();
+        if (departmentId.HasValue)
+            employees = employees.Where(e => e.DepartmentId == departmentId.Value);
+
+        var totalEmployees = await employees.CountAsync(cancellationToken);
+        var activeEmployees = await employees.CountAsync(e => e.IsActive, cancellationToken);
 
         var todayRecords = _db.AttendanceRecords.AsNoTracking().Where(a => a.Date == targetDate);
+        if (departmentId.HasValue)
+            todayRecords = todayRecords.Where(a => a.Employee != null && a.Employee.DepartmentId == departmentId.Value);
+
         // Present bucket: Present, EarlyLeave, HalfDay, NightShift, WeekendWork (excludes Late)
         var presentBucketToday = await todayRecords.CountAsync(a =>
             a.Status == AttendanceStatus.Present ||
@@ -50,7 +60,8 @@ var onLeaveEmployees = await _db.LeaveRequests
     .CountAsync(l =>
         l.Status == RequestStatus.Approved &&
         l.StartDate <= targetDate &&
-        l.EndDate >= targetDate,
+        l.EndDate >= targetDate &&
+        (!departmentId.HasValue || (l.Employee != null && l.Employee.DepartmentId == departmentId.Value)),
         cancellationToken);
 
         var absentToday =

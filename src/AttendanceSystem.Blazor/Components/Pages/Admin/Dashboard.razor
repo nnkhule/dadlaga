@@ -390,6 +390,7 @@
     private bool isLoading;
     private bool isLoadingLeave;
     private bool isProcessingLeave;
+    private bool _refreshInProgress;
     private bool autoRefresh;
     private DateTime _lastUpdated = DateTime.Now;
     private PeriodicTimer? _timer;
@@ -428,6 +429,10 @@
 
     private async Task RefreshAsync(bool forceRedrawCharts)
     {
+        if (_refreshInProgress)
+            return;
+
+        _refreshInProgress = true;
         isLoading = true;
         StateHasChanged();
         try
@@ -465,6 +470,7 @@
         }
         finally
         {
+            _refreshInProgress = false;
             isLoading = false;
             StateHasChanged();
         }
@@ -557,7 +563,8 @@
                     trends.Select(t => t.Date.ToString("MM/dd")).ToArray(),
                     trends.Select(t => t.Present).ToArray(),
                     trends.Select(t => t.Late).ToArray(),
-                    trends.Select(t => t.Absent).ToArray());
+                    trends.Select(t => t.Absent).ToArray(),
+                    trends.Select(t => t.OnLeave).ToArray());
 
             if (summary is not null)
                 await JS.InvokeVoidAsync("renderDonutChart",

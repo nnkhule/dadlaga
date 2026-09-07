@@ -66,7 +66,7 @@ public class JwtTokenService
                 return null;
         }
 
-        return await GenerateTokensAsync(user, cancellationToken);
+        return await GenerateTokensAsync(user, saveImmediately: true, cancellationToken);
     }
 
     /// <summary>
@@ -101,14 +101,17 @@ public class JwtTokenService
                 return null;
         }
 
-        var result = await GenerateTokensAsync(user, cancellationToken);
+        var result = await GenerateTokensAsync(user, saveImmediately: false, cancellationToken);
         stored.Revoke(result.RefreshToken);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        await _dbContext.SaveChangesAsync(CancellationToken.None);
 
         return result;
     }
 
-    private async Task<TokenResponseDto> GenerateTokensAsync(ApplicationUser user, CancellationToken cancellationToken)
+    private async Task<TokenResponseDto> GenerateTokensAsync(
+        ApplicationUser user,
+        bool saveImmediately,
+        CancellationToken cancellationToken)
     {
         var roles = await _userManager.GetRolesAsync(user);
         var claims = new List<Claim>
@@ -147,7 +150,8 @@ public class JwtTokenService
         var refresh = RefreshToken.Create(user.Id, GenerateRefreshTokenString(),
             DateTime.Now.AddDays(_settings.RefreshTokenExpiryDays));
         await _dbContext.RefreshTokens.AddAsync(refresh, cancellationToken);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        if (saveImmediately)
+            await _dbContext.SaveChangesAsync(CancellationToken.None);
 
         return new TokenResponseDto(
             new JwtSecurityTokenHandler().WriteToken(token),

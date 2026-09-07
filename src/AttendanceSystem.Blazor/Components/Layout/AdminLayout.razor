@@ -1232,6 +1232,9 @@
             using var req = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, "api/employees/me");
             req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
             var resp = await Http.SendAsync(req);
+            if (resp.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.NotFound)
+                return;
+
             if (resp.IsSuccessStatusCode)
             {
                 var profile = await resp.Content.ReadFromJsonAsync<ProfileDto>();
