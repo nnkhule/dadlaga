@@ -2,7 +2,7 @@
 @layout EmployeeLayout
 @inject ApiClient Api
 
-<PageHeader Title="Profile" Subtitle="Employee profile from the database" Icon="◎" />
+<PageHeader Title="Профайл" Subtitle="Ажилтны хувийн мэдээлэл" Icon="◎" />
 
 <div class="page-stack">
     @if (!string.IsNullOrWhiteSpace(error))
@@ -46,7 +46,7 @@
             {
                 <button class="btn-primary"
                         @onclick="(() => isEditing = true)">
-                    Edit Profile
+                    Профайл засах
                 </button>
             }
         </div>
@@ -57,40 +57,40 @@
 
     <div class="profile-info-card">
 
-        <h3>Personal Information</h3>
+        <h3>Хувийн мэдээлэл</h3>
 
         <div class="info-row">
-            <span>Employee Code</span>
+            <span>Ажилтны код</span>
             <strong>@profile.EmployeeCode</strong>
         </div>
 
         <div class="info-row">
-            <span>Email</span>
+            <span>И-мэйл</span>
             <strong>@profile.Email</strong>
         </div>
 
         <div class="info-row">
-            <span>Phone</span>
+            <span>Утас</span>
             <strong>@Display(profile.Phone)</strong>
         </div>
 
         <div class="info-row">
-            <span>Date Of Birth</span>
+            <span>Төрсөн огноо</span>
             <strong>@profile.DateOfBirth?.ToString("yyyy-MM-dd")</strong>
         </div>
 
         <div class="info-row">
-            <span>Department</span>
+            <span>Хэлтэс</span>
             <strong>@Display(profile.Department ?? profile.DepartmentName)</strong>
         </div>
 
         <div class="info-row">
-            <span>Position</span>
+            <span>Албан тушаал</span>
             <strong>@Display(profile.Position)</strong>
         </div>
 
         <div class="info-row">
-            <span>Hire Date</span>
+            <span>Ажилд орсон огноо</span>
             <strong>@profile.HireDate.ToString("yyyy-MM-dd")</strong>
         </div>
 
@@ -101,55 +101,55 @@
             <EditForm Model="@edit" OnValidSubmit="SaveAsync">
                 <div class="card page-stack">
 
-                    <h2>Edit Profile</h2>
+                    <h2>Профайл засах</h2>
 
-                    <SettingsRow Label="Employee Code"
+                    <SettingsRow Label="Ажилтны код"
                                  Value="@profile.EmployeeCode" />
 
                     <div class="form-group">
-                        <label>Full Name</label>
+                        <label>Бүтэн нэр</label>
                         <InputText class="form-control"
                                    @bind-Value="edit.FullName" />
                     </div>
 
                     <div class="form-group">
-                        <label>Email</label>
+                        <label>И-мэйл</label>
                         <InputText class="form-control"
                                    @bind-Value="edit.Email" />
                     </div>
 
                     <div class="form-group">
-                        <label>Phone</label>
+                        <label>Утас</label>
                         <InputText class="form-control"
                                    @bind-Value="edit.Phone" />
                     </div>
 
                     <div class="form-group">
-                        <label>Date Of Birth</label>
+                        <label>Төрсөн огноо</label>
                         <InputDate class="form-control"
                                    @bind-Value="edit.DateOfBirth" />
                     </div>
 
-                    <SettingsRow Label="Department"
+                    <SettingsRow Label="Хэлтэс"
                                  Value="@(profile.Department ?? profile.DepartmentName)" />
 
-                    <SettingsRow Label="Position"
+                    <SettingsRow Label="Албан тушаал"
                                  Value="@profile.Position" />
 
-                    <SettingsRow Label="Hire Date"
+                    <SettingsRow Label="Ажилд орсон огноо"
                                  Value="@profile.HireDate.ToString("yyyy-MM-dd")" />
 
                     <div style="display:flex;gap:10px">
                         <button class="btn-primary"
                                 type="submit"
                                 disabled="@saving">
-                            Save
+                            Хадгалах
                         </button>
 
                         <button class="btn-ghost"
                                 type="button"
                                 @onclick="CancelEdit">
-                            Cancel
+                            Болих
                         </button>
                     </div>
 

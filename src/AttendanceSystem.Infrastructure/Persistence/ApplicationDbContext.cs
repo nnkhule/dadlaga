@@ -19,6 +19,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<AttendanceRecord> AttendanceRecords => Set<AttendanceRecord>();
     public DbSet<TimeAdjustmentRequest> TimeAdjustmentRequests => Set<TimeAdjustmentRequest>();
     public DbSet<LeaveRequest> LeaveRequests => Set<LeaveRequest>();
+    public DbSet<LeavePolicy> LeavePolicies => Set<LeavePolicy>();
+    public DbSet<LeaveBalance> LeaveBalances => Set<LeaveBalance>();
     public DbSet<Holiday> Holidays => Set<Holiday>();
     public DbSet<SuspiciousActivityAlert> SuspiciousActivityAlerts => Set<SuspiciousActivityAlert>();
     public DbSet<Notification> Notifications => Set<Notification>();
@@ -58,6 +60,20 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         builder.Entity<AttendanceRecord>()
             .HasIndex(a => new { a.EmployeeId, a.Date })
             .IsUnique();
+
+        builder.Entity<LeavePolicy>()
+            .HasIndex(p => p.LeaveType)
+            .IsUnique();
+
+        builder.Entity<LeaveBalance>()
+            .HasIndex(b => new { b.EmployeeId, b.LeaveType, b.Year })
+            .IsUnique();
+
+        builder.Entity<LeaveBalance>()
+            .HasOne(b => b.Employee)
+            .WithMany()
+            .HasForeignKey(b => b.EmployeeId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         // Configure RolePermission composite primary key
         builder.Entity<RolePermission>()

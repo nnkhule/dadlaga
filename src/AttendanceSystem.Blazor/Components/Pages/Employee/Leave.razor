@@ -2,21 +2,22 @@
 @layout EmployeeLayout
 @inject ApiClient Api
 @using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Components.Forms
 
-<PageHeader Title="Leave" Subtitle="Leave requests from the database" Icon="☑" />
+<PageHeader Title="Чөлөөний хүсэлт" Subtitle="Хүсэлтээ илгээж, шийдвэрийн явцыг хянах" Icon="☑" />
 
-<div class="page-stack">
+<div class="page-stack leave-page">
     @if (!string.IsNullOrWhiteSpace(error))
     {
         <div class="card" style="border-color:var(--clr-danger);color:var(--clr-danger)">
-            <strong>Error:</strong> @error
+            <strong>Алдаа:</strong> @error
         </div>
     }
 
     @if (submitSuccess)
     {
         <div class="card" style="border-color:var(--clr-success);color:var(--clr-success)">
-            ✓ Leave request submitted successfully!
+            ✓ Хүсэлт амжилттай илгээгдлээ. Удирдлага баталгаажуулсны дараа төлөв шинэчлэгдэнэ.
         </div>
     }
 
@@ -26,11 +27,22 @@
                 <DataAnnotationsValidator />
                 <div class="card page-stack">
                     <h2>Чөлөөний хүсэлт</h2>
+                    @if (balance is not null)
+                    {
+                        <div class="leave-balance-strip">
+                            <div><span>Ээлжийн амралт</span><strong>@balance.Remaining.ToString("0.#") / @balance.Allocated.ToString("0.#") өдөр үлдсэн</strong></div>
+                            <div><span>Хүлээгдэж буй</span><strong>@balance.PendingRequests хүсэлт</strong></div>
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(balanceWarning))
+                        {
+                            <div class="leave-validation">@balanceWarning</div>
+                        }
+                    }
 
                     <!-- Leave Duration Toggle -->
                     <div class="form-group">
                         <label>Чөлөөний төрөл</label>
-                        <div style="display:flex;gap:1rem">
+                        <div class="leave-mode-switch">
                             <button type="button" class="btn"
                                     style="flex:1;border:2px solid @(isDailyLeave ? "var(--clr-primary)" : "var(--clr-muted)");background:@(isDailyLeave ? "var(--clr-primary)" : "transparent");color:@(isDailyLeave ? "white" : "inherit")"
                                     @onclick="() => SetLeaveType(true)">
@@ -46,19 +58,21 @@
 
                     <!-- Leave Type -->
                     
-                    @if (isDailyLeave)
-                    {
-                        <!-- Daily Leave Section -->
-                        <div class="form-group">
+                    <!-- Leave Type -->
+                    <div class="form-group">
                         <label>Төрөл</label>
-                        <InputSelect class="form-control" @bind-Value="request.Type">
+                        <InputSelect class="form-control" @bind-Value="request.Type" @onchange="() => OnLeaveTypeChanged()">
                             @foreach (var type in LeaveTypes)
                             {
-                                <option value="@type">@type</option>
+                                <option value="@type.Key">@type.Label</option>
                             }
                         </InputSelect>
                         <ValidationMessage For="@(() => request.Type)" />
                     </div>
+
+                    @if (isDailyLeave)
+                    {
+                        <!-- Daily Leave Section -->
 
                         <div class="row g-3">
                             <div class="col-6 form-group">
@@ -75,12 +89,12 @@
 
                         @if (validationError != null)
                         {
-                            <div style="color:var(--clr-danger);font-size:0.9rem">@validationError</div>
+                            <div class="leave-validation">@validationError</div>
                         }
 
                         <div class="muted" style="padding:0.75rem;background:rgba(0,0,0,0.05);border-radius:0.25rem">
-                            <strong>📊 Хэмжээ:</strong> @Days
-                            @if (Days > 10)
+                            <strong>📊 Ажлын өдөр:</strong> @BusinessDays
+                            @if (BusinessDays > 10)
                             {
                                 <span style="color:var(--clr-warning)"> ⚠ Урт хугацааны</span>
                             }
@@ -108,12 +122,12 @@
 
                         @if (validationError != null)
                         {
-                            <div style="color:var(--clr-danger);font-size:0.9rem">@validationError</div>
+                            <div class="leave-validation">@validationError</div>
                         }
 
                         <div class="muted" style="padding:0.75rem;background:rgba(0,0,0,0.05);border-radius:0.25rem">
-                            <strong>⏱️ Duration:</strong> @Hours.ToString("F1") hours
-                            @if (Hours > 8)
+                            <strong>⏱️ Үргэлжлэх хугацаа:</strong> @Hours.ToString("F1") цаг
+                            @if (Hours > LeaveRules.MaxHoursPerDay)
                             {
                                 <span style="color:var(--clr-warning)"> ⚠ 1 өдрөөс илүү хэмжээтэй байна</span>
                             }
@@ -127,13 +141,30 @@
                     <!-- Reason -->
                     <div class="form-group">
                         <label>Шалтгаан</label>
-                        <InputTextArea class="form-control" @bind-Value="request.Reason" rows="4" />
+                        <InputTextArea class="form-control" @bind-Value="request.Reason" @bind-Value:event="oninput" rows="4" />
                         <ValidationMessage For="@(() => request.Reason)" />
-                        <small class="muted">@request.Reason?.Length  / 500 characters</small>
+                        <small class="muted">@request.Reason?.Length  / 500 тэмдэгт</small>
                     </div>
 
+                    @if (RequiresDocument)
+                    {
+                        <div class="form-group">
+                            <label>Баримт бичиг <span class="leave-required">заавал</span></label>
+                            <InputFile OnChange="OnDocumentSelected" accept=".pdf,.jpg,.jpeg,.png" @key="selectedDocument" />
+                            <small class="muted">PDF, JPG, PNG; дээд хэмжээ 5 MB.</small>
+                            @if (!string.IsNullOrWhiteSpace(documentError))
+                            {
+                                <div class="leave-validation">@documentError</div>
+                            }
+                            else if (!string.IsNullOrWhiteSpace(documentName))
+                            {
+                                <small class="leave-document-name">✓ @documentName</small>
+                            }
+                        </div>
+                    }
+
                     <button class="btn-primary" type="submit" disabled="@(saving || !IsFormValid)">
-                        @(saving ? "Submitting..." : "Submit")
+                        @(saving ? "Илгээж байна..." : "Хүсэлт илгээх")
                     </button>
                 </div>
             </EditForm>
@@ -145,7 +176,7 @@
 
                 @if (loadingHistory)
                 {
-                    <div class="muted">Loading leave requests...</div>
+                    <div class="muted">Хүсэлтүүдийг ачааллаж байна...</div>
                 }
                 else if (history.Count == 0)
                 {
@@ -161,17 +192,17 @@
 
                     @foreach (var item in history)
                     {
-                        var isDailyRecord = item.StartTime == null && item.EndTime == null;
+                        var isDailyRecord = item.LeaveMode == "Daily";
                         var duration = isDailyRecord
-                            ? $"{CalculateDuration(item.StartDate, item.EndDate)} days"
-                            : $"{CalculateHours(item.StartDate, item.StartTime, item.EndDate, item.EndTime):F1} hours";
+                            ? $"{item.TotalDays:F1} ажлын өдөр"
+                            : $"{item.Hours:F1} цаг";
                         var status = item.Status ?? item.ApprovalStatus ?? "Pending";
 
-                        <div class="card" style="border-left:4px solid @GetStatusColor(status)">
-                            <div style="display:flex;justify-content:space-between;align-items:start">
+                        <div class="card leave-history-card" style="border-left-color:@GetStatusColor(status)">
+                            <div class="leave-history-card__top">
                                 <div style="flex:1">
-                                    <strong>@item.LeaveType</strong>
-                                    <div class="muted" style="margin:0.5rem 0">
+                                    <strong>@TranslateLeaveType(item.LeaveType)</strong>
+                                    <div class="leave-history-card__meta">
                                         @if (isDailyRecord)
                                         {
                                             <span>📅 @item.StartDate.ToString("yyyy-MM-dd") -
@@ -182,20 +213,88 @@
                                                 <text>⏰ @item.StartDate.ToString("yyyy-MM-dd") @item.StartTime.Value.ToString("HH:mm") -
                                                     @item.EndDate.ToString("yyyy-MM-dd") @item.EndTime.Value.ToString("HH:mm")</text>
                                                 }
-                                                <span style="font-weight:bold;display:block;margin-top:0.25rem">@duration</span>
+                                                <span class="leave-history-card__count">@duration</span>
                                             </div>
-                                            <div style="margin-top:0.5rem;font-size:0.9rem">@(string.IsNullOrWhiteSpace(item.Reason) ?
+                                            <div class="leave-history-card__reason">Шалтгаан: @(string.IsNullOrWhiteSpace(item.Reason) ?
                                                                                                                                                                                                                                                        "--" : item.Reason)</div>
+                                            @if (!string.IsNullOrWhiteSpace(item.DecisionReason))
+                                            {
+                                                <div class="leave-history-card__reason">Шийдвэрийн тайлбар: @item.DecisionReason</div>
+                                            }
+                                            @if (!string.IsNullOrWhiteSpace(item.DocumentName))
+                                            {
+                                                <div class="leave-history-card__reason">Баримт: @item.DocumentName</div>
+                                            }
                                             </div>
                                             <StatusBadge Status="@status" />
                                         </div>
+                                        @if (string.Equals(status, "Pending", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            <div class="leave-history-card__actions">
+                                                <button class="btn btn-ghost btn-sm" @onclick="() => CancelAsync(item.Id)" disabled="@saving">Хүсэлт цуцлах</button>
+                                            </div>
+                                        }
                                     </div>
                                 }
                             }
                         </div>
                     </div>
+
+                    @if (calendar is not null && (calendar.ApprovedLeaves.Count > 0 || calendar.Holidays.Count > 0))
+                    {
+                        <div class="card leave-calendar-card">
+                            <div class="section-title"><div><span class="section-kicker">КАЛЕНДАРЬ</span><h2>Ойрын чөлөө, баярын өдрүүд</h2></div></div>
+                            <div class="leave-calendar-grid">
+                                @foreach (var item in calendar.ApprovedLeaves)
+                                {
+                                    <div class="leave-calendar-item leave-calendar-item--leave">
+                                        <span>Чөлөө</span>
+                                        <strong>@TranslateLeaveType(item.LeaveType)</strong>
+                                        <small>@item.StartDate.ToString("yyyy-MM-dd") - @item.EndDate.ToString("yyyy-MM-dd")</small>
+                                    </div>
+                                }
+                                @foreach (var holiday in calendar.Holidays)
+                                {
+                                    <div class="leave-calendar-item leave-calendar-item--holiday">
+                                        <span>Нийтийн амралт</span>
+                                        <strong>@holiday.Name</strong>
+                                        <small>@holiday.Date.ToString("yyyy-MM-dd")</small>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
                 </div>
             </div>
+
+            <style>
+                .leave-page { display: grid; gap: 20px; }
+                .leave-balance-strip { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 12px; border: 1px solid var(--clr-border); border-radius: var(--radius); background: var(--clr-surface-2); }
+                .leave-balance-strip div { display: grid; gap: 3px; }
+                .leave-balance-strip span { color: var(--clr-text-muted); font-size: 11px; }
+                .leave-balance-strip strong { color: var(--clr-text); font-size: 15px; }
+                .leave-mode-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+                .leave-mode-switch .btn { width: 100%; }
+                .leave-history-card { border-left: 4px solid var(--clr-border); }
+                .leave-history-card__top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+                .leave-history-card__meta { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 7px; color: var(--clr-text-muted); font-size: 12px; }
+                .leave-history-card__reason { margin-top: 9px; color: var(--clr-text); font-size: 13px; }
+                .leave-history-card__count { margin-top: 4px; color: var(--clr-text-muted); font-size: 12px; font-weight: 700; }
+                .leave-history-card__actions { display: flex; justify-content: flex-end; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--clr-border); }
+                .leave-validation { padding: 9px 11px; border-radius: var(--radius-sm); background: var(--clr-danger-light); color: var(--clr-danger); font-size: 12px; }
+                .leave-required { color: var(--clr-danger); font-size: 11px; }
+                .leave-document-name { display: block; margin-top: 5px; color: var(--clr-success); font-weight: 600; }
+                .leave-calendar-card { margin-top: 0; }
+                .leave-calendar-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+                .leave-calendar-item { display: grid; gap: 4px; padding: 12px; border-left: 3px solid var(--clr-primary); border-radius: var(--radius-sm); background: var(--clr-surface-2); }
+                .leave-calendar-item--holiday { border-left-color: var(--clr-warning); }
+                .leave-calendar-item span, .leave-calendar-item small { color: var(--clr-text-muted); font-size: 11px; }
+                .leave-calendar-item strong { font-size: 13px; }
+                @@media (max-width: 600px) {
+                    .leave-balance-strip { grid-template-columns: 1fr 1fr; }
+                    .leave-history-card__top { flex-direction: column; }
+                }
+            </style>
 
 @code {
     private LeaveForm request = new();
@@ -206,26 +305,46 @@
     private bool loadingHistory;
     private bool submitSuccess;
     private bool isDailyLeave = true;
+    private LeaveBalanceSummary? balance;
+    private LeaveCalendarResponse? calendar;
+    private IBrowserFile? selectedDocument;
+    private string? documentName;
+    private string? documentError;
+    private string? balanceWarning;
 
-private readonly string[] LeaveTypes =
+    private static DateOnly GetToday()
+    {
+        var ulaanbaatarOffset = TimeSpan.FromHours(8);
+        var now = DateTime.UtcNow.Add(ulaanbaatarOffset);
+        return DateOnly.FromDateTime(now);
+    }
+
+    private static class LeaveRules
+    {
+        public const int MaxHoursPerDay = 8;
+        public const int MinReasonLength = 10;
+        public const int MaxReasonLength = 500;
+        public const long MaxDocumentSizeBytes = 5 * 1024 * 1024;
+    }
+
+    private readonly (string Key, string Label)[] LeaveTypes =
 [
-    "Жилийн ээлжийн амралт",
-    "Өвчний чөлөө",
-    "Цалингүй чөлөө",
-    "Төрсөн өдрийн чөлөө",
-    "Жирэмсний амралт",
-    "Хувийн чөлөө",
-    "Бусад"
+    ("Annual", "Жилийн ээлжийн амралт"),
+    ("Sick", "Өвчний чөлөө"),
+    ("Unpaid", "Цалингүй чөлөө"),
+    ("Birthday", "Төрсөн өдрийн чөлөө"),
+    ("Maternity", "Жирэмсний амралт"),
+    ("Other", "Хувийн болон бусад чөлөө")
 ];
-    private int Days
+
+    private int BusinessDays
     {
         get
         {
             if (request.Start == default || request.End == default)
                 return 0;
 
-            var diff = request.End.DayNumber - request.Start.DayNumber + 1;
-            return Math.Max(1, diff);
+            return CalculateBusinessDays(request.Start, request.End, calendar?.Holidays);
         }
     }
 
@@ -246,10 +365,13 @@ private readonly string[] LeaveTypes =
         !string.IsNullOrWhiteSpace(request.Type) &&
         request.Start != default &&
         !string.IsNullOrWhiteSpace(request.Reason) &&
-        request.Reason.Length >= 10 &&
+        request.Reason.Length >= LeaveRules.MinReasonLength &&
         (isDailyLeave
-            ? (request.End >= request.Start && Days > 0)
-            : (request.StartTime.HasValue && request.EndTime.HasValue && Hours > 0 && Hours <= 24));
+            ? (request.End >= request.Start && BusinessDays > 0)
+            : (request.StartTime.HasValue && request.EndTime.HasValue && Hours > 0 && Hours <= LeaveRules.MaxHoursPerDay)) &&
+        (!RequiresDocument || selectedDocument != null);
+
+    private bool RequiresDocument => request.Type is "Sick" or "Maternity";
 
     private void SetLeaveType(bool daily)
     {
@@ -257,7 +379,7 @@ private readonly string[] LeaveTypes =
         validationError = null;
         if (daily)
         {
-            request.End = DateOnly.FromDateTime(DateTime.Today);
+            request.End = request.Start == default ? GetToday() : request.Start;
             request.StartTime = null;
             request.EndTime = null;
         }
@@ -269,37 +391,80 @@ private readonly string[] LeaveTypes =
         }
     }
 
-    protected override Task OnInitializedAsync() => LoadAsync();
-
-    protected override Task OnParametersSetAsync()
+    private void OnLeaveTypeChanged()
     {
-        request.Start = DateOnly.FromDateTime(DateTime.Today);
-        request.End = DateOnly.FromDateTime(DateTime.Today);
+        if (!RequiresDocument)
+        {
+            documentName = null;
+            selectedDocument = null;
+            documentError = null;
+        }
+
+        if (request.Type == "Annual" && balance is not null)
+        {
+            var businessDays = isDailyLeave ? BusinessDays : (int)Math.Ceiling(Hours / 8);
+            if (businessDays > balance.Remaining)
+            {
+                balanceWarning = $"Анхааруулга: Хүсэлт илгээвэл үлдэгдэл {balance.Remaining - businessDays:F1} болно.";
+            }
+            else
+            {
+                balanceWarning = null;
+            }
+        }
+        else
+        {
+            balanceWarning = null;
+        }
+    }
+
+    protected override Task OnInitializedAsync()
+    {
+        request.Start = GetToday();
+        request.End = GetToday();
         request.StartTime = new TimeOnly(9, 0);
         request.EndTime = new TimeOnly(12, 0);
-        return Task.CompletedTask;
+        return LoadAsync();
     }
+
+    protected override Task OnParametersSetAsync() => Task.CompletedTask;
 
     private async Task LoadAsync()
     {
+        loadingHistory = true;
+        error = null;
+        validationError = null;
+        documentError = null;
+
         try
         {
-            loadingHistory = true;
-            error = null;
-            validationError = null;
-
-            var result = await Api.GetAsync<PagedResponse<LeaveDto>>("api/leave/history");
-            history = result?.Items?.OrderByDescending(x => x.StartDate).ToList() ?? [];
+            var historyResult = await Api.GetAsync<PagedResponse<LeaveDto>>("api/leave/history");
+            history = historyResult?.Items?.OrderByDescending(x => x.StartDate).ThenByDescending(x => x.CreatedAt).ToList() ?? [];
         }
-        catch (Exception ex)
+        catch
         {
-            error = ParseErrorMessage(ex);
             history = [];
         }
-        finally
+
+        try
         {
-            loadingHistory = false;
+            balance = await Api.GetAsync<LeaveBalanceSummary>("api/leave/statistics");
         }
+        catch
+        {
+            balance = null;
+        }
+
+        try
+        {
+            calendar = await Api.GetAsync<LeaveCalendarResponse>("api/leave/calendar");
+        }
+        catch
+        {
+            calendar = null;
+        }
+
+        loadingHistory = false;
     }
 
     private async Task SubmitAsync()
@@ -312,32 +477,44 @@ private readonly string[] LeaveTypes =
         {
             if (!request.StartTime.HasValue || !request.EndTime.HasValue)
             {
-                validationError = "Start and end times are required";
+                validationError = "Эхлэх болон дуусах цагийг сонгоно уу.";
                 return;
             }
 
             if (request.EndTime <= request.StartTime)
             {
-                validationError = "End time must be after start time";
+                validationError = "Дуусах цаг эхлэх цагаас хойш байх ёстой.";
                 return;
             }
 
-            if ((request.EndTime.Value.ToTimeSpan() - request.StartTime.Value.ToTimeSpan()).TotalHours > 24)
+            if ((request.EndTime.Value.ToTimeSpan() - request.StartTime.Value.ToTimeSpan()).TotalHours > LeaveRules.MaxHoursPerDay)
             {
-                validationError = "Leave duration cannot exceed 24 hours";
+                validationError = $"Цагийн чөлөө нэг ажлын өдөр буюу {LeaveRules.MaxHoursPerDay} цагаас хэтрэхгүй байна.";
                 return;
             }
+        }
+
+        if (request.Start < GetToday() && request.Type != "Sick")
+        {
+            validationError = "Өнгөрсөн огноогоор шинэ хүсэлт илгээх боломжгүй.";
+            return;
         }
 
         if (isDailyLeave && request.End < request.Start)
         {
-            validationError = "End date must be after or equal to start date";
+            validationError = "Дуусах өдөр эхлэх өдрөөс өмнө байж болохгүй.";
             return;
         }
 
-        if (request.Reason.Length < 10)
+        if (isDailyLeave && BusinessDays == 0)
         {
-            validationError = "Reason must be at least 10 characters";
+            validationError = "Сонгосон хугацаанд ажлын өдөр алга байна.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Reason) || request.Reason.Trim().Length < LeaveRules.MinReasonLength)
+        {
+            validationError = $"Шалтгаан дор хаяж {LeaveRules.MinReasonLength} тэмдэгттэй байна.";
             return;
         }
 
@@ -374,14 +551,29 @@ private readonly string[] LeaveTypes =
                 };
             }
 
-            await Api.PostAsync("api/leave/requests", payload);
+            await Api.SubmitLeaveRequestAsync(payload, selectedDocument);
 
             submitSuccess = true;
-            request = new LeaveForm { Type = request.Type };
-
-            await Task.Delay(2000);
-            submitSuccess = false;
+            StateHasChanged();
             await LoadAsync();
+
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(2000);
+                submitSuccess = false;
+                StateHasChanged();
+            });
+
+            request = new LeaveForm
+            {
+                Type = "Annual",
+                Start = GetToday(),
+                End = GetToday(),
+                StartTime = new TimeOnly(9, 0),
+                EndTime = new TimeOnly(12, 0)
+            };
+            selectedDocument = null;
+            documentName = null;
         }
         catch (Exception ex)
         {
@@ -393,30 +585,18 @@ private readonly string[] LeaveTypes =
         }
     }
 
-    private static int CalculateDuration(DateOnly start, DateOnly end)
+    private static int CalculateBusinessDays(DateOnly start, DateOnly end, IReadOnlyList<HolidayCalendarItem>? holidays)
     {
-        return (end.DayNumber - start.DayNumber) + 1;
-    }
+        if (end < start) return 0;
+        var days = 0;
+        var holidayDates = holidays?.Select(h => h.Date).ToHashSet() ?? new HashSet<DateOnly>();
 
-    private static decimal CalculateHours(DateOnly startDate, TimeOnly? startTime, DateOnly endDate, TimeOnly? endTime)
-    {
-        if (startTime == null || endTime == null)
-            return 0;
-
-        if (startDate == endDate)
+        for (var date = start; date <= end; date = date.AddDays(1))
         {
-            var diff = endTime.Value.ToTimeSpan() - startTime.Value.ToTimeSpan();
-            return (decimal)diff.TotalHours;
+            if (date.DayOfWeek is not (DayOfWeek.Saturday or DayOfWeek.Sunday) && !holidayDates.Contains(date))
+                days++;
         }
-        else
-        {
-            // Multi-day hourly leave
-            var startDiff = new TimeOnly(23, 59) - startTime.Value;
-            var endDiff = endTime.Value - new TimeOnly(0, 0);
-            var daysDiff = endDate.DayNumber - startDate.DayNumber - 1;
-
-            return (decimal)(startDiff.TotalHours + (daysDiff * 24) + endDiff.TotalHours);
-        }
+        return days;
     }
 
     private static string GetStatusColor(string status) => status?.ToLower() switch
@@ -427,26 +607,99 @@ private readonly string[] LeaveTypes =
         _ => "var(--clr-muted)"
     };
 
+    private async Task OnDocumentSelected(InputFileChangeEventArgs args)
+    {
+        documentError = null;
+        selectedDocument = args.File;
+        try
+        {
+            await using var stream = selectedDocument.OpenReadStream(5 * 1024 * 1024);
+            documentName = selectedDocument.Name;
+        }
+        catch (Exception ex)
+        {
+            selectedDocument = null;
+            documentName = null;
+            documentError = ex.Message.Contains("maximum", StringComparison.OrdinalIgnoreCase)
+                ? "Файл 5 MB-ээс бага хэмжээтэй байна."
+                : "Файл уншиж чадсангүй.";
+        }
+    }
+
+    private async Task CancelAsync(Guid id)
+    {
+        if (saving) return;
+        try
+        {
+            saving = true;
+            error = null;
+            await Api.CancelLeaveRequestAsync(id);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            error = ParseErrorMessage(ex);
+        }
+        finally { saving = false; }
+    }
+
+    private static string TranslateLeaveType(string? type) => type switch
+    {
+        "Annual" => "Жилийн ээлжийн амралт",
+        "Sick" => "Өвчний чөлөө",
+        "Unpaid" => "Цалингүй чөлөө",
+        "Birthday" => "Төрсөн өдрийн чөлөө",
+        "Maternity" => "Жирэмсний амралт",
+        "Other" => "Бусад",
+        _ => type ?? "Бусад"
+    };
+
+    private sealed record LeaveBalanceSummary(decimal Allocated, decimal Used, decimal Remaining, int PendingRequests);
+    private sealed record LeaveCalendarResponse(IReadOnlyList<LeaveCalendarItem> ApprovedLeaves, IReadOnlyList<HolidayCalendarItem> Holidays);
+    private sealed record LeaveCalendarItem(Guid Id, DateOnly StartDate, DateOnly EndDate, string LeaveType, string? LeaveMode);
+    private sealed record HolidayCalendarItem(DateOnly Date, string Name);
+
     private static string ParseErrorMessage(Exception ex)
     {
-        if (ex.Message.Contains("400"))
-            return "Invalid request. Please check your input.";
-        if (ex.Message.Contains("401"))
-            return "You are not authorized to perform this action.";
-        if (ex.Message.Contains("409"))
-            return "You already have a leave request for this period.";
-        if (ex.Message.Contains("500"))
-            return "Server error. Please try again later.";
+        if (ex is HttpRequestException httpEx && httpEx.StatusCode.HasValue)
+        {
+            var statusCode = httpEx.StatusCode.Value;
+            var message = httpEx.Message;
+
+            switch (statusCode)
+            {
+                case System.Net.HttpStatusCode.BadRequest:
+                    if (message.Contains("balance", StringComparison.OrdinalIgnoreCase))
+                        return "Үлдэгдэл хүрэлцэхгүй байна.";
+                    if (message.Contains("overlap", StringComparison.OrdinalIgnoreCase))
+                        return "Энэ хугацаанд давхардсан чөлөөний хүсэлт байна.";
+                    if (message.Contains("past", StringComparison.OrdinalIgnoreCase))
+                        return "Өнгөрсөн огноогоор шинэ хүсэлт илгээх боломжгүй.";
+                    return "Хүсэлт буруу байна. Оруулсан мэдээллээ шалгана уу.";
+                case System.Net.HttpStatusCode.Unauthorized:
+                    return "Энэ үйлдлийг хийх эрхгүй байна.";
+                case System.Net.HttpStatusCode.Forbidden:
+                    return "Энэ үйлдлийг хийх зөвшөөрөл байхгүй байна.";
+                case System.Net.HttpStatusCode.NotFound:
+                    return "Өгөгдөл олдсонгүй.";
+                case System.Net.HttpStatusCode.Conflict:
+                    return "Энэ хугацаанд давхардсан чөлөөний хүсэлт байна.";
+                case System.Net.HttpStatusCode.InternalServerError:
+                    return "Серверийн алдаа гарлаа. Дараа дахин оролдоно уу.";
+                default:
+                    return $"Алдаа гарлаа: {message}";
+            }
+        }
 
         return ex.Message;
     }
 
     private sealed class LeaveForm
     {
-        [Required(ErrorMessage = "Leave type is required")]
-        public string Type { get; set; } = "Жилийн";
+        [Required(ErrorMessage = "Чөлөөний төрлийг сонгоно уу.")]
+        public string Type { get; set; } = "Annual";
 
-        [Required(ErrorMessage = "Start date is required")]
+        [Required(ErrorMessage = "Эхлэх огноог сонгоно уу.")]
 
 
         public DateOnly Start { get; set; } = DateOnly.FromDateTime(DateTime.Today);
@@ -457,8 +710,8 @@ private readonly string[] LeaveTypes =
         public TimeOnly? EndTime { get; set; }
 
 
-        [Required(ErrorMessage = "Reason is required")]
-        [StringLength(500, MinimumLength = 10, ErrorMessage = "Reason must be between 10 and 500 characters")]
+        [Required(ErrorMessage = "Шалтгаан оруулна уу.")]
+        [StringLength(500, MinimumLength = 10, ErrorMessage = "Шалтгаан 10-500 тэмдэгттэй байна.")]
         public string Reason { get; set; } = string.Empty;
     }
 }

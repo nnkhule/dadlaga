@@ -37,6 +37,21 @@ public class AttendanceController : ControllerBase
         if (employeeId is null)
             return BadRequest(new ApiErrorResponse("Employee profile not linked to user."));
 
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var approvedLeave = await _db.LeaveRequests
+            .AsNoTracking()
+            .Where(l => l.EmployeeId == employeeId.Value &&
+                        l.Status == RequestStatus.Approved &&
+                        l.StartDate <= today && l.EndDate >= today)
+            .Select(l => new { l.LeaveMode, l.StartTime, l.EndTime })
+            .ToListAsync(cancellationToken);
+        var now = TimeOnly.FromDateTime(DateTime.Now);
+        if (approvedLeave.Any(l => l.LeaveMode == "Daily" ||
+            (l.StartTime.HasValue && l.EndTime.HasValue && now >= l.StartTime.Value && now < l.EndTime.Value)))
+        {
+            return BadRequest(new ApiErrorResponse("Та өнөөдөр батлагдсан чөлөөтэй байна. Ирц бүртгүүлэх шаардлагагүй.", "ON_LEAVE"));
+        }
+
         var result = await _mediator.Send(new CheckInCommand(
             employeeId.Value,
             request.Latitude,

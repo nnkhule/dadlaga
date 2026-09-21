@@ -26,8 +26,13 @@ public class DefaultAiProvider : IAiProvider
         List<(string Role, string Content)> messages,
         CancellationToken cancellationToken = default)
     {
-        var apiKey  = _configuration["AiSettings:ApiKey"];
-        var model   = _configuration["AiSettings:Model"]   ?? "meta/llama-3.1-70b-instruct";
+        var apiKey = FirstNonEmpty(
+            _configuration["AiSettings:ApiKey"],
+            _configuration["AiSettings__ApiKey"],
+            _configuration["NVIDIA_API_KEY"],
+            Environment.GetEnvironmentVariable("AiSettings__ApiKey"),
+            Environment.GetEnvironmentVariable("NVIDIA_API_KEY"));
+        var model   = _configuration["AiSettings:Model"]   ?? "deepseek-ai/deepseek-v4-flash-0731";
         var baseUrl = _configuration["AiSettings:BaseUrl"] ?? "https://integrate.api.nvidia.com/v1/chat/completions";
 
         if (string.IsNullOrWhiteSpace(apiKey))
@@ -47,8 +52,8 @@ public class DefaultAiProvider : IAiProvider
                 model       = model,
                 messages    = chatMessages,
                 temperature = 0.45,   // ↑ Дата лавлагаанаас гадна HR зөвлөгөө/тооцоолол хариулдаг тул бага зэрэг уян хатан
-                top_p       = 10,
-                max_tokens  = 12000,
+                top_p       = 0.9,
+                max_tokens  = 512,
                 stream      = false
             };
 
@@ -61,7 +66,7 @@ public class DefaultAiProvider : IAiProvider
 
             // ✅ Timeout — гадны API маш удаашрахаас хамгаалах
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(200));
+            cts.CancelAfter(TimeSpan.FromSeconds(45));
 
             var response = await _httpClient.SendAsync(httpRequest, cts.Token);
 
@@ -90,7 +95,7 @@ public class DefaultAiProvider : IAiProvider
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            _logger.LogWarning("AI API хүсэлт 200 секундийн дотор хариу өгсөнгүй (timeout).");
+            _logger.LogWarning("AI API хүсэлт 45 секундийн дотор хариу өгсөнгүй (timeout).");
             return "Уучлаарай, AI сервер одоо удаашралтай байна. Түр хүлээгээд дахин оролдоно уу.";
         }
         catch (HttpRequestException ex)
@@ -103,6 +108,11 @@ public class DefaultAiProvider : IAiProvider
             _logger.LogError(ex, "AI provider дуудлага амжилтгүй боллоо.");
             return GetFallbackReply(messages);
         }
+    }
+
+    private static string? FirstNonEmpty(params string?[] values)
+    {
+        return values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
     }
 
     /// <summary>

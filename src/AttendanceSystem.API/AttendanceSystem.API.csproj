@@ -4,6 +4,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>AttendanceSystem.API</RootNamespace>
+    <UserSecretsId>attendance-system-api-local</UserSecretsId>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <BuildInParallel>false</BuildInParallel>
   </PropertyGroup>

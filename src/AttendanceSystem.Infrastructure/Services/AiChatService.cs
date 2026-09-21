@@ -26,10 +26,63 @@ public class AiChatService : IAiChatService
         ChatRequestDto request, Guid adminId, CancellationToken cancellationToken = default)
     {
         var context = await BuildAdminContextAsync(cancellationToken);
+        if (TryBuildAdminQuickReply(request.Message, context, out var quickReply))
+            return new ChatResponseDto { Reply = quickReply, Timestamp = _clock.UtcNow };
+
         var systemPrompt = BuildAdminSystemPrompt(context);
         var messages = BuildMessageHistory(request);
         var reply = await _aiProvider.GenerateReplyAsync(systemPrompt, messages, cancellationToken);
         return new ChatResponseDto { Reply = reply, Timestamp = _clock.UtcNow };
+    }
+
+    private bool TryBuildAdminQuickReply(string message, AdminAiContextDto context, out string reply)
+    {
+        reply = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(message))
+            return false;
+
+        var text = message.Trim().ToLowerInvariant();
+        var asksToday = ContainsAny(text, "өнөөдөр", "today", "unuudur", "onooodor", "odoo");
+        if (!asksToday)
+            return false;
+
+        if (ContainsAny(text, "ирсэн", "ирц", "present", "attendance", "ирэв", "irs"))
+        {
+            reply = $"Өнөөдөр {_clock.TodayLocal:yyyy-MM-dd} байдлаар {context.PresentToday} ажилтан ирсэн байна.";
+            return true;
+        }
+
+        if (ContainsAny(text, "хоцор", "late"))
+        {
+            reply = $"Өнөөдөр {_clock.TodayLocal:yyyy-MM-dd} байдлаар {context.LateTodayCount} ажилтан хоцорсон байна.";
+            return true;
+        }
+
+        if (ContainsAny(text, "ирээгүй", "тасал", "absent"))
+        {
+            reply = $"Өнөөдөр {_clock.TodayLocal:yyyy-MM-dd} байдлаар {context.AbsentToday} ажилтан ирээгүй байна.";
+            return true;
+        }
+
+        if (ContainsAny(text, "чөлөө", "амралт", "leave"))
+        {
+            reply = $"Өнөөдөр {_clock.TodayLocal:yyyy-MM-dd} байдлаар {context.OnLeaveToday} ажилтан чөлөөтэй байна.";
+            return true;
+        }
+
+        if (ContainsAny(text, "нийт", "ажилтан", "employee", "employees"))
+        {
+            reply = $"Системд нийт {context.TotalEmployees} идэвхтэй ажилтан бүртгэлтэй байна.";
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool ContainsAny(string text, params string[] terms)
+    {
+        return terms.Any(text.Contains);
     }
 
     public async Task<ChatResponseDto> GetEmployeeResponseAsync(

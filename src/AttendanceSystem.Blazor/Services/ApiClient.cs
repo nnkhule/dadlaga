@@ -4,6 +4,7 @@ using System.Text.Json;
 using AttendanceSystem.Application.DTOs.AI;
 using AttendanceSystem.Blazor.Models;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Forms;
 
 namespace AttendanceSystem.Blazor.Services;
 
@@ -122,13 +123,45 @@ public sealed class ApiClient
         => PostAsync($"api/leave/requests/{id}/approve", new { });
 
     public Task<HttpResponseMessage> RejectLeaveRequestAsync(Guid id)
-        => PostAsync($"api/leave/requests/{id}/reject", new { });
+        => RejectLeaveRequestAsync(id, "Шалтгаан тодорхойгүй");
+
+    public Task<HttpResponseMessage> RejectLeaveRequestAsync(Guid id, string reason)
+        => PostAsync($"api/leave/requests/{id}/reject", new { Reason = reason });
+
+    public Task<HttpResponseMessage> CancelLeaveRequestAsync(Guid id)
+        => PostAsync($"api/leave/requests/{id}/cancel", new { });
 
     public Task<HttpResponseMessage> DeactivateEmployeeAsync(Guid id)
         => DeleteAsync($"api/employees/{id}");
 
     public Task<HttpResponseMessage> ReactivateEmployeeAsync(Guid id)
         => PostAsync($"api/employees/{id}/reactivate", new { });
+
+    public async Task<HttpResponseMessage> SubmitLeaveRequestAsync(object payload, IBrowserFile? documentFile, CancellationToken cancellationToken = default)
+    {
+        await AuthorizeAsync();
+
+        var content = new MultipartFormDataContent();
+
+        foreach (var prop in payload.GetType().GetProperties())
+        {
+            var value = prop.GetValue(payload);
+            if (value != null)
+            {
+                content.Add(new StringContent(value.ToString() ?? string.Empty), prop.Name);
+            }
+        }
+
+        if (documentFile != null)
+        {
+            await using var stream = documentFile.OpenReadStream(5 * 1024 * 1024);
+            using var memory = new MemoryStream();
+            await stream.CopyToAsync(memory, cancellationToken);
+            content.Add(new ByteArrayContent(memory.ToArray()), "document", documentFile.Name);
+        }
+
+        return await SendWithRefreshAsync(() => _http.PostAsync("api/leave/requests", content, cancellationToken));
+    }
 
     public async Task<ChatResponseDto?> PostChatAsync(ChatRequestDto request, CancellationToken cancellationToken = default)
     {

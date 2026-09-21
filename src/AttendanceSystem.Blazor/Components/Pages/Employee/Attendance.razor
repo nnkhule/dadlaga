@@ -40,19 +40,19 @@
     </div>
 
     <div class="card animate-fade-in-up">
-            <div class="section-title"><h2>Attendance History</h2></div>
+            <div class="section-title"><h2>Ирцийн түүх</h2></div>
             <div class="table-responsive">
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th>Date</th>
-                            <th>Check In Time</th>
-                            <th>Check Out Time</th>
-                            <th>Work Hours</th>
-                            <th>Overtime Hours</th>
-                            <th>Late Minutes</th>
-                            <th>Status</th>
-                            <th>Verification Method</th>
+                            <th>Огноо</th>
+                            <th>Ирсэн цаг</th>
+                            <th>Гарсан цаг</th>
+                            <th>Ажилласан цаг</th>
+                            <th>Илүү цаг</th>
+                            <th>Хоцролт</th>
+                            <th>Төлөв</th>
+                            <th>Баталгаажуулалт</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -60,7 +60,7 @@
                 {
                     <tr>
                         <td colspan="8" class="muted">
-                            No attendance records found.
+                            Ирцийн бүртгэл олдсонгүй.
                         </td>
                     </tr>
                 }
@@ -73,8 +73,8 @@
                             <td>@row.In</td>
                             <td>@row.Out</td>
                             <td>@row.Total</td>
-                            <td>@($"{row.Overtime:0.##}h")</td>
-                            <td>@row.LateMinutes</td>
+                            <td>@($"{row.Overtime:0.##}ц")</td>
+                            <td>@row.LateMinutes мин</td>
                             <td>@row.Status</td>
                             <td>GPS</td>
                         </tr>

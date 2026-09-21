@@ -16,6 +16,8 @@ public class LeaveRequest : BaseEntity
     public RequestStatus Status { get; private set; } = RequestStatus.Pending;
     public bool IsBirthdayLeave { get; private set; }
     public Guid? ApprovedBy { get; private set; }
+    public string? DecisionReason { get; private set; }
+    public string? DocumentName { get; private set; }
     public decimal TotalDays { get; private set; }
 
     /// <summary>"Daily" (бүтэн өдрөөр) эсвэл "Hourly" (цагаар) чөлөө мөн эсэх.</summary>
@@ -30,7 +32,7 @@ public class LeaveRequest : BaseEntity
     private LeaveRequest() { }
 
     public static LeaveRequest Create(Guid employeeId, LeaveType type, DateOnly start, DateOnly end,
-        string? reason, bool isBirthdayLeave = false)
+        string? reason, bool isBirthdayLeave = false, string? documentName = null)
         => new()
         {
             EmployeeId = employeeId,
@@ -39,11 +41,12 @@ public class LeaveRequest : BaseEntity
             EndDate = end,
             Reason = reason,
             IsBirthdayLeave = isBirthdayLeave,
+            DocumentName = documentName,
             LeaveMode = "Daily"
         };
 
     public static LeaveRequest CreateHourly(Guid employeeId, LeaveType type, DateOnly date,
-        TimeOnly startTime, TimeOnly endTime, decimal hours, string? reason)
+        TimeOnly startTime, TimeOnly endTime, decimal hours, string? reason, string? documentName = null)
         => new()
         {
             EmployeeId = employeeId,
@@ -51,6 +54,7 @@ public class LeaveRequest : BaseEntity
             StartDate = date,
             EndDate = date,
             Reason = reason,
+            DocumentName = documentName,
             LeaveMode = "Hourly",
             StartTime = startTime,
             EndTime = endTime,
@@ -66,6 +70,7 @@ public class LeaveRequest : BaseEntity
         return request;
     }
 
-    public void Approve(Guid approverId) { Status = RequestStatus.Approved; ApprovedBy = approverId; SetUpdated(); }
-    public void Reject(Guid approverId) { Status = RequestStatus.Rejected; ApprovedBy = approverId; SetUpdated(); }
+    public void Approve(Guid approverId) { Status = RequestStatus.Approved; ApprovedBy = approverId; DecisionReason = null; SetUpdated(); }
+    public void Reject(Guid approverId, string reason) { Status = RequestStatus.Rejected; ApprovedBy = approverId; DecisionReason = reason; SetUpdated(); }
+    public void Cancel() { Status = RequestStatus.Cancelled; SetUpdated(); }
 }

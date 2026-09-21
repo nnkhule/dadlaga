@@ -3,32 +3,48 @@
 @code {
     [Parameter] public string Status { get; set; } = "Pending";
 
-    private string Key => Status.Replace(" ", "", StringComparison.OrdinalIgnoreCase)
-                                .ToLowerInvariant();
+    private string Key => Normalize(Status);
+
+    private static string Normalize(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return "pending";
+
+        return value
+            .Trim()
+            .Replace("-", string.Empty, StringComparison.Ordinal)
+            .Replace("_", string.Empty, StringComparison.Ordinal)
+            .Replace(" ", string.Empty, StringComparison.Ordinal)
+            .ToLowerInvariant();
+    }
 
     private string DisplayText => Key switch
     {
-        "present" or "checkedin" or "checkedout" => "Ирсэн",
-        "late" => "Хоцорсон",
-        "absent" => "Ирээгүй",
-        "onleave" or "leave" => "Чөлөөтэй",
-        "approved" => "Батлагдсан",
-        "rejected" => "Татгалзсан",
+        "present" or "checkedin" or "checkedout" or "clockedin" or "clockedout" or "checked-in" or "checked-out" => "Ирсэн",
+        "late" or "latearrival" => "Хоцорсон",
+        "absent" or "notcheckedin" => "Ирээгүй",
+        "onleave" or "leave" or "leaveapproved" => "Чөлөөтэй",
+        "approved" or "approvedleave" => "Батлагдсан",
+        "rejected" or "denied" => "Татгалзсан",
         "earlybird" => "Эрт ирсэн",
         "earlyleave" => "Эрт гарсан",
+        "halfday" or "half-day" => "Хагас өдөр",
+        "pending" or "waiting" => "Хүлээгдэж байна",
         _ => "Хүлээгдэж байна"
     };
 
     private string BadgeClass => Key switch
     {
-        "present" or "checkedin" or "checkedout" => "badge-present",
-        "late" => "badge-late",
-        "absent" => "badge-absent",
-        "onleave" or "leave" => "badge-leave",
-        "approved" => "badge-approved",
-        "rejected" => "badge-rejected",
+        "present" or "checkedin" or "checkedout" or "clockedin" or "clockedout" or "checked-in" or "checked-out" => "badge-present",
+        "late" or "latearrival" => "badge-late",
+        "absent" or "notcheckedin" => "badge-absent",
+        "onleave" or "leave" or "leaveapproved" => "badge-leave",
+        "approved" or "approvedleave" => "badge-approved",
+        "rejected" or "denied" => "badge-rejected",
         "earlybird" => "badge-earlybird",
         "earlyleave" => "badge-earlyleave",
+        "halfday" or "half-day" => "badge-pending",
+        "pending" or "waiting" => "badge-pending",
         _ => "badge-pending"
     };
 }

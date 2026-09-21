@@ -5,6 +5,7 @@ using AttendanceSystem.Domain.Enums;
 using AttendanceSystem.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace AttendanceSystem.API.Controllers
@@ -15,15 +16,17 @@ namespace AttendanceSystem.API.Controllers
     public class LeaveController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
+        private readonly IWebHostEnvironment _environment;
 
-        public LeaveController(ApplicationDbContext context)
+        public LeaveController(ApplicationDbContext context, IWebHostEnvironment environment)
         {
             _context = context;
+            _environment = environment;
         }
 
         [HttpPost("requests")]
         [Authorize(Roles = "Employee,SuperAdmin,HRManager,DepartmentHead")]
-        public async Task<IActionResult> CreateLeave([FromBody] LeaveRequestDto request)
+        public async Task<IActionResult> CreateLeave([FromForm] LeaveRequestDto request, IFormFile? document, CancellationToken cancellationToken)
         {
             if (request == null)
                 return BadRequest(new { error = "Invalid payload" });
@@ -40,11 +43,55 @@ namespace AttendanceSystem.API.Controllers
             if (endDate < startDate)
                 return BadRequest(new { error = "EndDate cannot be before StartDate." });
 
+            if (string.IsNullOrWhiteSpace(request.Reason) || request.Reason.Trim().Length is < 10 or > 500)
+                return BadRequest(new { error = "Reason must be between 10 and 500 characters." });
+
             var employeeId = GetEmployeeId();
             if (employeeId is null)
                 return BadRequest(new { error = "Employee profile not linked to user." });
 
             var leaveType = ParseLeaveType(request.Type);
+            var policy = await _context.LeavePolicies
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.LeaveType == leaveType && p.IsActive, cancellationToken);
+            if (policy is null)
+                return BadRequest(new { error = "Leave policy is not configured for this leave type." });
+
+            if (policy.AdminOnly && User.IsInRole("Employee"))
+                return Forbid();
+
+            if (policy.RequiresReason && string.IsNullOrWhiteSpace(request.Reason))
+                return BadRequest(new { error = "A reason is required for this leave type." });
+
+            if (policy.RequiresDocument && document == null)
+                return BadRequest(new { error = "A supporting document is required for this leave type." });
+
+            string? documentName = null;
+            if (document != null)
+            {
+                try
+                {
+                    documentName = await SaveDocumentAsync(document, cancellationToken);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    return BadRequest(new { error = ex.Message });
+                }
+            }
+
+            var today = DateOnly.FromDateTime(DateTime.Today);
+            if (startDate < today && User.IsInRole("Employee") && leaveType != LeaveType.Sick)
+                return BadRequest(new { error = "New leave requests cannot start in the past." });
+
+            if (policy.AdvanceNoticeDays > 0 && startDate.DayNumber - today.DayNumber < policy.AdvanceNoticeDays)
+                return BadRequest(new { error = $"This leave must be requested at least {policy.AdvanceNoticeDays} days in advance." });
+
+            var hasOverlap = await _context.LeaveRequests.AnyAsync(l =>
+                l.EmployeeId == employeeId.Value &&
+                (l.Status == RequestStatus.Pending || l.Status == RequestStatus.Approved) &&
+                l.StartDate <= endDate && l.EndDate >= startDate);
+            if (hasOverlap)
+                return Conflict(new { error = "An active leave request already exists for this period." });
 
             LeaveRequest leaveRequest;
             if (string.Equals(request.LeaveMode, "Hourly", StringComparison.OrdinalIgnoreCase))
@@ -56,14 +103,29 @@ namespace AttendanceSystem.API.Controllers
                 if (endTime <= startTime)
                     return BadRequest(new { error = "EndTime must be after StartTime." });
 
-                var hours = request.Hours ?? (decimal)(endTime.ToTimeSpan() - startTime.ToTimeSpan()).TotalHours;
+                var hours = (decimal)(endTime.ToTimeSpan() - startTime.ToTimeSpan()).TotalHours;
+                if (hours <= 0 || hours > 8)
+                    return BadRequest(new { error = "Hourly leave must be between 1 and 8 hours." });
 
-                leaveRequest = LeaveRequest.CreateHourly(employeeId.Value, leaveType, startDate, startTime, endTime, hours, request.Reason);
+                leaveRequest = LeaveRequest.CreateHourly(employeeId.Value, leaveType, startDate, startTime, endTime, hours, request.Reason, documentName);
             }
             else
             {
-                leaveRequest = LeaveRequest.Create(employeeId.Value, leaveType, startDate, endDate, request.Reason);
+                leaveRequest = LeaveRequest.Create(employeeId.Value, leaveType, startDate, endDate, request.Reason, documentName: documentName);
             }
+
+            if (policy.DeductsBalance)
+            {
+                var year = startDate.Year;
+                var requestedDays = BusinessDays(startDate, endDate);
+                var balance = await _context.LeaveBalances.FirstOrDefaultAsync(b =>
+                    b.EmployeeId == employeeId.Value && b.LeaveType == leaveType && b.Year == year, cancellationToken);
+                if (balance is null || balance.RemainingDays < requestedDays)
+                    return BadRequest(new { error = "Insufficient leave balance for this request." });
+            }
+
+            if (policy.AutoApprove)
+                leaveRequest.Approve(Guid.Empty);
 
             await _context.LeaveRequests.AddAsync(leaveRequest);
             await _context.SaveChangesAsync();
@@ -82,7 +144,9 @@ namespace AttendanceSystem.API.Controllers
                 leaveRequest.LeaveMode,
                 leaveRequest.StartTime,
                 leaveRequest.EndTime,
-                leaveRequest.Hours
+                leaveRequest.Hours,
+                leaveRequest.DecisionReason,
+                leaveRequest.DocumentName
             });
         }
 
@@ -118,7 +182,10 @@ namespace AttendanceSystem.API.Controllers
                     l.LeaveMode,
                     l.StartTime,
                     l.EndTime,
-                    l.Hours
+                    l.Hours,
+                    l.DecisionReason,
+                    l.DocumentName,
+                    l.CreatedAt
                 })
                 .ToListAsync(cancellationToken);
 
@@ -136,7 +203,10 @@ namespace AttendanceSystem.API.Controllers
                     l.LeaveMode,
                     l.StartTime,
                     l.EndTime,
-                    l.Hours
+                    l.Hours,
+                    l.DecisionReason,
+                    l.DocumentName,
+                    l.CreatedAt
                 ))
                 .ToList();
 
@@ -167,7 +237,9 @@ namespace AttendanceSystem.API.Controllers
                     l.LeaveMode,
                     l.StartTime,
                     l.EndTime,
-                    l.Hours
+                    l.Hours,
+                    l.DecisionReason,
+                    l.DocumentName
                 })
                 .ToListAsync(cancellationToken);
 
@@ -186,7 +258,10 @@ namespace AttendanceSystem.API.Controllers
                     l.LeaveMode,
                     l.StartTime,
                     l.EndTime,
-                    l.Hours
+                    l.Hours,
+                    l.DecisionReason,
+                    l.DocumentName,
+                    l.CreatedAt
                 ))
                 .ToList();
 
@@ -208,7 +283,108 @@ namespace AttendanceSystem.API.Controllers
                 .ToListAsync(cancellationToken);
             var used = approvedLeaves.Sum(l => (decimal)((l.EndDate.ToDateTime(TimeOnly.MinValue) - l.StartDate.ToDateTime(TimeOnly.MinValue)).TotalDays + 1));
             var pending = await query.CountAsync(l => l.Status == RequestStatus.Pending, cancellationToken);
-            return Ok(new LeaveStatisticsApiDto(used, pending));
+            var annualBalance = employeeId.HasValue
+                ? await _context.LeaveBalances.AsNoTracking().FirstOrDefaultAsync(b =>
+                    b.EmployeeId == employeeId.Value && b.LeaveType == LeaveType.Annual && b.Year == DateTime.Today.Year,
+                    cancellationToken)
+                : null;
+            var allocated = annualBalance?.AllocatedDays ?? 0;
+            var usedFromBalance = annualBalance?.UsedDays ?? used;
+            return Ok(new LeaveStatisticsApiDto(allocated, usedFromBalance, Math.Max(0, allocated - usedFromBalance), pending));
+        }
+
+        [HttpGet("calendar")]
+        [Authorize(Roles = "Employee,SuperAdmin,HRManager,DepartmentHead")]
+        public async Task<ActionResult<LeaveCalendarResponse>> Calendar(
+            [FromQuery] DateOnly? from,
+            [FromQuery] DateOnly? to,
+            CancellationToken cancellationToken)
+        {
+            var employeeId = GetEmployeeId();
+            if (employeeId is null)
+                return BadRequest(new { error = "Employee profile not linked to user." });
+
+            var start = from ?? DateOnly.FromDateTime(DateTime.Today);
+            var end = to ?? start.AddDays(90);
+            var leaves = await _context.LeaveRequests.AsNoTracking()
+                .Where(l => l.EmployeeId == employeeId.Value && l.Status == RequestStatus.Approved &&
+                            l.StartDate <= end && l.EndDate >= start)
+                .OrderBy(l => l.StartDate)
+                .Select(l => new LeaveCalendarItem(l.Id, l.StartDate, l.EndDate, l.LeaveType.ToString(), l.LeaveMode))
+                .ToListAsync(cancellationToken);
+            var holidays = await _context.Holidays.AsNoTracking()
+                .Where(h => h.Date >= start && h.Date <= end)
+                .OrderBy(h => h.Date)
+                .Select(h => new HolidayCalendarItem(h.Date, h.Name))
+                .ToListAsync(cancellationToken);
+            return Ok(new LeaveCalendarResponse(leaves, holidays));
+        }
+
+        [HttpGet("team-calendar")]
+        [Authorize(Roles = "SuperAdmin,HRManager,DepartmentHead")]
+        public async Task<ActionResult<IReadOnlyList<TeamLeaveCalendarItem>>> TeamCalendar(
+            [FromQuery] DateOnly? from,
+            [FromQuery] DateOnly? to,
+            [FromQuery] Guid? departmentId,
+            CancellationToken cancellationToken)
+        {
+            var start = from ?? DateOnly.FromDateTime(DateTime.Today);
+            var end = to ?? start.AddDays(90);
+            var query = _context.LeaveRequests.AsNoTracking()
+                .Include(l => l.Employee)
+                .Where(l => l.Status == RequestStatus.Approved && l.StartDate <= end && l.EndDate >= start);
+            if (departmentId.HasValue)
+                query = query.Where(l => l.Employee != null && l.Employee.DepartmentId == departmentId.Value);
+
+            var items = await query.OrderBy(l => l.StartDate)
+                .Select(l => new TeamLeaveCalendarItem(
+                    l.Id,
+                    l.EmployeeId,
+                    l.Employee == null ? null : l.Employee.FullName,
+                    l.Employee == null ? null : l.Employee.DepartmentId,
+                    l.StartDate,
+                    l.EndDate,
+                    l.LeaveType.ToString()))
+                .ToListAsync(cancellationToken);
+            return Ok(items);
+        }
+
+        [HttpPut("balances/{employeeId:guid}")]
+        [Authorize(Roles = "SuperAdmin,HRManager,DepartmentHead")]
+        public async Task<IActionResult> AdjustBalance(
+            Guid employeeId,
+            [FromBody] BalanceAdjustmentRequest request,
+            CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(request.Reason))
+                return BadRequest(new { error = "A reason is required for balance adjustments." });
+            if (request.AllocatedDays < 0)
+                return BadRequest(new { error = "Allocated days cannot be negative." });
+
+            var balance = await _context.LeaveBalances.FirstOrDefaultAsync(b =>
+                b.EmployeeId == employeeId && b.LeaveType == LeaveType.Annual && b.Year == DateTime.Today.Year,
+                cancellationToken);
+            if (balance is null)
+            {
+                balance = LeaveBalance.Create(employeeId, LeaveType.Annual, DateTime.Today.Year, request.AllocatedDays);
+                _context.LeaveBalances.Add(balance);
+                _context.AuditLogs.Add(AuditLog.Create(
+                    "LeaveBalance", balance.Id, "Create",
+                    null, $"AllocatedDays={request.AllocatedDays}; Reason={request.Reason.Trim()}",
+                    User.Identity?.Name, HttpContext.Connection.RemoteIpAddress?.ToString(), Request.Headers.UserAgent.ToString()));
+            }
+            else
+            {
+                var oldValue = balance.AllocatedDays;
+                balance.Adjust(request.AllocatedDays, request.Reason.Trim());
+                _context.AuditLogs.Add(AuditLog.Create(
+                    "LeaveBalance", balance.Id, "Adjust",
+                    $"AllocatedDays={oldValue}", $"AllocatedDays={request.AllocatedDays}; Reason={request.Reason.Trim()}",
+                    User.Identity?.Name, HttpContext.Connection.RemoteIpAddress?.ToString(), Request.Headers.UserAgent.ToString()));
+            }
+
+            await _context.SaveChangesAsync(cancellationToken);
+            return Ok(new { message = "Leave balance updated.", balance.AllocatedDays, balance.UsedDays, balance.RemainingDays });
         }
 
         /// <summary>
@@ -230,7 +406,27 @@ namespace AttendanceSystem.API.Controllers
             // байхгүй бол Guid.Empty (SuperAdmin/HRManager-ийн системийн зөвшөөрөл).
             var approverId = GetEmployeeId() ?? Guid.Empty;
 
+            var policy = await _context.LeavePolicies.AsNoTracking()
+                .FirstOrDefaultAsync(p => p.LeaveType == request.LeaveType && p.IsActive, cancellationToken);
+            if (policy?.DeductsBalance == true)
+            {
+                var balance = await _context.LeaveBalances.FirstOrDefaultAsync(b =>
+                    b.EmployeeId == request.EmployeeId && b.LeaveType == request.LeaveType && b.Year == request.StartDate.Year,
+                    cancellationToken);
+                var requestedDays = BusinessDays(request.StartDate, request.EndDate);
+                if (balance is null || balance.RemainingDays < requestedDays)
+                    return BadRequest(new { error = "Insufficient leave balance for this approval." });
+                balance.ApplyUsage(requestedDays);
+            }
+
             request.Approve(approverId);
+            _context.Notifications.Add(Notification.Create(
+                request.EmployeeId,
+                "Чөлөөний хүсэлт батлагдлаа",
+                $"{request.StartDate:yyyy-MM-dd} - {request.EndDate:yyyy-MM-dd} хугацааны хүсэлт батлагдлаа.",
+                NotificationChannel.InApp,
+                request.Id,
+                "LeaveRequest"));
             await _context.SaveChangesAsync(cancellationToken);
             return Ok(new { message = "Leave request approved." });
         }
@@ -241,7 +437,7 @@ namespace AttendanceSystem.API.Controllers
         /// </summary>
         [HttpPost("requests/{id:guid}/reject")]
         [Authorize(Roles = "SuperAdmin,HRManager,DepartmentHead")]
-        public async Task<IActionResult> Reject(Guid id, CancellationToken cancellationToken)
+        public async Task<IActionResult> Reject(Guid id, [FromBody] DecisionRequest? decision, CancellationToken cancellationToken)
         {
             var request = await _context.LeaveRequests.FirstOrDefaultAsync(l => l.Id == id, cancellationToken);
             if (request is null)
@@ -250,11 +446,41 @@ namespace AttendanceSystem.API.Controllers
             if (request.Status != RequestStatus.Pending)
                 return BadRequest(new { error = "Only pending leave requests can be rejected." });
 
+            if (string.IsNullOrWhiteSpace(decision?.Reason))
+                return BadRequest(new { error = "A rejection reason is required." });
+
             var approverId = GetEmployeeId() ?? Guid.Empty;
 
-            request.Reject(approverId);
+            request.Reject(approverId, decision.Reason.Trim());
+            _context.Notifications.Add(Notification.Create(
+                request.EmployeeId,
+                "Чөлөөний хүсэлт татгалзсан",
+                decision.Reason.Trim(),
+                NotificationChannel.InApp,
+                request.Id,
+                "LeaveRequest"));
             await _context.SaveChangesAsync(cancellationToken);
             return Ok(new { message = "Leave request rejected." });
+        }
+
+        [HttpPost("requests/{id:guid}/cancel")]
+        [Authorize(Roles = "Employee,SuperAdmin,HRManager,DepartmentHead")]
+        public async Task<IActionResult> Cancel(Guid id, CancellationToken cancellationToken)
+        {
+            var employeeId = GetEmployeeId();
+            if (employeeId is null)
+                return BadRequest(new { error = "Employee profile not linked to user." });
+
+            var request = await _context.LeaveRequests.FirstOrDefaultAsync(l =>
+                l.Id == id && l.EmployeeId == employeeId.Value, cancellationToken);
+            if (request is null)
+                return NotFound(new { error = "Leave request not found." });
+            if (request.Status != RequestStatus.Pending)
+                return BadRequest(new { error = "Only pending leave requests can be cancelled." });
+
+            request.Cancel();
+            await _context.SaveChangesAsync(cancellationToken);
+            return Ok(new { message = "Leave request cancelled." });
         }
 
         private Guid? GetEmployeeId()
@@ -307,8 +533,51 @@ namespace AttendanceSystem.API.Controllers
             string? LeaveMode = null,
             TimeOnly? StartTime = null,
             TimeOnly? EndTime = null,
-            decimal? Hours = null);
+            decimal? Hours = null,
+            string? DecisionReason = null,
+            string? DocumentName = null,
+            DateTime CreatedAt = default);
 
-        public sealed record LeaveStatisticsApiDto(decimal Used, int PendingRequests);
+        public sealed record LeaveStatisticsApiDto(decimal Allocated, decimal Used, decimal Remaining, int PendingRequests);
+
+        public sealed record LeaveCalendarResponse(IReadOnlyList<LeaveCalendarItem> ApprovedLeaves, IReadOnlyList<HolidayCalendarItem> Holidays);
+        public sealed record LeaveCalendarItem(Guid Id, DateOnly StartDate, DateOnly EndDate, string LeaveType, string? LeaveMode);
+        public sealed record HolidayCalendarItem(DateOnly Date, string Name);
+        public sealed record TeamLeaveCalendarItem(Guid Id, Guid EmployeeId, string? EmployeeName, Guid? DepartmentId, DateOnly StartDate, DateOnly EndDate, string LeaveType);
+        public sealed record BalanceAdjustmentRequest(decimal AllocatedDays, string Reason);
+
+        public sealed record DecisionRequest(string? Reason);
+
+        private static int BusinessDays(DateOnly start, DateOnly end)
+        {
+            var days = 0;
+            for (var date = start; date <= end; date = date.AddDays(1))
+                if (date.DayOfWeek is not (DayOfWeek.Saturday or DayOfWeek.Sunday)) days++;
+            return days;
+        }
+
+        private async Task<string?> SaveDocumentAsync(IFormFile? document, CancellationToken cancellationToken)
+        {
+            if (document == null || document.Length == 0)
+                return null;
+
+            if (document.Length > 5 * 1024 * 1024)
+                throw new InvalidOperationException("Supporting document cannot exceed 5 MB.");
+
+            var extension = Path.GetExtension(document.FileName).ToLowerInvariant();
+            var allowedExtensions = new[] { ".pdf", ".jpg", ".jpeg", ".png" };
+            if (!allowedExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Only PDF, JPG, and PNG documents are supported.");
+
+            var directory = Path.Combine(_environment.ContentRootPath, "App_Data", "leave-documents");
+            Directory.CreateDirectory(directory);
+            var storedName = $"{Guid.NewGuid():N}{extension}";
+
+            await using var stream = document.OpenReadStream();
+            using var fileStream = new FileStream(Path.Combine(directory, storedName), FileMode.Create);
+            await stream.CopyToAsync(fileStream, cancellationToken);
+
+            return storedName;
+        }
     }
 }

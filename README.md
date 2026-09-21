@@ -90,3 +90,6 @@ See `src/AttendanceSystem.API/appsettings.json` for `AttendanceRules`, `JwtSetti
 
 **Security:** Replace `JwtSettings:SecretKey` and SQL password before production. Use Azure Key Vault or Docker secrets for sensitive values.
 "# dadlaga" 
+
+
+setx NVIDIA_API_KEY "таны_api_key"

@@ -1039,7 +1039,7 @@
             var summaryTask  = Api.GetAsync<IReadOnlyList<DepartmentSummaryDto>>(
                 $"api/reports/summary?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}");
             var overtimeTask = Api.GetOvertimeSummaryAsync(from, to);
-            var departmentsTask = Api.GetAsync<IReadOnlyList<DepartmentDto>>("api/departments");
+            var departmentsTask = Api.GetAsync<PagedResponse<DepartmentDto>>("api/departments?pageNumber=1&pageSize=200");
 
             // ажилтан сонгосон бол employeeId filter нэмнэ
             var attUrl = _selectedEmployee is not null
@@ -1051,7 +1051,7 @@
 
             summaries        = summaryTask.Result  ?? [];
             overtimeSummary  = overtimeTask.Result;
-            _departments    = departmentsTask.Result ?? [];
+            _departments    = departmentsTask.Result?.Items ?? [];
             var ar           = attendanceTask.Result;
             attendanceRows   = ar?.Items?.ToList() ?? [];
             _attendanceTotal = ar?.TotalCount ?? 0;

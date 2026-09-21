@@ -117,7 +117,10 @@ public sealed record LeaveDto(
     string? LeaveMode = null,
     TimeOnly? StartTime = null,
     TimeOnly? EndTime = null,
-    decimal? Hours = null);
+    decimal? Hours = null,
+    string? DecisionReason = null,
+    string? DocumentName = null,
+    DateTime CreatedAt = default);
 
 public sealed record CreateLeaveDto(DateOnly StartDate, DateOnly EndDate, string LeaveType, string Reason);
 

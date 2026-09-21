@@ -10,7 +10,7 @@
             @NavItem("/attendance", "⌖", "Нүүр")
             @NavItem("/leave", "☑", "Чөлөө")
             @NavItem("/profile", "◎", "Профайл")
-            @NavItem("/statistic", "⚙", "Статистик")
+            @NavItem("/statistics", "📊", "Статистик")
             @NavItem("/employee/ai-chat", "🤖", "AI Assistant")
         </nav>
         <div class="sidebar-bottom employee-brand">
@@ -48,16 +48,26 @@
     <main class="content-wrap">@Body</main>
     <nav class="mobile-bottom-nav">
         @NavItem("/attendance", "⌖", "Нүүр")
-            @NavItem("/leave", "☑", "Чөлөө")
-            @NavItem("/profile", "◎", "Профайл")
-            @NavItem("/statistic", "⚙", "Статистик")
-            @NavItem("/employee/ai-chat", "🤖", "AI Assistant")
+        @NavItem("/leave", "☑", "Чөлөө")
+        @NavItem("/profile", "◎", "Профайл")
+        @NavItem("/statistics", "📊", "Статистик")
+        @NavItem("/employee/ai-chat", "🤖", "AI Assistant")
     </nav>
 </div>
 
 @code {
-    private RenderFragment NavItem(string href, string icon, string label) => @<a class="nav-link @(Nav.Uri.Contains(href, StringComparison.OrdinalIgnoreCase) ? "active" : "")" href="@href"><span>@icon</span><span>@label</span></a>;
-    private RenderFragment MobileItem(string href, string icon, string label) => @<a class="@(Nav.Uri.Contains(href, StringComparison.OrdinalIgnoreCase) ? "active" : "")" href="@href"><span>@icon</span><span>@label</span></a>;
+    private RenderFragment NavItem(string href, string icon, string label) => @<a class="nav-link @(IsCurrent(href) ? "active" : "")" href="@href"><span>@icon</span><span>@label</span></a>;
+    private RenderFragment MobileItem(string href, string icon, string label) => @<a class="@(IsCurrent(href) ? "active" : "")" href="@href"><span>@icon</span><span>@label</span></a>;
+
+    private bool IsCurrent(string href)
+    {
+        var current = Nav.ToBaseRelativePath(Nav.Uri);
+        var target = href.TrimStart('/');
+
+        return current.Equals(target, StringComparison.OrdinalIgnoreCase)
+            || current.StartsWith(target + "/", StringComparison.OrdinalIgnoreCase)
+            || (string.IsNullOrEmpty(current) && string.IsNullOrEmpty(target));
+    }
 
     
     private EmployeeProfileDto? profile;

@@ -2,6 +2,7 @@
 @layout AdminLayout
 @attribute [Authorize(Roles = AppRoles.SuperAdmin + "," + AppRoles.HrManager + "," + AppRoles.DepartmentHead)]
 @inject ApiClient Api
+@inject IJSRuntime JS
 
 <PageHeader Title="Чөлөөний хүсэлтүүд" Subtitle="SQL Server-ээс ачааллагдсан чөлөөний хүсэлтүүд" Icon="☑" />
 
@@ -73,6 +74,32 @@
             </div>
         }
     }
+
+    @if (teamCalendar.Count > 0)
+    {
+        <div class="card">
+            <div class="section-title">
+                <div><span class="muted" style="font-size:11px;font-weight:700">БАГИЙН КАЛЕНДАРЬ</span><h2>Батлагдсан чөлөө</h2></div>
+                <span class="badge badge-leave">Дараагийн 90 өдөр</span>
+            </div>
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead><tr><th>Ажилтан</th><th>Төрөл</th><th>Эхлэх</th><th>Дуусах</th></tr></thead>
+                    <tbody>
+                        @foreach (var item in teamCalendar)
+                        {
+                            <tr>
+                                <td>@Display(item.EmployeeName)</td>
+                                <td>@TranslateLeaveType(item.LeaveType)</td>
+                                <td>@item.StartDate.ToString("yyyy-MM-dd")</td>
+                                <td>@item.EndDate.ToString("yyyy-MM-dd")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
 </div>
 
 @code {
@@ -82,10 +109,12 @@
         ["Pending"] = "Хүлээгдэж буй",
         ["Approved"] = "Зөвшөөрсөн",
         ["Rejected"] = "Татгалзсан"
+        , ["Cancelled"] = "Цуцлагдсан"
     };
 
     private string activeStatus = "Pending";
     private IReadOnlyList<LeaveDto> requests = [];
+    private IReadOnlyList<TeamLeaveCalendarItem> teamCalendar = [];
     private string? error;
     private bool isProcessing;
     private bool isLoading;
@@ -99,8 +128,12 @@
         try
         {
             error = null;
-            var result = await Api.GetAsync<PagedResponse<LeaveDto>>($"api/leave/requests?status={activeStatus}&pageSize=100");
+            var resultTask = Api.GetAsync<PagedResponse<LeaveDto>>($"api/leave/requests?status={activeStatus}&pageSize=100");
+            var calendarTask = Api.GetAsync<IReadOnlyList<TeamLeaveCalendarItem>>("api/leave/team-calendar");
+            await Task.WhenAll(resultTask, calendarTask);
+            var result = await resultTask;
             requests = result?.Items ?? [];
+            teamCalendar = await calendarTask ?? [];
         }
         catch (Exception ex)
         {
@@ -153,13 +186,20 @@
     {
         if (isProcessing) return;
 
+        var reason = await JS.InvokeAsync<string?>("prompt", "Татгалзсан шалтгааныг оруулна уу:");
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            error = "Татгалзах шалтгаан заавал байна.";
+            return;
+        }
+
         try
         {
             error = null;
             isProcessing = true;
             StateHasChanged();
 
-            var response = await Api.RejectLeaveRequestAsync(id);
+            var response = await Api.RejectLeaveRequestAsync(id, reason.Trim());
             if (!response.IsSuccessStatusCode)
             {
                 error = $"Татгалзахад алдаа гарлаа ({(int)response.StatusCode}).";
@@ -191,4 +231,6 @@
         "Other" => "Бусад",
         _ => type
     };
+
+    private sealed record TeamLeaveCalendarItem(Guid Id, Guid EmployeeId, string? EmployeeName, Guid? DepartmentId, DateOnly StartDate, DateOnly EndDate, string LeaveType);
 }

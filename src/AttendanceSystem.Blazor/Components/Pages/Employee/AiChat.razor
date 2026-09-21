@@ -61,12 +61,34 @@
 </div>
 </div>
 
-
 @code {
     private List<ChatMessageItem> messages = new();
     private string currentMessage = string.Empty;
     private bool isLoading = false;
     private ElementReference messagesContainer;
+    private const string StorageKey = "ai_admin_chat_history";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var json = await JS.InvokeAsync<string?>("chatHistoryStorage.load", StorageKey);
+            if (!string.IsNullOrWhiteSpace(json))
+            {
+                try
+                {
+                    var saved = System.Text.Json.JsonSerializer.Deserialize<List<ChatMessageItem>>(json);
+                    if (saved != null && saved.Any())
+                    {
+                        messages = saved;
+                        StateHasChanged();
+                        await ScrollToBottom();
+                    }
+                }
+                catch { /* хуучин/буруу формат бол үл тоомсорлоно */ }
+            }
+        }
+    }
 
     private async Task SendSuggestion(string text)
     {
@@ -96,6 +118,7 @@
             Content = userMessage,
             Timestamp = DateTime.Now
         });
+        await SaveHistory();
 
         isLoading = true;
         StateHasChanged();
@@ -114,7 +137,7 @@
                 history = historyPayload.Take(historyPayload.Count - 1)
             };
 
-            var response = await Http.PostAsJsonAsync("api/ai/employee/chat", requestBody);
+            var response = await Http.PostAsJsonAsync("api/ai/admin/chat", requestBody);
 
             if (response.IsSuccessStatusCode)
             {
@@ -150,12 +173,25 @@
             isLoading = false;
             StateHasChanged();
             await ScrollToBottom();
+            await SaveHistory();
         }
+    }
+
+    private async Task SaveHistory()
+    {
+        var json = System.Text.Json.JsonSerializer.Serialize(messages);
+        await JS.InvokeVoidAsync("chatHistoryStorage.save", StorageKey, json);
+    }
+
+    private async Task ClearHistory()
+    {
+        messages.Clear();
+        await JS.InvokeVoidAsync("chatHistoryStorage.clear", StorageKey);
     }
 
     private async Task ScrollToBottom()
     {
-        await JS.InvokeVoidAsync("scrollElementToBottom", "employeeChatMessages");
+        await JS.InvokeVoidAsync("scrollElementToBottom", "adminChatMessages");
     }
 
     private class ChatMessageItem

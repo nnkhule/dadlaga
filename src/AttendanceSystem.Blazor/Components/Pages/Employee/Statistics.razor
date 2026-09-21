@@ -5,87 +5,104 @@
 @inject IJSRuntime JS
 @inject ApiClient Api
 
-<PageHeader Title="Employee Statistics" Subtitle="View your attendance, leave, and GPS statistics" Icon="📊" />
+<PageHeader Title="Ажилтны статистик" Subtitle="Ирц, чөлөө болон ажилласан цагийн мэдээлэл" Icon="📊" />
 
-@if (!string.IsNullOrWhiteSpace(Error))
-{
-    <div class="card" style="border-color:var(--clr-danger);color:var(--clr-danger)">@Error</div>
-}
-
-@if (stats == null)
-{
-    <div class="card">
-        <div class="section-title"><h2>Loading...</h2></div>
+<div class="statistics-page">
+    <div class="statistics-intro">
+        <div>
+            <span class="statistics-eyebrow">АЖИЛТНЫ ӨДРИЙН МЭДЭЭЛЭЛ</span>
+            <h1>Миний статистик</h1>
+            <p>Ирц, ажилласан цаг болон чөлөөний мэдээллээ нэг дороос хянаарай.</p>
+        </div>
+        <div class="statistics-intro-icon">◷</div>
     </div>
-}
-else
-{
-    <div class="page-stack">
-        <!-- Section 1: Employee Overview -->
-        <div class="card animate-fade-in-up">
-            <div class="section-title"><h2>Employee Overview</h2></div>
-            <div class="row g-4">
-                <div class="col-12 col-md-3">
-                    <StatCard Title="Total Working Days" Value="@($"{stats.Summary.TotalWorkingDays}")" Icon="📅" Color="Info" />
-                </div>
-                <div class="col-12 col-md-3">
-                    <StatCard Title="Present Days" Value="@($"{stats.Summary.PresentDays}")" Icon="✅" Color="Success" />
-                </div>
-                <div class="col-12 col-md-3">
-                    <StatCard Title="Late Days" Value="@($"{stats.Summary.LateDays}")" Icon="⏰" Color="Warning" />
-                </div>
-                <div class="col-12 col-md-3">
-                    <StatCard Title="Absent Days" Value="@($"{stats.Summary.AbsentDays}")" Icon="❌" Color="Danger" />
-                </div>
-            </div>
-            <div class="row g-4 mt-3">
-                <div class="col-12 col-md-3">
-                        <StatCard Title="Total Working Hours" Value="@($"{stats.Summary.TotalWorkingHours:0.0}h")" Icon="◷" Color="Primary" />
-                    </div>
-                    <div class="col-12 col-md-3">
-                        <StatCard Title="Overtime Hours" Value="@($"{stats.Summary.OvertimeHours:0.0}h")" Icon="⏫" Color="Secondary" />
-                </div>
-                <div class="col-12 col-md-3">
-                    <StatCard Title="Leave Requests" Value="@($"{stats.Summary.LeaveRequests}")" Icon="📝" Color="Info" />
-                </div>
-                <div class="col-12 col-md-3">
-                    <StatCard Title="Approved Leaves" Value="@($"{stats.Summary.ApprovedLeaves}")" Icon="👍" Color="Success" />
-                </div>
+
+    @if (!string.IsNullOrWhiteSpace(Error))
+    {
+        <div class="statistics-error" role="alert">
+            <span aria-hidden="true">!</span>
+            <div>
+                <strong>Мэдээлэл ачааллахад алдаа гарлаа</strong>
+                <div>@Error</div>
             </div>
         </div>
+    }
+
+    @if (stats == null)
+    {
+        <div class="statistics-loading" aria-live="polite">
+            <span class="statistics-spinner"></span>
+            <span>Статистик ачааллаж байна...</span>
+        </div>
+    }
+    else
+    {
+    <div class="page-stack statistics-stack">
+        <!-- Section 1: Employee Overview -->
+        <section class="statistics-section animate-fade-in-up">
+            <div class="section-title"><div><span class="section-kicker">ТОЙМ</span><h2>Ажилтны тойм</h2></div></div>
+            <div class="statistics-grid">
+                <div class="col-12 col-md-3">
+                    <StatCard Title="Нийт ажлын өдөр" Value="@($"{stats.Summary.TotalWorkingDays}")" Icon="📅" Color="Info" />
+                </div>
+                <div class="col-12 col-md-3">
+                    <StatCard Title="Ирсэн өдөр" Value="@($"{stats.Summary.PresentDays}")" Icon="✅" Color="Success" />
+                </div>
+                <div class="col-12 col-md-3">
+                    <StatCard Title="Хоцорсон өдөр" Value="@($"{stats.Summary.LateDays}")" Icon="⏰" Color="Warning" />
+                </div>
+                <div class="col-12 col-md-3">
+                    <StatCard Title="Ирээгүй өдөр" Value="@($"{stats.Summary.AbsentDays}")" Icon="❌" Color="Danger" />
+                </div>
+            </div>
+            <div class="statistics-grid statistics-grid--secondary">
+                <div class="col-12 col-md-3">
+                        <StatCard Title="Нийт ажилласан цаг" Value="@($"{stats.Summary.TotalWorkingHours:0.0}ц")" Icon="◷" Color="Primary" />
+                    </div>
+                    <div class="col-12 col-md-3">
+                        <StatCard Title="Илүү цаг" Value="@($"{stats.Summary.OvertimeHours:0.0}ц")" Icon="⏫" Color="Secondary" />
+                </div>
+                <div class="col-12 col-md-3">
+                    <StatCard Title="Чөлөөний хүсэлт" Value="@($"{stats.Summary.LeaveRequests}")" Icon="📝" Color="Info" />
+                </div>
+                <div class="col-12 col-md-3">
+                    <StatCard Title="Зөвшөөрсөн чөлөө" Value="@($"{stats.Summary.ApprovedLeaves}")" Icon="👍" Color="Success" />
+                </div>
+            </div>
+        </section>
 
         <!-- Section 2: Attendance Analytics -->
-        <div class="card animate-fade-in-up">
-            <div class="section-title"><h2>Attendance Analytics</h2></div>
-            <div class="row g-4">
+        <section class="statistics-section animate-fade-in-up">
+            <div class="section-title"><div><span class="section-kicker">ШИНЖИЛГЭЭ</span><h2>Энэ сарын ирц</h2></div></div>
+            <div class="statistics-grid">
                 <div class="col-12 col-md-3">
-                    <StatCard Title="Monthly Attendance Rate" Value="@($"{stats.AttendanceAnalytics.MonthlyAttendanceRate:0.0}%")" Icon="📈" Color="Info" />
+                    <StatCard Title="Сарын ирцийн хувь" Value="@($"{stats.AttendanceAnalytics.MonthlyAttendanceRate:0.0}%")" Icon="📈" Color="Info" />
                 </div>
                 <div class="col-12 col-md-3">
-                    <StatCard Title="Monthly Working Hours" Value="@($"{stats.AttendanceAnalytics.MonthlyWorkingHours:0.0}h")" Icon="◷" Color="Primary" />
+                    <StatCard Title="Сарын ажилласан цаг" Value="@($"{stats.AttendanceAnalytics.MonthlyWorkingHours:0.0}ц")" Icon="◷" Color="Primary" />
                 </div>
                 <div class="col-12 col-md-3">
-                    <StatCard Title="Monthly Overtime" Value="@($"{stats.AttendanceAnalytics.MonthlyOvertime:0.0}h")" Icon="⏫" Color="Secondary" />
+                    <StatCard Title="Сарын илүү цаг" Value="@($"{stats.AttendanceAnalytics.MonthlyOvertime:0.0}ц")" Icon="⏫" Color="Secondary" />
                 </div>
                 <div class="col-12 col-md-3">
-                    <StatCard Title="Monthly Late Minutes" Value="@($"{stats.AttendanceAnalytics.MonthlyLateMinutes:0}m")" Icon="⏰" Color="Warning" />
+                    <StatCard Title="Сарын хоцролт" Value="@($"{stats.AttendanceAnalytics.MonthlyLateMinutes:0} мин")" Icon="⏰" Color="Warning" />
                 </div>
             </div>
 
             @if (stats.AttendanceAnalytics.MonthlyChartData != null && stats.AttendanceAnalytics.MonthlyChartData.Any())
             {
-                <div class="card mt-4">
-                    <div class="section-title"><h2>Monthly Trends</h2></div>
+                <div class="statistics-panel">
+                    <div class="section-title"><h3>Сарын өөрчлөлт</h3><span class="statistics-hint">Сүүлийн 6 сар</span></div>
                     <div class="chart-box"><canvas id="monthlyChart"></canvas></div>
                     <div class="table-responsive mt-3">
                         <table class="data-table">
                             <thead>
                                 <tr>
-                                    <th>Month</th>
-                                    <th>Attendance Rate</th>
-                                    <th>Working Hours</th>
-                                    <th>Overtime</th>
-                                    <th>Late Minutes</th>
+                                    <th>Сар</th>
+                                    <th>Ирцийн хувь</th>
+                                    <th>Ажилласан цаг</th>
+                                    <th>Илүү цаг</th>
+                                    <th>Хоцролт</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -94,9 +111,9 @@ else
                                     <tr>
                                         <td>@month.Month</td>
                                         <td>@($"{month.AttendanceRate:0.0}%")</td>
-                                        <td>@($"{month.WorkingHours:0.0}h")</td>
-                                        <td>@($"{month.Overtime:0.0}h")</td>
-                                        <td>@($"{month.LateMinutes:0}m")</td>
+                                        <td>@($"{month.WorkingHours:0.0}ц")</td>
+                                        <td>@($"{month.Overtime:0.0}ц")</td>
+                                        <td>@($"{month.LateMinutes:0} мин")</td>
                                     </tr>
                                 }
                             </tbody>
@@ -104,29 +121,29 @@ else
                     </div>
                 </div>
             }
-        </div>
+        </section>
 
         <!-- Section 3: Attendance History -->
-        <div class="card animate-fade-in-up">
-            <div class="section-title"><h2>Attendance History</h2></div>
+        <section class="statistics-section animate-fade-in-up">
+            <div class="section-title"><div><span class="section-kicker">БҮРТГЭЛ</span><h2>Ирцийн түүх</h2></div></div>
             <div class="table-responsive">
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th>Date</th>
-                            <th>Check In Time</th>
-                            <th>Check Out Time</th>
-                            <th>Work Hours</th>
-                            <th>Overtime Hours</th>
-                            <th>Late Minutes</th>
-                            <th>Status</th>
-                            <th>Verification Method</th>
+                            <th>Огноо</th>
+                            <th>Ирсэн</th>
+                            <th>Тарсан</th>
+                            <th>Ажилласан</th>
+                            <th>Илүү цаг</th>
+                            <th>Хоцролт</th>
+                            <th>Төлөв</th>
+                            <th>Баталгаажуулалт</th>
                         </tr>
                     </thead>
                     <tbody>
                         @if (stats.AttendanceHistory == null || !stats.AttendanceHistory.Any())
                         {
-                            <tr><td colspan="8" class="muted">No attendance records found.</td></tr>
+                            <tr><td colspan="8" class="muted">Ирцийн бүртгэл олдсонгүй.</td></tr>
                         }
                         else
                         {
@@ -136,54 +153,54 @@ else
                                     <td>@record.Date.ToString("yyyy-MM-dd")</td>
                                     <td>@record.CheckInTime?.ToString("HH:mm")</td>
                                     <td>@record.CheckOutTime?.ToString("HH:mm")</td>
-                                    <td>@($"{record.WorkHours:0.0}h")</td>
-                                    <td>@($"{record.OvertimeHours:0.0}h")</td>
-                                    <td>@record.LateMinutes</td>
-                                    <td>@record.Status</td>
-                                    <td>@record.VerificationMethod</td>
+                                    <td>@($"{record.WorkHours:0.0}ц")</td>
+                                    <td>@($"{record.OvertimeHours:0.0}ц")</td>
+                                    <td>@($"{record.LateMinutes} мин")</td>
+                                    <td><span class="statistics-status">@StatusLabel(record.Status)</span></td>
+                                    <td>@VerificationLabel(record.VerificationMethod)</td>
                                 </tr>
                             }
                         }
                     </tbody>
                 </table>
             </div>
-        </div>
+        </section>
 
         <!-- Section 4: Leave Statistics -->
-        <div class="card animate-fade-in-up">
-            <div class="section-title"><h2>Leave Statistics</h2></div>
-            <div class="row g-4">
+        <section class="statistics-section animate-fade-in-up">
+            <div class="section-title"><div><span class="section-kicker">ЧӨЛӨӨ</span><h2>Чөлөөний статистик</h2></div></div>
+            <div class="statistics-grid">
                 <div class="col-12 col-md-3">
-                    <StatCard Title="Total Requests" Value="@($"{stats.LeaveStatistics.TotalRequests}")" Icon="📝" Color="Info" />
+                    <StatCard Title="Нийт хүсэлт" Value="@($"{stats.LeaveStatistics.TotalRequests}")" Icon="📝" Color="Info" />
                 </div>
                 <div class="col-12 col-md-3">
-                    <StatCard Title="Approved" Value="@($"{stats.LeaveStatistics.Approved}")" Icon="👍" Color="Success" />
+                    <StatCard Title="Зөвшөөрсөн" Value="@($"{stats.LeaveStatistics.Approved}")" Icon="👍" Color="Success" />
                 </div>
                 <div class="col-12 col-md-3">
-                    <StatCard Title="Rejected" Value="@($"{stats.LeaveStatistics.Rejected}")" Icon="👎" Color="Danger" />
+                    <StatCard Title="Татгалзсан" Value="@($"{stats.LeaveStatistics.Rejected}")" Icon="👎" Color="Danger" />
                 </div>
                 <div class="col-12 col-md-3">
-                    <StatCard Title="Pending" Value="@($"{stats.LeaveStatistics.Pending}")" Icon="⏳" Color="Warning" />
+                    <StatCard Title="Хүлээгдэж буй" Value="@($"{stats.LeaveStatistics.Pending}")" Icon="⏳" Color="Warning" />
                 </div>
             </div>
 
-            <div class="card mt-4">
-                <div class="section-title"><h2>Leave History</h2></div>
+            <div class="statistics-panel">
+                <div class="section-title"><h3>Чөлөөний түүх</h3></div>
                 <div class="table-responsive">
                     <table class="data-table">
                         <thead>
                             <tr>
-                                <th>Start Date</th>
-                                <th>End Date</th>
-                                <th>Leave Type</th>
-                                <th>Status</th>
-                                <th>Request Date</th>
+                                <th>Эхлэх огноо</th>
+                                <th>Дуусах огноо</th>
+                                <th>Төрөл</th>
+                                <th>Төлөв</th>
+                                <th>Хүсэлт гаргасан</th>
                             </tr>
                         </thead>
                         <tbody>
                             @if (stats.LeaveStatistics.LeaveHistory == null || !stats.LeaveStatistics.LeaveHistory.Any())
                             {
-                                <tr><td colspan="5" class="muted">No leave requests found.</td></tr>
+                                <tr><td colspan="5" class="muted">Чөлөөний хүсэлт олдсонгүй.</td></tr>
                             }
                             else
                             {
@@ -202,11 +219,79 @@ else
                     </table>
                 </div>
             </div>
-        </div>
+        </section>
+
+        <section class="statistics-section animate-fade-in-up">
+            <div class="section-title"><div><span class="section-kicker">БАЙРШИЛ</span><h2>GPS бүртгэл</h2></div></div>
+            <div class="statistics-grid statistics-grid--gps">
+                <div class="col-12 col-md-3">
+                    <StatCard Title="Нийт GPS бүртгэл" Value="@($"{stats.GpsStatistics.TotalGpsRecords}")" Icon="⌖" Color="Info" />
+                </div>
+                <div class="col-12 col-md-3">
+                    <StatCard Title="Оффисын бүртгэл" Value="@($"{stats.GpsStatistics.OfficeCheckins}")" Icon="⌂" Color="Success" />
+                </div>
+                <div class="col-12 col-md-3">
+                    <StatCard Title="Зайнаас бүртгэсэн" Value="@($"{stats.GpsStatistics.RemoteCheckins}")" Icon="⌁" Color="Warning" />
+                </div>
+                <div class="col-12 col-md-3 statistics-last-activity">
+                    <span>Сүүлийн үйлдэл</span>
+                    <strong>@(stats.GpsStatistics.LastGpsActivity == default ? "Бүртгэлгүй" : stats.GpsStatistics.LastGpsActivity.ToString("yyyy-MM-dd HH:mm"))</strong>
+                </div>
+            </div>
+        </section>
 
 
     </div>
-}
+    }
+</div>
+
+<style>
+    .statistics-page { display: grid; gap: 20px; }
+    .statistics-intro {
+        display: flex; align-items: center; justify-content: space-between; gap: 20px;
+        padding: 24px 28px; border: 1px solid var(--clr-border); border-radius: var(--radius-lg);
+        background: linear-gradient(120deg, var(--clr-surface), var(--clr-primary-light));
+    }
+    .statistics-eyebrow, .section-kicker { color: var(--clr-primary); font-size: 10px; font-weight: 800; letter-spacing: .12em; }
+    .statistics-intro h1 { margin: 5px 0 4px; font-size: clamp(24px, 3vw, 34px); line-height: 1.1; }
+    .statistics-intro p { margin: 0; color: var(--clr-text-muted); font-size: 13px; }
+    .statistics-intro-icon {
+        width: 58px; height: 58px; display: grid; place-items: center; flex-shrink: 0;
+        border-radius: 18px; background: var(--clr-primary); color: #fff; font-size: 28px;
+        box-shadow: 0 10px 22px var(--clr-primary-glow);
+    }
+    .statistics-stack { gap: 20px; }
+    .statistics-section { padding: 20px; border: 1px solid var(--clr-border); border-radius: var(--radius-lg); background: var(--clr-surface); }
+    .statistics-section .section-title { margin-bottom: 18px; }
+    .statistics-section .section-title h2, .statistics-panel .section-title h3 { margin: 4px 0 0; font-size: 17px; }
+    .statistics-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+    .statistics-grid > div { min-width: 0; }
+    .statistics-grid .stat-card { height: 100%; }
+    .statistics-grid--secondary { margin-top: 14px; }
+    .statistics-last-activity { display: flex; flex-direction: column; justify-content: center; gap: 6px; padding: 16px; border: 1px solid var(--clr-border); border-radius: var(--radius); background: var(--clr-surface-2); color: var(--clr-text-muted); font-size: 12px; }
+    .statistics-last-activity strong { color: var(--clr-text); font-size: 14px; }
+    .statistics-panel { margin-top: 18px; padding: 18px; border: 1px solid var(--clr-border); border-radius: var(--radius); background: var(--clr-surface-2); }
+    .statistics-hint { color: var(--clr-text-muted); font-size: 12px; }
+    .statistics-panel .chart-box { height: 300px; margin: 4px 0 18px; }
+    .statistics-panel .data-table, .statistics-section > .table-responsive .data-table { min-width: 760px; }
+    .statistics-section > .table-responsive { border: 1px solid var(--clr-border); border-radius: var(--radius); }
+    .statistics-status { display: inline-flex; padding: 3px 8px; border-radius: var(--radius-full); background: var(--clr-primary-light); color: var(--clr-primary); font-size: 11px; font-weight: 700; }
+    .statistics-error { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border: 1px solid var(--clr-danger); border-radius: var(--radius); background: var(--clr-danger-light); color: var(--clr-danger); font-size: 13px; }
+    .statistics-error > span { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--clr-danger); color: #fff; font-weight: 800; flex-shrink: 0; }
+    .statistics-error strong { display: block; margin-bottom: 2px; }
+    .statistics-loading { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 180px; border: 1px solid var(--clr-border); border-radius: var(--radius-lg); color: var(--clr-text-muted); background: var(--clr-surface); }
+    .statistics-spinner { width: 20px; height: 20px; border: 2px solid var(--clr-border); border-top-color: var(--clr-primary); border-radius: 50%; animation: statistics-spin .7s linear infinite; }
+    @@keyframes statistics-spin { to { transform: rotate(360deg); } }
+    @@media (max-width: 900px) { .statistics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @@media (max-width: 600px) {
+        .statistics-intro { padding: 20px; }
+        .statistics-intro-icon { width: 44px; height: 44px; font-size: 21px; border-radius: 14px; }
+        .statistics-section { padding: 14px; }
+        .statistics-grid { grid-template-columns: 1fr; }
+        .statistics-grid--secondary { margin-top: 10px; }
+        .statistics-panel { padding: 12px; }
+    }
+</style>
 
 @code {
     private EmployeeStatisticsDto? stats;
@@ -237,8 +322,6 @@ else
         if (chartRendered || stats?.AttendanceAnalytics?.MonthlyChartData == null || !stats.AttendanceAnalytics.MonthlyChartData.Any())
             return;
 
-        chartRendered = true;
-
         var labels = stats.AttendanceAnalytics.MonthlyChartData.Select(m => m.Month).ToArray();
         var attendance = stats.AttendanceAnalytics.MonthlyChartData.Select(m => m.AttendanceRate).ToArray();
         var hours = stats.AttendanceAnalytics.MonthlyChartData.Select(m => m.WorkingHours).ToArray();
@@ -253,11 +336,59 @@ else
             hours,
             overtime,
             late);
+
+        chartRendered = true;
     }
 
     public async ValueTask DisposeAsync()
     {
         // Nothing to dispose
         await Task.CompletedTask;
+    }
+
+    private static string StatusLabel(string? status)
+    {
+        var key = Normalize(status);
+
+        return key switch
+        {
+            "present" or "checkedin" or "checkedout" => "Ирсэн",
+            "late" => "Хоцорсон",
+            "absent" or "notcheckedin" => "Ирээгүй",
+            "earlyleave" => "Эрт гарсан",
+            "halfday" => "Хагас өдөр",
+            "onleave" or "leave" => "Чөлөөтэй",
+            "pending" => "Хүлээгдэж буй",
+            _ => status ?? "Тодорхойгүй"
+        };
+    }
+
+    private static string VerificationLabel(string? method)
+    {
+        var key = Normalize(method);
+
+        return key switch
+        {
+            "gps" or "geo" => "GPS",
+            "facerecognition" or "face" => "Царай танилт",
+            "manual" => "Гар оруулсан",
+            "qrcode" => "QR код",
+            "nfc" => "NFC",
+            "autogeo" => "Авто GPS",
+            _ => method ?? "Тодорхойгүй"
+        };
+    }
+
+    private static string Normalize(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return string.Empty;
+
+        return value
+            .Trim()
+            .Replace("-", string.Empty, StringComparison.Ordinal)
+            .Replace("_", string.Empty, StringComparison.Ordinal)
+            .Replace(" ", string.Empty, StringComparison.Ordinal)
+            .ToLowerInvariant();
     }
 }
