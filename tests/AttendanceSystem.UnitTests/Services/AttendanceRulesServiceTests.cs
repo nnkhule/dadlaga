@@ -2,6 +2,7 @@ using AttendanceSystem.Application.Configuration;
 using AttendanceSystem.Application.Services;
 using AttendanceSystem.Domain.Entities;
 using AttendanceSystem.Domain.Enums;
+using AttendanceSystem.Infrastructure.Persistence;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -174,5 +175,4 @@ public class AttendanceRulesServiceTests
         // Shift starts at 22:00, check-in at 22:00, so late should be 0
         late.Should().Be(0);
     }
-}
 }
