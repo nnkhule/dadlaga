@@ -12,6 +12,9 @@ secrets/
 appsettings.*.local.json
 appsettings.Development.json
 
+.json
+.txt
+.dll
 .dist/
 TestResults/
 coverage/
