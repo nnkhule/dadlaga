@@ -27,10 +27,6 @@
                 <button class="rpt-quick @(IsQuick("week")  ? "rpt-quick--on" : "")" @onclick='() => SetQuick("week")'>7 хоног</button>
                 <button class="rpt-quick @(IsQuick("month") ? "rpt-quick--on" : "")" @onclick='() => SetQuick("month")'>Энэ сар</button>
                 <button class="rpt-quick @(IsQuick("last")  ? "rpt-quick--on" : "")" @onclick='() => SetQuick("last")'>Өмнөх сар</button>
-                <button class="rpt-quick @(IsQuick("q1")    ? "rpt-quick--on" : "")" @onclick='() => SetQuick("q1")'>Q1</button>
-                <button class="rpt-quick @(IsQuick("q2")    ? "rpt-quick--on" : "")" @onclick='() => SetQuick("q2")'>Q2</button>
-                <button class="rpt-quick @(IsQuick("q3")    ? "rpt-quick--on" : "")" @onclick='() => SetQuick("q3")'>Q3</button>
-                <button class="rpt-quick @(IsQuick("q4")    ? "rpt-quick--on" : "")" @onclick='() => SetQuick("q4")'>Q4</button>
                 <button class="rpt-quick @(IsQuick("year")  ? "rpt-quick--on" : "")" @onclick='() => SetQuick("year")'>Жил</button>
             </div>
             <div class="rpt-date-inputs">
@@ -234,16 +230,41 @@
                 @* ── Department Chart ── *@
                 <div class="rpt-chart-section">
                     <div class="rpt-chart-header">
-                        <h3 class="rpt-chart-title">Хэлтсүүдийн ирцийн харьцаа</h3>
-                        <div class="rpt-chart-legend">
-                            <div class="rpt-legend-item"><span class="rpt-legend-color" style="background:var(--clr-success)"></span>Ирсэн</div>
-                            <div class="rpt-legend-item"><span class="rpt-legend-color" style="background:var(--clr-warning)"></span>Хоцорсон</div>
-                            <div class="rpt-legend-item"><span class="rpt-legend-color" style="background:var(--clr-danger)"></span>Ирээгүй</div>
-                            <div class="rpt-legend-item"><span class="rpt-legend-color" style="background:var(--clr-info)"></span>Чөлөөтэй</div>
+                        <div>
+                            <h3 class="rpt-chart-title">Хэлтсүүдийн ирцийн харьцаа</h3>
+                            <p class="rpt-chart-subtitle">Ирцийн үр дүнг хэлтэс бүрээр харьцуулсан тойм</p>
+                        </div>
+                        <div class="rpt-chart-summary">
+                            <strong>@(FilteredSummaries.Count == 0 ? 0 : Math.Round(FilteredSummaries.Average(DepartmentRate), 0))%</strong>
+                            <span>дундаж ирц</span>
                         </div>
                     </div>
-                    <div class="rpt-chart-scroll">
-                        <canvas id="departmentChart" class="rpt-bar-chart"></canvas>
+                    <div class="rpt-comparison-legend">
+                        <span><i class="rpt-status-dot rpt-status-dot--present"></i>Ирсэн</span>
+                        <span><i class="rpt-status-dot rpt-status-dot--late"></i>Хоцорсон</span>
+                        <span><i class="rpt-status-dot rpt-status-dot--absent"></i>Ирээгүй</span>
+                        <span><i class="rpt-status-dot rpt-status-dot--leave"></i>Чөлөөтэй</span>
+                    </div>
+                    <div class="rpt-department-comparison">
+                        @foreach (var row in FilteredSummaries.OrderByDescending(DepartmentRate).ThenBy(x => x.DepartmentName))
+                        {
+                            var total = row.Present + row.Late + row.Absent + row.Leave;
+                            var safeTotal = Math.Max(total, 1);
+                            var rate = DepartmentRate(row);
+                            <div class="rpt-department-compare-row">
+                                <div class="rpt-department-compare-label">
+                                    <span class="rpt-department-rank">@((FilteredSummaries.OrderByDescending(DepartmentRate).ToList().IndexOf(row) + 1).ToString("00"))</span>
+                                    <span class="rpt-department-name" title="@row.DepartmentName">@row.DepartmentName</span>
+                                </div>
+                                <div class="rpt-department-track" title="@row.DepartmentName: @rate% ирц">
+                                    <span class="rpt-department-segment rpt-department-segment--present" style="width:@(row.Present * 100.0 / safeTotal)%"></span>
+                                    <span class="rpt-department-segment rpt-department-segment--late" style="width:@(row.Late * 100.0 / safeTotal)%"></span>
+                                    <span class="rpt-department-segment rpt-department-segment--absent" style="width:@(row.Absent * 100.0 / safeTotal)%"></span>
+                                    <span class="rpt-department-segment rpt-department-segment--leave" style="width:@(row.Leave * 100.0 / safeTotal)%"></span>
+                                </div>
+                                <div class="rpt-department-rate">@rate%</div>
+                            </div>
+                        }
                     </div>
                 </div>
 
@@ -536,14 +557,7 @@
                     </div>
                 </div>
 
-                <div class="card rpt-card">
-                    <div class="rpt-card-header"><h2 class="rpt-card-title">Илүү цагийн хуваарилалт</h2></div>
-                    <div class="rpt-chart-section">
-                        <div class="rpt-chart-scroll">
-                            <canvas id="overtimeChart" class="rpt-bar-chart"></canvas>
-                        </div>
-                    </div>
-                </div>
+              
 
                 <div class="card rpt-card">
                     <div class="rpt-card-header">
@@ -807,11 +821,39 @@
 .rpt-chart-section { padding: 20px; border-bottom: 1px solid var(--clr-border); }
 .rpt-chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
 .rpt-chart-title { margin: 0; font-size: 14px; font-weight: 700; }
+.rpt-chart-subtitle { margin: 4px 0 0; color: var(--clr-text-muted); font-size: 12px; }
+.rpt-chart-summary { display: flex; align-items: flex-end; flex-direction: column; gap: 2px; }
+.rpt-chart-summary strong { color: var(--clr-success); font-size: 22px; line-height: 1; }
+.rpt-chart-summary span { color: var(--clr-text-muted); font-size: 11px; }
 .rpt-chart-legend { display: flex; gap: 12px; flex-wrap: wrap; }
 .rpt-legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--clr-text-muted); }
 .rpt-legend-color { width: 10px; height: 10px; border-radius: 2px; }
 .rpt-chart-scroll { overflow-x: auto; padding: 0; }
 .rpt-bar-chart { width: 100%; min-width: 400px; height: 250px; }
+.rpt-comparison-legend { display: flex; gap: 14px; flex-wrap: wrap; margin: 2px 0 18px 76px; color: var(--clr-text-muted); font-size: 11px; }
+.rpt-comparison-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.rpt-status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.rpt-status-dot--present { background: #16a34a; }
+.rpt-status-dot--late { background: #f59e0b; }
+.rpt-status-dot--absent { background: #ef4444; }
+.rpt-status-dot--leave { background: #60a5fa; }
+.rpt-department-comparison { display: grid; gap: 13px; }
+.rpt-department-compare-row { display: grid; grid-template-columns: minmax(150px, 220px) minmax(160px, 1fr) 46px; align-items: center; gap: 14px; }
+.rpt-department-compare-label { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.rpt-department-rank { color: var(--clr-text-hint); font-size: 10px; font-variant-numeric: tabular-nums; }
+.rpt-department-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--clr-text); font-size: 12px; font-weight: 650; }
+.rpt-department-track { display: flex; height: 13px; overflow: hidden; border-radius: 5px; background: var(--clr-border-light); box-shadow: inset 0 0 0 1px rgba(15,23,42,.04); }
+.rpt-department-segment { height: 100%; min-width: 0; transition: width .35s ease; }
+.rpt-department-segment--present { background: #16a34a; }
+.rpt-department-segment--late { background: #f59e0b; }
+.rpt-department-segment--absent { background: #ef4444; }
+.rpt-department-segment--leave { background: #60a5fa; }
+.rpt-department-rate { color: var(--clr-text); font-size: 12px; font-weight: 750; text-align: right; font-variant-numeric: tabular-nums; }
+@@media (max-width: 640px) {
+    .rpt-chart-header { align-items: flex-start; }
+    .rpt-comparison-legend { margin-left: 0; }
+    .rpt-department-compare-row { grid-template-columns: minmax(110px, 1fr) minmax(110px, 1.5fr) 40px; gap: 8px; }
+}
 
 /* Employee cell */
 .rpt-emp-cell { display: flex; align-items: center; gap: 10px; }
@@ -1015,11 +1057,7 @@
     {
         if (!firstRender && !_loading)
         {
-            if (_tab == "summary")
-            {
-                await RenderDepartmentChartAsync();
-            }
-            else if (_tab == "overtime" && overtimeSummary?.TotalOvertimeHours > 0)
+            if (_tab == "overtime" && overtimeSummary?.TotalOvertimeHours > 0)
             {
                 await RenderOvertimeChartAsync();
             }
@@ -1207,10 +1245,7 @@
             "month" => (new DateOnly(today.Year, today.Month, 1), DateOnly.FromDateTime(today)),
             "last"  => (new DateOnly(today.Year, today.Month, 1).AddMonths(-1),
                         new DateOnly(today.Year, today.Month, 1).AddDays(-1)),
-            "q1"    => (new DateOnly(today.Year, 1,  1),  new DateOnly(today.Year, 3,  31)),
-            "q2"    => (new DateOnly(today.Year, 4,  1),  new DateOnly(today.Year, 6,  30)),
-            "q3"    => (new DateOnly(today.Year, 7,  1),  new DateOnly(today.Year, 9,  30)),
-            "q4"    => (new DateOnly(today.Year, 10, 1),  new DateOnly(today.Year, 12, 31)),
+            
             "year"  => (new DateOnly(today.Year, 1,  1),  new DateOnly(today.Year, 12, 31)),
             _       => (from, to)
         };
@@ -1352,6 +1387,12 @@
         var leaveData = FilteredSummaries.Select(s => s.Leave).ToArray();
 
         await JS.InvokeVoidAsync("renderDepartmentChart", "departmentChart", labels, presentData, lateData, absentData, leaveData);
+    }
+
+    private static int DepartmentRate(DepartmentSummaryDto summary)
+    {
+        var total = summary.Present + summary.Late + summary.Absent + summary.Leave;
+        return total == 0 ? 0 : (int)Math.Round((summary.Present + summary.Late) * 100.0 / total);
     }
 
     private async Task RenderOvertimeChartAsync()

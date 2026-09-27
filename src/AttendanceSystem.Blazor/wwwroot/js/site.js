@@ -5,6 +5,31 @@ window.scrollElementToBottom = (elementId) => {
     }
 };
 
+window.chatHistoryStorage = {
+    load: (key) => {
+        try {
+            return localStorage.getItem(key);
+        } catch (error) {
+            console.warn('Failed to load chat history:', error);
+            return null;
+        }
+    },
+    save: (key, value) => {
+        try {
+            localStorage.setItem(key, value);
+        } catch (error) {
+            console.warn('Failed to save chat history:', error);
+        }
+    },
+    clear: (key) => {
+        try {
+            localStorage.removeItem(key);
+        } catch (error) {
+            console.warn('Failed to clear chat history:', error);
+        }
+    }
+};
+
 window.renderDonutChart = (canvasId, labelsOrValues, valuesOrColors, maybeColors) => {
     const canvas = document.getElementById(canvasId);
     if (!canvas || !window.Chart) return;
@@ -68,4 +93,27 @@ window.renderDonutChart = (canvasId, labelsOrValues, valuesOrColors, maybeColors
         },
         plugins: [centerPlugin]
     });
+};
+
+window.downloadBase64File = (base64, fileName, mimeType) => {
+    if (!base64) return;
+
+    const cleanedBase64 = base64.replace(/\s/g, '');
+    const binary = atob(cleanedBase64);
+    const bytes = new Uint8Array(binary.length);
+
+    for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+    }
+
+    const blob = new Blob([bytes], { type: mimeType || 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+
+    link.href = url;
+    link.download = fileName || 'download';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
 };

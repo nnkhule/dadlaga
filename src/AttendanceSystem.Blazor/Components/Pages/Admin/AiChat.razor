@@ -1,5 +1,6 @@
 @page "/admin/ai-chat"
 @layout AdminLayout
+@using System.Net.Http.Json
 @inject HttpClient Http
 @inject IJSRuntime JS
 @attribute [Authorize(Roles = AppRoles.SuperAdmin + "," + AppRoles.HrManager + "," + AppRoles.DepartmentHead)]
@@ -64,6 +65,32 @@
     private string currentMessage = string.Empty;
     private bool isLoading = false;
     private ElementReference messagesContainer;
+    private const string StorageKey = "ai_admin_chat_history";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var json = await JS.InvokeAsync<string?>("chatHistoryStorage.load", StorageKey);
+            if (!string.IsNullOrWhiteSpace(json))
+            {
+                try
+                {
+                    var saved = System.Text.Json.JsonSerializer.Deserialize<List<ChatMessageItem>>(json);
+                    if (saved != null && saved.Any())
+                    {
+                        messages = saved;
+                        StateHasChanged();
+                        await ScrollToBottom();
+                    }
+                }
+                catch
+                {
+                    // хуучин/буруу формат бол үл тоомсорлоно
+                }
+            }
+        }
+    }
 
     private async Task SendSuggestion(string text)
     {
@@ -93,6 +120,7 @@
             Content = userMessage,
             Timestamp = DateTime.Now
         });
+        await SaveHistory();
 
         isLoading = true;
         StateHasChanged();
@@ -147,7 +175,20 @@
             isLoading = false;
             StateHasChanged();
             await ScrollToBottom();
+            await SaveHistory();
         }
+    }
+
+    private async Task SaveHistory()
+    {
+        var json = System.Text.Json.JsonSerializer.Serialize(messages);
+        await JS.InvokeVoidAsync("chatHistoryStorage.save", StorageKey, json);
+    }
+
+    private async Task ClearHistory()
+    {
+        messages.Clear();
+        await JS.InvokeVoidAsync("chatHistoryStorage.clear", StorageKey);
     }
 
     private async Task ScrollToBottom()

@@ -2,7 +2,6 @@
 @layout AdminLayout
 @attribute [Authorize(Roles = AppRoles.SuperAdmin + "," + AppRoles.HrManager + "," + AppRoles.DepartmentHead)]
 @inject ApiClient Api
-@inject IJSRuntime JS
 
 <PageHeader Title="Чөлөөний хүсэлтүүд" Subtitle="SQL Server-ээс ачааллагдсан чөлөөний хүсэлтүүд" Icon="☑" />
 
@@ -63,13 +62,46 @@
                 @if (string.Equals(request.Status, "Pending", StringComparison.OrdinalIgnoreCase))
                 {
                     <div class="action-row" style="justify-content:flex-end; gap: 8px;">
-                        <button class="btn btn-danger" @onclick="() => RejectAsync(request.Id)" disabled="@isProcessing">
+                        <button class="btn btn-danger" @onclick="() => BeginReject(request.Id)" disabled="@isProcessing">
                             @(isProcessing ? "Боловсруулж байна..." : "Татгалзах")
                         </button>
                         <button class="btn btn-success" @onclick="() => ApproveAsync(request.Id)" disabled="@isProcessing">
                             @(isProcessing ? "Боловсруулж байна..." : "Зөвшөөрөх")
                         </button>
                     </div>
+
+                    @if (showRejectForm && rejectRequestId == request.Id)
+                    {
+                        <div class="card" style="margin-top:12px; border-color:var(--clr-danger); background:rgba(220,53,69,0.03);">
+                            <div class="section-title" style="margin-bottom:8px;">
+                                <div>
+                                    <span class="muted" style="font-size:11px;font-weight:700">ТАТГАЛЗАХ ШАЛТГААН</span>
+                                </div>
+                            </div>
+
+                            <textarea class="form-control"
+                                      rows="3"
+                                      @bind="rejectReason"
+                                      placeholder="Шалтгаан бичнэ үү...">
+                            </textarea>
+
+                            @if (!string.IsNullOrWhiteSpace(rejectValidationError))
+                            {
+                                <div style="color:var(--clr-danger); margin-top:8px; font-size:0.9rem;">
+                                    @rejectValidationError
+                                </div>
+                            }
+
+                            <div class="action-row" style="justify-content:flex-end; gap: 8px; margin-top:12px;">
+                                <button class="btn btn-secondary" @onclick="CancelReject" disabled="@isProcessing">
+                                    Болих
+                                </button>
+                                <button class="btn btn-danger" @onclick="() => SubmitRejectAsync(request.Id)" disabled="@isProcessing">
+                                    @(isProcessing ? "Боловсруулж байна..." : "Татгалзах")
+                                </button>
+                            </div>
+                        </div>
+                    }
                 }
             </div>
         }
@@ -118,6 +150,10 @@
     private string? error;
     private bool isProcessing;
     private bool isLoading;
+    private bool showRejectForm;
+    private Guid rejectRequestId;
+    private string rejectReason = string.Empty;
+    private string? rejectValidationError;
 
     protected override Task OnInitializedAsync() => LoadAsync();
 
@@ -182,30 +218,48 @@
         }
     }
 
-    private async Task RejectAsync(Guid id)
+    private void BeginReject(Guid id)
+    {
+        rejectRequestId = id;
+        rejectReason = string.Empty;
+        rejectValidationError = null;
+        showRejectForm = true;
+    }
+
+    private void CancelReject()
+    {
+        showRejectForm = false;
+        rejectRequestId = Guid.Empty;
+        rejectReason = string.Empty;
+        rejectValidationError = null;
+    }
+
+    private async Task SubmitRejectAsync(Guid id)
     {
         if (isProcessing) return;
 
-        var reason = await JS.InvokeAsync<string?>("prompt", "Татгалзсан шалтгааныг оруулна уу:");
+        var reason = rejectReason.Trim();
         if (string.IsNullOrWhiteSpace(reason))
         {
-            error = "Татгалзах шалтгаан заавал байна.";
+            rejectValidationError = "Татгалзах шалтгаан заавал байна.";
             return;
         }
 
         try
         {
             error = null;
+            rejectValidationError = null;
             isProcessing = true;
             StateHasChanged();
 
-            var response = await Api.RejectLeaveRequestAsync(id, reason.Trim());
+            var response = await Api.RejectLeaveRequestAsync(id, reason);
             if (!response.IsSuccessStatusCode)
             {
                 error = $"Татгалзахад алдаа гарлаа ({(int)response.StatusCode}).";
                 return;
             }
 
+            CancelReject();
             await LoadAsync();
         }
         catch (Exception ex)

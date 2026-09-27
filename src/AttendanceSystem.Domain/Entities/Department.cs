@@ -29,5 +29,7 @@ public class Department : BaseEntity
         SetUpdated();
     }
 
+    public void Activate() { IsActive = true; SetUpdated(); }
+
     public void Deactivate() { IsActive = false; SetUpdated(); }
 }

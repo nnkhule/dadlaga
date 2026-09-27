@@ -317,248 +317,336 @@ public sealed class EmployeeReportService(ApplicationDbContext db) : IEmployeeRe
         var report = await GetAsync(employeeId, from, to, ct);
         if (report is null) return null;
 
+        var employee = await db.Employees
+            .AsNoTracking()
+            .FirstOrDefaultAsync(e => e.Id == employeeId, ct);
+
+        var employeeName = employee?.FullName ?? "Тодорхойгүй ажилтан";
+        var employeeCode = employee?.EmployeeCode ?? "—";
+
+        var summaryItems = new[]
+        {
+            ("Нийт өдөр", report.TotalWorkDays.ToString(), Colors.Blue.Medium),
+            ("Ирсэн", report.PresentDays.ToString(), Colors.Green.Medium),
+            ("Хоцорсон", report.LateDays.ToString(), Colors.Orange.Medium),
+            ("Тасалсан", report.AbsentDays.ToString(), Colors.Red.Medium),
+            ("Илүү цаг", $"{report.OvertimeHours:F1}", Colors.Purple.Medium),
+            ("Чөлөө", $"{report.LeaveDays}", Colors.Teal.Medium)
+        };
+
         return Document.Create(container =>
         {
             container.Page(page =>
             {
                 page.Size(PageSizes.A4);
-                page.Margin(2, Unit.Centimetre);
+                page.Margin(1.2f, Unit.Centimetre);
                 page.PageColor(Colors.White);
-                page.DefaultTextStyle(x => x.FontSize(10));
+                page.DefaultTextStyle(x => x.FontSize(9).FontColor(Colors.Grey.Darken3));
 
-                page.Header()
-                    .PaddingBottom(10)
-                    .Text($"Employee Report: {from:yyyy-MM-dd} - {to:yyyy-MM-dd}")
-                    .SemiBold().FontSize(16).AlignCenter();
+                page.Header().PaddingBottom(14).Row(row =>
+                {
+                    row.ConstantItem(84).Height(46).Background(Colors.Blue.Darken2).AlignCenter().AlignMiddle()
+                        .Text("ATTENDIQ")
+                        .FontColor(Colors.White)
+                        .SemiBold()
+                        .FontSize(16);
 
-                page.Content()
-                    .PaddingVertical(10)
-                    .Column(column =>
+                    row.RelativeItem().PaddingLeft(12).Column(col =>
                     {
-                        column.Item().Row(row =>
+                        col.Item().Text("Ажилтны тайлан").SemiBold().FontColor(Colors.Blue.Darken2).FontSize(18);
+                        col.Item().Text($"{employeeName} • {employeeCode}").FontSize(10).FontColor(Colors.Grey.Darken1);
+                        col.Item().Text($"{from:yyyy-MM-dd} - {to:yyyy-MM-dd}").FontSize(10).FontColor(Colors.Grey.Darken1);
+                    });
+
+                    row.ConstantItem(120).AlignRight().Column(col =>
+                    {
+                        col.Item().Text("Ирц").FontSize(8).FontColor(Colors.Grey.Darken1);
+                        col.Item().Text($"{report.AttendanceRate:F1}%").SemiBold().FontSize(20).FontColor(Colors.Green.Darken2);
+                    });
+                });
+
+                page.Content().Column(column =>
+                {
+                    column.Item().PaddingBottom(10).Row(row =>
+                    {
+                        foreach (var (label, value, color) in summaryItems)
                         {
-                            row.RelativeItem(2).Column(col =>
+                            row.RelativeItem().Padding(4).Column(card =>
                             {
-                                col.Item().Text("Summary").SemiBold().FontSize(12);
-                                col.Item().Text($"Work Days: {report.TotalWorkDays}");
-                                col.Item().Text($"Present: {report.PresentDays}");
-                                col.Item().Text($"Late: {report.LateDays}");
-                                col.Item().Text($"Absent: {report.AbsentDays}");
-                                col.Item().Text($"Overtime Hours: {report.OvertimeHours:F1}");
-                                col.Item().Text($"Undertime Hours: {report.UndertimeHours:F1}");
-                                col.Item().Text($"Leave Days: {report.LeaveDays}");
-                                col.Item().Text($"Leave Balance: {report.LeaveBalance}");
-                                col.Item().Text($"Attendance Rate: {report.AttendanceRate:F1}%");
-                                col.Item().Text($"Punctuality Rate: {report.PunctualityRate:F1}%");
+                                card.Item().Background(color).Padding(8).Text(label)
+                                    .FontSize(8)
+                                    .FontColor(Colors.White)
+                                    .SemiBold();
+
+                                card.Item().Background(Colors.Grey.Lighten4).Padding(8)
+                                    .Text(value)
+                                    .FontSize(18)
+                                    .SemiBold()
+                                    .FontColor(Colors.Grey.Darken3)
+                                    .AlignCenter();
                             });
-
-                            row.RelativeItem(3).Column(col =>
-                            {
-                                col.Item().Text("Average Times").SemiBold().FontSize(12);
-                                col.Item().Text($"Check-in: {report.AvgCheckIn ?? "N/A"}");
-                                col.Item().Text($"Check-out: {report.AvgCheckOut ?? "N/A"}");
-                                col.Item().Text($"Max Late Minutes: {report.MaxLateMinutes}");
-                                col.Item().Text($"Consecutive Present Days: {report.ConsecutivePresentDays}");
-                            });
-                        });
-
-                        column.Item().Text("Attendance Records").SemiBold().FontSize(12);
-                        if (report.AttendanceRecords.Any())
-                        {
-                            // Define cell styles
-                            IContainer HeaderCellStyle(IContainer container) =>
-                                container.Background(Colors.Grey.Lighten2)
-                                    .PaddingHorizontal(4)
-                                    .PaddingVertical(2)
-                                    .AlignLeft()
-                                    .AlignMiddle();
-
-                            IContainer CellStyle(IContainer container) =>
-                                container.BorderBottom(0.5f)
-                                    .BorderColor(Colors.Grey.Lighten3)
-                                    .PaddingHorizontal(4)
-                                    .PaddingVertical(2)
-                                    .AlignLeft()
-                                    .AlignMiddle();
-
-                            column.Item().Table(table =>
-                            {
-                                // Columns definition
-                                table.ColumnsDefinition(columns =>
-                                {
-                                    columns.RelativeColumn(2); // Date
-                                    columns.RelativeColumn(2); // Check In
-                                    columns.RelativeColumn(2); // Check Out
-                                    columns.RelativeColumn(2); // Worked Hours
-                                    columns.RelativeColumn(2); // Overtime Hours
-                                    columns.RelativeColumn(2); // Undertime Hours
-                                    columns.RelativeColumn(2); // Status
-                                    columns.RelativeColumn(3); // Note
-                                });
-
-                                // Header
-                                table.Header(header =>
-                                {
-                                    header.Cell().Element(HeaderCellStyle).Text("Date");
-                                    header.Cell().Element(HeaderCellStyle).Text("Check In");
-                                    header.Cell().Element(HeaderCellStyle).Text("Check Out");
-                                    header.Cell().Element(HeaderCellStyle).Text("Worked Hours");
-                                    header.Cell().Element(HeaderCellStyle).Text("Overtime Hours");
-                                    header.Cell().Element(HeaderCellStyle).Text("Undertime Hours");
-                                    header.Cell().Element(HeaderCellStyle).Text("Status");
-                                    header.Cell().Element(HeaderCellStyle).Text("Note");
-                                });
-
-                                // Data rows
-                                foreach (var record in report.AttendanceRecords)
-                                {
-                                    table.Cell().Element(CellStyle).Text($"{record.Date:yyyy-MM-dd}");
-                                    table.Cell().Element(CellStyle).Text(record.CheckIn?.ToString(@"HH\:mm") ?? "");
-                                    table.Cell().Element(CellStyle).Text(record.CheckOut?.ToString(@"HH\:mm") ?? "");
-                                    table.Cell().Element(CellStyle).Text(record.WorkedHours?.ToString("F1") ?? "");
-                                    table.Cell().Element(CellStyle).Text(record.OvertimeHours?.ToString("F1") ?? "");
-                                    table.Cell().Element(CellStyle).Text(record.UndertimeHours?.ToString("F1") ?? "");
-                                    table.Cell().Element(CellStyle).Text(record.Status);
-                                    table.Cell().Element(CellStyle).Text(record.Note ?? "");
-                                }
-                            });
-                        }
-                        else
-                        {
-                            column.Item().Text("No attendance records found for this period.")
-                                .Italic()
-                                .AlignCenter();
-                        }
-
-                        column.Item().Text("Leave Requests").SemiBold().FontSize(12);
-                        if (report.LeaveRequests.Any())
-                        {
-                            // Define cell styles
-                            IContainer HeaderCellStyle(IContainer container) =>
-                                container.Background(Colors.Grey.Lighten2)
-                                    .PaddingHorizontal(4)
-                                    .PaddingVertical(2)
-                                    .AlignLeft()
-                                    .AlignMiddle();
-
-                            IContainer CellStyle(IContainer container) =>
-                                container.BorderBottom(0.5f)
-                                    .BorderColor(Colors.Grey.Lighten3)
-                                    .PaddingHorizontal(4)
-                                    .PaddingVertical(2)
-                                    .AlignLeft()
-                                    .AlignMiddle();
-
-                            column.Item().Table(table =>
-                            {
-                                // Columns definition
-                                table.ColumnsDefinition(columns =>
-                                {
-                                    columns.RelativeColumn(2); // Requested At
-                                    columns.RelativeColumn(2); // Leave Type
-                                    columns.RelativeColumn(2); // Start Date
-                                    columns.RelativeColumn(2); // End Date
-                                    columns.RelativeColumn(2); // Days
-                                    columns.RelativeColumn(3); // Reason
-                                    columns.RelativeColumn(2); // Status
-                                });
-
-                                // Header
-                                table.Header(header =>
-                                {
-                                    header.Cell().Element(HeaderCellStyle).Text("Requested At");
-                                    header.Cell().Element(HeaderCellStyle).Text("Leave Type");
-                                    header.Cell().Element(HeaderCellStyle).Text("Start Date");
-                                    header.Cell().Element(HeaderCellStyle).Text("End Date");
-                                    header.Cell().Element(HeaderCellStyle).Text("Days");
-                                    header.Cell().Element(HeaderCellStyle).Text("Reason");
-                                    header.Cell().Element(HeaderCellStyle).Text("Status");
-                                });
-
-                                // Data rows
-                                foreach (var leave in report.LeaveRequests)
-                                {
-                                    table.Cell().Element(CellStyle).Text($"{leave.RequestedAt:yyyy-MM-dd HH:mm}");
-                                    table.Cell().Element(CellStyle).Text(leave.LeaveType);
-                                    table.Cell().Element(CellStyle).Text($"{leave.StartDate:yyyy-MM-dd}");
-                                    table.Cell().Element(CellStyle).Text($"{leave.EndDate:yyyy-MM-dd}");
-                                    table.Cell().Element(CellStyle).Text(leave.Days.ToString());
-                                    table.Cell().Element(CellStyle).Text(leave.Reason ?? "");
-                                    table.Cell().Element(CellStyle).Text(leave.Status);
-                                }
-                            });
-                        }
-                        else
-                        {
-                            column.Item().Text("No leave requests found for this period.")
-                                .Italic()
-                                .AlignCenter();
-                        }
-
-                        column.Item().Text("Leave Balances").SemiBold().FontSize(12);
-                        if (report.LeaveBalances.Any())
-                        {
-                            // Define cell styles
-                            IContainer HeaderCellStyle(IContainer container) =>
-                                container.Background(Colors.Grey.Lighten2)
-                                    .PaddingHorizontal(4)
-                                    .PaddingVertical(2)
-                                    .AlignLeft()
-                                    .AlignMiddle();
-
-                            IContainer CellStyle(IContainer container) =>
-                                container.BorderBottom(0.5f)
-                                    .BorderColor(Colors.Grey.Lighten3)
-                                    .PaddingHorizontal(4)
-                                    .PaddingVertical(2)
-                                    .AlignLeft()
-                                    .AlignMiddle();
-
-                            column.Item().Table(table =>
-                            {
-                                // Columns definition
-                                table.ColumnsDefinition(columns =>
-                                {
-                                    columns.RelativeColumn(3); // Leave Type
-                                    columns.RelativeColumn(2); // Total
-                                    columns.RelativeColumn(2); // Used
-                                    columns.RelativeColumn(2); // Remaining
-                                });
-
-                                // Header
-                                table.Header(header =>
-                                {
-                                    header.Cell().Element(HeaderCellStyle).Text("Leave Type");
-                                    header.Cell().Element(HeaderCellStyle).Text("Total");
-                                    header.Cell().Element(HeaderCellStyle).Text("Used");
-                                    header.Cell().Element(HeaderCellStyle).Text("Remaining");
-                                });
-
-                                // Data rows
-                                foreach (var balance in report.LeaveBalances)
-                                {
-                                    table.Cell().Element(CellStyle).Text(balance.LeaveType);
-                                    table.Cell().Element(CellStyle).Text(balance.Total.ToString());
-                                    table.Cell().Element(CellStyle).Text(balance.Used.ToString());
-                                    table.Cell().Element(CellStyle).Text(balance.Remaining.ToString());
-                                }
-                            });
-                        }
-                        else
-                        {
-                            column.Item().Text("No leave balances found.")
-                                .Italic()
-                                .AlignCenter();
                         }
                     });
 
+                    column.Item().PaddingTop(6).Row(row =>
+                    {
+                        row.RelativeItem().Background(Colors.Grey.Lighten4).Border(1).BorderColor(Colors.Grey.Lighten2).Padding(10).Column(col =>
+                        {
+                            col.Item().Text("Нийт ажилласан цаг").FontSize(8).FontColor(Colors.Grey.Darken1);
+                            col.Item().Text($"{report.OvertimeHours:F1} цаг").SemiBold().FontSize(16).FontColor(Colors.Grey.Darken3);
+                        });
+
+                        row.RelativeItem().Background(Colors.Grey.Lighten4).Border(1).BorderColor(Colors.Grey.Lighten2).Padding(10).Column(col =>
+                        {
+                            col.Item().Text("Дундаж ирсэн цаг").FontSize(8).FontColor(Colors.Grey.Darken1);
+                            col.Item().Text(report.AvgCheckIn ?? "N/A").SemiBold().FontSize(16).FontColor(Colors.Grey.Darken3);
+                        });
+
+                        row.RelativeItem().Background(Colors.Grey.Lighten4).Border(1).BorderColor(Colors.Grey.Lighten2).Padding(10).Column(col =>
+                        {
+                            col.Item().Text("Дундаж гарсан цаг").FontSize(8).FontColor(Colors.Grey.Darken1);
+                            col.Item().Text(report.AvgCheckOut ?? "N/A").SemiBold().FontSize(16).FontColor(Colors.Grey.Darken3);
+                        });
+                    });
+
+                    column.Item().PaddingTop(14).Text("Ирцийн түүх").SemiBold().FontSize(12).FontColor(Colors.Grey.Darken3);
+
+                    if (report.AttendanceRecords.Any())
+                    {
+                        IContainer HeaderCellStyle(IContainer container) =>
+                            container.Background(Colors.Blue.Darken2)
+                                .Padding(6)
+                                .AlignCenter()
+                                .AlignMiddle();
+
+                        IContainer CellStyle(IContainer container) =>
+                            container.Border(0.5f)
+                                .BorderColor(Colors.Grey.Lighten2)
+                                .Padding(5)
+                                .AlignMiddle();
+
+                        column.Item().Table(table =>
+                        {
+                            table.ColumnsDefinition(columns =>
+                            {
+                                columns.RelativeColumn(1.5f);
+                                columns.RelativeColumn(1.2f);
+                                columns.RelativeColumn(1.2f);
+                                columns.RelativeColumn(1.1f);
+                                columns.RelativeColumn(1.1f);
+                                columns.RelativeColumn(1.1f);
+                                columns.RelativeColumn(1.3f);
+                            });
+
+                            table.Header(header =>
+                            {
+                                header.Cell().Element(cell =>
+                                {
+                                    cell.Background(Colors.Blue.Darken2).Padding(6).AlignCenter().AlignMiddle();
+                                    cell.Text(text => text.Span("Огноо").FontColor(Colors.White).FontSize(8).SemiBold());
+                                });
+                                header.Cell().Element(cell =>
+                                {
+                                    cell.Background(Colors.Blue.Darken2).Padding(6).AlignCenter().AlignMiddle();
+                                    cell.Text(text => text.Span("Ирсэн").FontColor(Colors.White).FontSize(8).SemiBold());
+                                });
+                                header.Cell().Element(cell =>
+                                {
+                                    cell.Background(Colors.Blue.Darken2).Padding(6).AlignCenter().AlignMiddle();
+                                    cell.Text(text => text.Span("Гарсан").FontColor(Colors.White).FontSize(8).SemiBold());
+                                });
+                                header.Cell().Element(cell =>
+                                {
+                                    cell.Background(Colors.Blue.Darken2).Padding(6).AlignCenter().AlignMiddle();
+                                    cell.Text(text => text.Span("Ажил").FontColor(Colors.White).FontSize(8).SemiBold());
+                                });
+                                header.Cell().Element(cell =>
+                                {
+                                    cell.Background(Colors.Blue.Darken2).Padding(6).AlignCenter().AlignMiddle();
+                                    cell.Text(text => text.Span("Илүү").FontColor(Colors.White).FontSize(8).SemiBold());
+                                });
+                                header.Cell().Element(cell =>
+                                {
+                                    cell.Background(Colors.Blue.Darken2).Padding(6).AlignCenter().AlignMiddle();
+                                    cell.Text(text => text.Span("Дутуу").FontColor(Colors.White).FontSize(8).SemiBold());
+                                });
+                                header.Cell().Element(cell =>
+                                {
+                                    cell.Background(Colors.Blue.Darken2).Padding(6).AlignCenter().AlignMiddle();
+                                    cell.Text(text => text.Span("Статус").FontColor(Colors.White).FontSize(8).SemiBold());
+                                });
+                            });
+
+                            foreach (var record in report.AttendanceRecords)
+                            {
+                                table.Cell().Element(CellStyle).Text($"{record.Date:yyyy-MM-dd}");
+                                table.Cell().Element(CellStyle).Text(record.CheckIn?.ToString(@"HH\:mm") ?? "—");
+                                table.Cell().Element(CellStyle).Text(record.CheckOut?.ToString(@"HH\:mm") ?? "—");
+                                table.Cell().Element(CellStyle).Text(record.WorkedHours.HasValue ? $"{record.WorkedHours:F1}h" : "—");
+                                table.Cell().Element(CellStyle).Text(record.OvertimeHours.HasValue && record.OvertimeHours > 0 ? $"+{record.OvertimeHours:F1}" : "—");
+                                table.Cell().Element(CellStyle).Text(record.UndertimeHours.HasValue && record.UndertimeHours > 0 ? $"-{record.UndertimeHours:F1}" : "—");
+                                table.Cell().Element(CellStyle).Text(record.Status);
+                            }
+                        });
+                    }
+                    else
+                    {
+                        column.Item().PaddingVertical(8).Text("Энэ хугацаанд ирцийн мэдээлэл байхгүй байна.").FontColor(Colors.Grey.Darken1).Italic();
+                    }
+
+                    column.Item().PaddingTop(16).Text("Чөлөөний хүсэлт").SemiBold().FontSize(12).FontColor(Colors.Grey.Darken3);
+
+                    if (report.LeaveRequests.Any())
+                    {
+                        IContainer HeaderCellStyle(IContainer container) =>
+                            container.Background(Colors.Teal.Darken2)
+                                .Padding(6)
+                                .AlignCenter()
+                                .AlignMiddle();
+
+                        IContainer CellStyle(IContainer container) =>
+                            container.Border(0.5f)
+                                .BorderColor(Colors.Grey.Lighten2)
+                                .Padding(5)
+                                .AlignMiddle();
+
+                        column.Item().Table(table =>
+                        {
+                            table.ColumnsDefinition(columns =>
+                            {
+                                columns.RelativeColumn(1.1f);
+                                columns.RelativeColumn(1.2f);
+                                columns.RelativeColumn(1.2f);
+                                columns.RelativeColumn(1.2f);
+                                columns.RelativeColumn(0.7f);
+                                columns.RelativeColumn(1.8f);
+                                columns.RelativeColumn(1f);
+                            });
+
+                            table.Header(header =>
+                            {
+                                header.Cell().Element(cell =>
+                                {
+                                    cell.Background(Colors.Teal.Darken2).Padding(6).AlignCenter().AlignMiddle();
+                                    cell.Text(text => text.Span("Огноо").FontColor(Colors.White).FontSize(8).SemiBold());
+                                });
+                                header.Cell().Element(cell =>
+                                {
+                                    cell.Background(Colors.Teal.Darken2).Padding(6).AlignCenter().AlignMiddle();
+                                    cell.Text(text => text.Span("Төрөл").FontColor(Colors.White).FontSize(8).SemiBold());
+                                });
+                                header.Cell().Element(cell =>
+                                {
+                                    cell.Background(Colors.Teal.Darken2).Padding(6).AlignCenter().AlignMiddle();
+                                    cell.Text(text => text.Span("Эхлэх").FontColor(Colors.White).FontSize(8).SemiBold());
+                                });
+                                header.Cell().Element(cell =>
+                                {
+                                    cell.Background(Colors.Teal.Darken2).Padding(6).AlignCenter().AlignMiddle();
+                                    cell.Text(text => text.Span("Дуусах").FontColor(Colors.White).FontSize(8).SemiBold());
+                                });
+                                header.Cell().Element(cell =>
+                                {
+                                    cell.Background(Colors.Teal.Darken2).Padding(6).AlignCenter().AlignMiddle();
+                                    cell.Text(text => text.Span("Өдөр").FontColor(Colors.White).FontSize(8).SemiBold());
+                                });
+                                header.Cell().Element(cell =>
+                                {
+                                    cell.Background(Colors.Teal.Darken2).Padding(6).AlignCenter().AlignMiddle();
+                                    cell.Text(text => text.Span("Шалтгаан").FontColor(Colors.White).FontSize(8).SemiBold());
+                                });
+                                header.Cell().Element(cell =>
+                                {
+                                    cell.Background(Colors.Teal.Darken2).Padding(6).AlignCenter().AlignMiddle();
+                                    cell.Text(text => text.Span("Төлөв").FontColor(Colors.White).FontSize(8).SemiBold());
+                                });
+                            });
+
+                            foreach (var item in report.LeaveRequests)
+                            {
+                                table.Cell().Element(CellStyle).Text($"{item.RequestedAt:yyyy-MM-dd}");
+                                table.Cell().Element(CellStyle).Text(item.LeaveType);
+                                table.Cell().Element(CellStyle).Text($"{item.StartDate:yyyy-MM-dd}");
+                                table.Cell().Element(CellStyle).Text($"{item.EndDate:yyyy-MM-dd}");
+                                table.Cell().Element(CellStyle).Text(item.Days.ToString());
+                                table.Cell().Element(CellStyle).Text(item.Reason ?? "—");
+                                table.Cell().Element(CellStyle).Text(item.Status);
+                            }
+                        });
+                    }
+                    else
+                    {
+                        column.Item().PaddingVertical(8).Text("Энэ хугацаанд чөлөөний хүсэлт байхгүй байна.").FontColor(Colors.Grey.Darken1).Italic();
+                    }
+
+                    column.Item().PaddingTop(16).Text("Чөлөөний үлдэгдэл").SemiBold().FontSize(12).FontColor(Colors.Grey.Darken3);
+
+                    if (report.LeaveBalances.Any())
+                    {
+                        IContainer HeaderCellStyle(IContainer container) =>
+                            container.Background(Colors.Grey.Darken2)
+                                .Padding(6)
+                                .AlignCenter()
+                                .AlignMiddle();
+
+                        IContainer CellStyle(IContainer container) =>
+                            container.Border(0.5f)
+                                .BorderColor(Colors.Grey.Lighten2)
+                                .Padding(5)
+                                .AlignMiddle();
+
+                        column.Item().Table(table =>
+                        {
+                            table.ColumnsDefinition(columns =>
+                            {
+                                columns.RelativeColumn(2.5f);
+                                columns.RelativeColumn(1f);
+                                columns.RelativeColumn(1f);
+                                columns.RelativeColumn(1f);
+                            });
+
+                            table.Header(header =>
+                            {
+                                header.Cell().Element(cell =>
+                                {
+                                    cell.Background(Colors.Grey.Darken2).Padding(6).AlignCenter().AlignMiddle();
+                                    cell.Text(text => text.Span("Төрөл").FontColor(Colors.White).FontSize(8).SemiBold());
+                                });
+                                header.Cell().Element(cell =>
+                                {
+                                    cell.Background(Colors.Grey.Darken2).Padding(6).AlignCenter().AlignMiddle();
+                                    cell.Text(text => text.Span("Нийт").FontColor(Colors.White).FontSize(8).SemiBold());
+                                });
+                                header.Cell().Element(cell =>
+                                {
+                                    cell.Background(Colors.Grey.Darken2).Padding(6).AlignCenter().AlignMiddle();
+                                    cell.Text(text => text.Span("Ашигласан").FontColor(Colors.White).FontSize(8).SemiBold());
+                                });
+                                header.Cell().Element(cell =>
+                                {
+                                    cell.Background(Colors.Grey.Darken2).Padding(6).AlignCenter().AlignMiddle();
+                                    cell.Text(text => text.Span("Үлдсэн").FontColor(Colors.White).FontSize(8).SemiBold());
+                                });
+                            });
+
+                            foreach (var balance in report.LeaveBalances)
+                            {
+                                table.Cell().Element(CellStyle).Text(balance.LeaveType);
+                                table.Cell().Element(CellStyle).Text(balance.Total.ToString());
+                                table.Cell().Element(CellStyle).Text(balance.Used.ToString());
+                                table.Cell().Element(CellStyle).Text(balance.Remaining.ToString());
+                            }
+                        });
+                    }
+                });
+
                 page.Footer()
                     .AlignCenter()
-                    .Text(x =>
+                    .PaddingTop(10)
+                    .Text(text =>
                     {
-                        x.CurrentPageNumber();
-                        x.Span(" / ");
-                        x.TotalPages();
+                        text.Span("Тайланг үүсгэсэн огноо: ").FontColor(Colors.Grey.Darken1).FontSize(8);
+                        text.Span(DateTime.Today.ToString("yyyy-MM-dd")).FontColor(Colors.Grey.Darken1).FontSize(8);
                     });
             });
         })

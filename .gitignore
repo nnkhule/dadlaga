@@ -11,10 +11,15 @@ secrets/
 
 appsettings.*.local.json
 appsettings.Development.json
-
-.json
-.txt
-.dll
-.dist/
+*.json
+*.dll
+*.exe
+*pdb
+*.xml
+*.ttf
+*.so
+*.dylib
+*.txt
+*.dist/
 TestResults/
 coverage/

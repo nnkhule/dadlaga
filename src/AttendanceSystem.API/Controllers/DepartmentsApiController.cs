@@ -20,12 +20,16 @@ public sealed class DepartmentsApiController : ControllerBase
         [FromQuery] int pageNumber = 1,
         [FromQuery] int pageSize = 20,
         [FromQuery] string? search = null,
+        [FromQuery] bool includeInactive = false,
         CancellationToken cancellationToken = default)
     {
         pageNumber = Math.Max(1, pageNumber);
         pageSize = Math.Clamp(pageSize, 1, 100);
 
         var query = _db.Departments.AsNoTracking().AsQueryable();
+        if (!includeInactive)
+            query = query.Where(d => d.IsActive);
+
         if (!string.IsNullOrWhiteSpace(search))
         {
             var term = search.Trim();
@@ -104,6 +108,30 @@ public sealed class DepartmentsApiController : ControllerBase
         await _db.SaveChangesAsync(cancellationToken);
 
         return await Details(id, cancellationToken);
+    }
+
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Deactivate(Guid id, CancellationToken cancellationToken)
+    {
+        var department = await _db.Departments.FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
+        if (department is null)
+            return NotFound();
+
+        department.Deactivate();
+        await _db.SaveChangesAsync(cancellationToken);
+        return NoContent();
+    }
+
+    [HttpPost("{id:guid}/activate")]
+    public async Task<IActionResult> Activate(Guid id, CancellationToken cancellationToken)
+    {
+        var department = await _db.Departments.FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
+        if (department is null)
+            return NotFound();
+
+        department.Activate();
+        await _db.SaveChangesAsync(cancellationToken);
+        return NoContent();
     }
 }
 

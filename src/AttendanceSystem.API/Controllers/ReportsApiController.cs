@@ -129,7 +129,7 @@ public sealed class ReportsApiController : ControllerBase
         pageNumber = Math.Max(1, pageNumber);
         pageSize = Math.Clamp(pageSize, 1, 200);
 
-        var query = _db.Departments.AsNoTracking().OrderBy(d => d.Name);
+        var query = _db.Departments.AsNoTracking().Where(d => d.IsActive).OrderBy(d => d.Name);
         var total = await query.CountAsync(cancellationToken);
         var data = await query.Skip((pageNumber - 1) * pageSize).Take(pageSize)
             .Select(d => new { d.Name, EmployeeCount = d.Employees.Count, d.IsActive })
@@ -151,6 +151,7 @@ public sealed class ReportsApiController : ControllerBase
         CancellationToken cancellationToken)
     {
         var departments = await _db.Departments.AsNoTracking()
+            .Where(d => d.IsActive)
             .Select(d => new
             {
                 d.Id,

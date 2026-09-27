@@ -10,7 +10,7 @@
     </Actions>
 </PageHeader>
 
-<div class="page-stack">
+<div class="page-stack departments-page">
 
     @if (!string.IsNullOrWhiteSpace(error))
     {
@@ -22,12 +22,14 @@
     }
 
     <!-- Filter bar -->
-    <div class="card filter-bar">
-        <input class="form-control"
-               style="flex:1;min-width:200px"
-               placeholder="Хэлтэс хайх..."
+    <div class="card filter-bar departments-toolbar">
+        <div class="department-search">
+            <span class="department-search-icon" aria-hidden="true">⌕</span>
+            <input class="form-control"
+               placeholder="Хэлтсийн нэрээр хайх..."
                value="@_search"
                @oninput="OnSearchInput" />
+        </div>
 
         <select class="form-control" style="max-width:160px" @onchange="OnStatusChange">
             <option value="">Бүх төлөв</option>
@@ -39,7 +41,7 @@
         {
             <button class="btn btn-ghost" @onclick="ClearFilters">✕ Цэвэрлэх</button>
         }
-        <span class="muted" style="margin-left:auto;white-space:nowrap">Нийт @_totalCount хэлтэс</span>
+        <span class="department-count"><strong>@_totalCount</strong> хэлтэс</span>
     </div>
 
     <!-- KPI cards -->
@@ -79,7 +81,7 @@
     </div>
 
     <!-- Department table -->
-    <div class="card">
+    <div class="card department-table-card">
         @if (_isLoading)
         {
             <div class="loading-state">
@@ -118,14 +120,14 @@
                     <tbody>
                         @foreach (var dept in _paged)
                         {
-                            <tr class="emp-row">
+                            <tr class="emp-row @(!dept.IsActive ? "department-row-inactive" : "")">
                                 <td>
                                     <div style="display:flex;align-items:center;gap:10px">
-                                        <div style="width:36px;height:36px;border-radius:var(--radius-sm);background:var(--clr-primary-light);color:var(--clr-primary);display:grid;place-items:center;font-size:15px;flex-shrink:0">
-                                            🏢
+                                        <div class="department-avatar">
+                                            <span aria-hidden="true">⌂</span>
                                         </div>
                                         <div>
-                                            <div style="font-weight:600">@dept.Name</div>
+                                            <div class="department-name">@dept.Name</div>
                                             @if (!string.IsNullOrWhiteSpace(dept.Description))
                                             {
                                                 <div class="muted" style="font-size:12px">@dept.Description</div>
@@ -166,21 +168,21 @@
                                 </td>
                                 <td style="text-align:right">
                                     <div class="action-row" style="justify-content:flex-end">
-                                        <button class="btn btn-ghost btn-sm" @onclick="() => OpenEditModal(dept)" title="Засах">
-                                            ✏ Засах
+                                        <button class="btn btn-ghost btn-sm" @onclick="() => OpenEditModal(dept)" title="Хэлтэс засах">
+                                            <span aria-hidden="true">✎</span> Засах
                                         </button>
                                         @if (dept.IsActive)
                                         {
                                             <button class="btn btn-sm" style="background:var(--clr-warning-light);color:var(--clr-warning);border:1px solid var(--clr-warning)"
                                                     @onclick="() => ToggleActive(dept)" title="Идэвхгүй болгох">
-                                                🚫
+                                                <span aria-hidden="true">⏸</span>
                                             </button>
                                         }
                                         else
                                         {
                                             <button class="btn btn-sm" style="background:var(--clr-success-light);color:var(--clr-success);border:1px solid var(--clr-success)"
                                                     @onclick="() => ToggleActive(dept)" title="Идэвхжүүлэх">
-                                                ✓
+                                                <span aria-hidden="true">▶</span>
                                             </button>
                                         }
                                     </div>
@@ -263,6 +265,39 @@
     </div>
 }
 
+<style>
+    .departments-page { --department-accent: #2563eb; --department-ink: #172033; }
+    .departments-toolbar { margin-bottom: 0; padding: 12px; gap: 10px; }
+    .department-search { position: relative; flex: 1 1 260px; min-width: 220px; }
+    .department-search .form-control { max-width: none; padding-left: 38px; height: 42px; }
+    .department-search-icon { position: absolute; z-index: 1; left: 13px; top: 50%; transform: translateY(-50%); color: var(--clr-text-hint); font-size: 21px; line-height: 1; pointer-events: none; }
+    .departments-toolbar select { height: 42px; max-width: 170px; }
+    .department-count { margin-left: auto; padding: 0 8px; color: var(--clr-text-muted); font-size: 12px; white-space: nowrap; }
+    .department-count strong { color: var(--department-ink); font-size: 15px; }
+    .department-table-card { padding: 8px 0 0; overflow: hidden; }
+    .department-table-card .table-responsive { border-radius: 0; }
+    .department-table-card .data-table th { padding: 13px 18px; background: #f8fafc; }
+    .department-table-card .data-table td { padding: 15px 18px; }
+    .department-table-card .data-table tbody tr { transition: background .16s ease, opacity .16s ease; }
+    .department-table-card .data-table tbody tr:hover { background: #f8fbff; }
+    .department-row-inactive { opacity: .64; }
+    .department-avatar { width: 38px; height: 38px; display: grid; place-items: center; flex-shrink: 0; border: 1px solid #bfdbfe; border-radius: 10px; background: linear-gradient(145deg, #eff6ff, #dbeafe); color: var(--department-accent); font-size: 20px; font-weight: 700; }
+    .department-name { color: var(--department-ink); font-weight: 700; letter-spacing: -.01em; }
+    .departments-page .kpi-card { position: relative; overflow: hidden; }
+    .departments-page .kpi-card::after { content: ""; position: absolute; right: -18px; bottom: -24px; width: 74px; height: 74px; border: 12px solid currentColor; border-radius: 50%; opacity: .06; }
+    .departments-page .emd-card { border: 1px solid rgba(15, 23, 42, .1); box-shadow: 0 24px 70px rgba(15, 23, 42, .2); }
+    .departments-page .emd-header { background: linear-gradient(135deg, #eff6ff, #ffffff); border-bottom: 1px solid #dbeafe; }
+    .departments-page .emd-title { color: var(--department-ink); letter-spacing: -.02em; }
+    .departments-page .emd-footer { background: #f8fafc; border-top: 1px solid var(--clr-border); }
+    @@media (max-width: 640px) {
+        .departments-toolbar { align-items: stretch; }
+        .department-search { flex-basis: 100%; }
+        .departments-toolbar select { max-width: none; flex: 1; }
+        .department-count { margin-left: 0; align-self: center; }
+        .department-table-card { padding-top: 0; }
+    }
+</style>
+
 @code {
     // ── State ──────────────────────────────────────────────
     private List<DepartmentDto> _departments = [];
@@ -317,7 +352,7 @@
         StateHasChanged();
         try
         {
-            var url = $"api/departments?pageNumber={_page}&pageSize={_pageSize}" +
+            var url = $"api/departments?pageNumber={_page}&pageSize={_pageSize}&includeInactive=true" +
                       $"&search={Uri.EscapeDataString(_search ?? "")}";
 
             var result = await Api.GetAsync<PagedResponse<DepartmentDto>>(url);

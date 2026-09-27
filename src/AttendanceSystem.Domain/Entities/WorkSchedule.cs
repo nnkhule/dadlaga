@@ -33,6 +33,21 @@ public class WorkSchedule : BaseEntity
             StandardHoursPerDay = 8m
         };
 
+    public static WorkSchedule CreateNightShift(string name = "Night Shift 22:00-06:00")
+        => new()
+        {
+            Name = name,
+            ShiftStart = new TimeOnly(22, 0),
+            ShiftEnd = new TimeOnly(6, 0),
+            GraceMinutes = 10,
+            WorkDays = WorkDays.Weekdays,
+            BreakDurationMinutes = 60,
+            StandardHoursPerDay = 8m,
+            IsNightShift = true,
+            NightShiftMultiplier = 1.5m,
+            WeekendMultiplier = 2.0m
+        };
+
     public bool IsWorkDay(DayOfWeek day) => day switch
     {
         DayOfWeek.Monday => WorkDays.HasFlag(WorkDays.Monday),
