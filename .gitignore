@@ -11,6 +11,7 @@ secrets/
 
 appsettings.*.local.json
 appsettings.Development.json
+<<<<<<< HEAD
 *.json
 *.dll
 *.exe
@@ -23,3 +24,9 @@ appsettings.Development.json
 *.dist/
 TestResults/
 coverage/
+=======
+
+.dist/
+TestResults/
+coverage/
+>>>>>>> 7476cd44ef22abe2c2e9093c8013a531d82e2eb4
