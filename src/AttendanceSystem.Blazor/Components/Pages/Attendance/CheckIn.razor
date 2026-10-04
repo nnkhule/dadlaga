@@ -93,7 +93,7 @@
             var location = await Js.InvokeAsync<BrowserLocation>("getLocation");
             latitude = location.Latitude;
             longitude = location.Longitude;
-            currentLocationText = $"{latitude:0.######}, {longitude:0.######}";
+            currentLocationText = $"{latitude:0.000000}, {longitude:0.000000}";
             await action();
         }
         catch (Exception ex)

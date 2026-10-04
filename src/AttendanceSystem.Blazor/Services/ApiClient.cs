@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using AttendanceSystem.Application.Common;
 using AttendanceSystem.Application.DTOs.AI;
 using AttendanceSystem.Blazor.Models;
 using Microsoft.AspNetCore.Components;
@@ -13,12 +14,14 @@ public sealed class ApiClient
     private readonly HttpClient _http;
     private readonly AuthService _auth;
     private readonly NavigationManager _navigation;
+    private readonly IClock _clock;
 
-    public ApiClient(HttpClient http, AuthService auth, NavigationManager navigation)
+    public ApiClient(HttpClient http, AuthService auth, NavigationManager navigation, IClock clock)
     {
         _http = http;
         _auth = auth;
         _navigation = navigation;
+        _clock = clock;
     }
 
     public async Task<T?> GetAsync<T>(string url, CancellationToken cancellationToken = default)
@@ -74,7 +77,7 @@ public sealed class ApiClient
         {
             var date = DateOnly.TryParse(response.Labels[i], out var parsed)
                 ? parsed
-                : DateOnly.FromDateTime(DateTime.Today.AddDays(i - count + 1));
+                : _clock.TodayLocal.AddDays(i - count + 1);
             var onLeave = i < onLeaveCounts.Count ? onLeaveCounts[i] : 0;
             items.Add(new AttendanceTrendDto(date, response.PresentCounts[i], response.AbsentCounts[i], response.LateCounts[i], onLeave));
         }
@@ -169,6 +172,12 @@ public sealed class ApiClient
         return await response.Content.ReadFromJsonAsync<ChatResponseDto>(cancellationToken: cancellationToken);
     }
 
+    public async Task<ChatResponseDto?> PostAdminChatAsync(ChatRequestDto request, CancellationToken cancellationToken = default)
+    {
+        var response = await PostAsync("api/ai/admin/chat", request, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<ChatResponseDto>(cancellationToken: cancellationToken);
+    }
+
     private async Task AuthorizeAsync()
     {
         var token = await _auth.GetTokenAsync();
@@ -239,7 +248,10 @@ public sealed class ApiClient
         }
 
         response.Dispose();
-        throw new HttpRequestException($"Request failed with status code {(int)response.StatusCode}: {message}");
+        throw new HttpRequestException(
+            $"Request failed with status code {(int)response.StatusCode}: {message}",
+            inner: null,
+            statusCode: response.StatusCode);
     }
 
     private sealed record ApiErrorResponse(string? Message, string? Error, string? Detail, string? Code);

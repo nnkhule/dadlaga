@@ -3,6 +3,7 @@
 @implements IAsyncDisposable
 @inject IJSRuntime JS
 @inject ApiClient Api
+@inject AttendanceSystem.Application.Common.IClock Clock
 
 <PageHeader Title="Өнөөдрийн ирц" Subtitle="GPS байршлаар оффисын хүрээнд check-in/check-out хийнэ" Icon="⌖" />
 
@@ -103,7 +104,18 @@
     private DateTime? CheckOutAt;
     private string CheckInText => CheckInAt?.ToString("HH:mm") ?? "--:--";
     private string CheckOutText => CheckOutAt?.ToString("HH:mm") ?? "--:--";
-    private string TotalHours => CheckInAt is null ? "0h" : $"{Math.Max(0, ((CheckOutAt ?? DateTime.Now) - CheckInAt.Value).TotalHours):0.0}h";
+    private string TotalHours
+    {
+        get
+        {
+            if (CheckInAt is null)
+                return "0h";
+
+            var duration = (CheckOutAt ?? Clock.LocalNow) - CheckInAt.Value;
+            var breakDuration = duration.TotalHours < 4 ? TimeSpan.Zero : TimeSpan.FromHours(1);
+            return $"{Math.Max(0, (duration - breakDuration).TotalHours):0.0}h";
+        }
+    }
     private IReadOnlyList<Row> WeekRows = [];
 
     private double OfficeLat => activeOffice?.Latitude ?? gpsSettings?.OfficeLatitude ?? 47.9123;
@@ -196,8 +208,8 @@
             Error = null;
             var today = await Api.GetTodayAttendanceAsync();
             var history = await Api.GetMyAttendanceHistoryAsync(
-                DateOnly.FromDateTime(DateTime.Today.AddDays(-30)),
-                DateOnly.FromDateTime(DateTime.Today),
+                Clock.TodayLocal.AddDays(-30),
+                Clock.TodayLocal,
                 100);
 
             CheckInAt = today?.CheckInTime;

@@ -62,7 +62,7 @@ public static class ApplicationDbSeeder
         if (!await context.Departments.AnyAsync())
         {
             var schedule = WorkSchedule.CreateStandard();
-            var office   = OfficeLocation.Create("Head Office Ulaanbaatar", 47.9123, 106.9308, 100);
+            var office   = OfficeLocation.Create("Head Office Ulaanbaatar", 47.912216, 106.931346, 5000);
             var dept     = Department.Create("Human Resources");
             context.WorkSchedules.Add(schedule);
             context.OfficeLocations.Add(office);

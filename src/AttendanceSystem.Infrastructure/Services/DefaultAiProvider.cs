@@ -32,13 +32,13 @@ public class DefaultAiProvider : IAiProvider
             _configuration["NVIDIA_API_KEY"],
             Environment.GetEnvironmentVariable("AiSettings__ApiKey"),
             Environment.GetEnvironmentVariable("NVIDIA_API_KEY"));
-        var model   = _configuration["AiSettings:Model"]   ?? "deepseek-ai/deepseek-v4-flash-0731";
+        var model   = _configuration["AiSettings:Model"]   ?? "qwen/qwen3.5-122b-a10b";
         var baseUrl = _configuration["AiSettings:BaseUrl"] ?? "https://integrate.api.nvidia.com/v1/chat/completions";
 
         if (string.IsNullOrWhiteSpace(apiKey))
         {
-            _logger.LogWarning("AiSettings:ApiKey тохируулагдаагүй тул fallback хариулт ашиглаж байна.");
-            return GetFallbackReply(messages);
+            _logger.LogError("AI provider is not configured: NVIDIA_API_KEY or AiSettings:ApiKey is missing.");
+            return "AI үйлчилгээний NVIDIA API түлхүүр тохируулагдаагүй байна. NVIDIA_API_KEY орчны хувьсагч эсвэл AiSettings:ApiKey тохируулаад API серверээ дахин эхлүүлнэ үү.";
         }
 
         try
@@ -72,9 +72,11 @@ public class DefaultAiProvider : IAiProvider
 
             if (!response.IsSuccessStatusCode)
             {
-                var errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
-                _logger.LogError("AI API алдаа: {Status} - {Body}", response.StatusCode, errorBody);
-                return GetFallbackReply(messages);
+                _logger.LogError(
+                    "AI API returned HTTP {StatusCode} for model {Model}.",
+                    (int)response.StatusCode,
+                    model);
+                return GetProviderErrorReply(response.StatusCode, model);
             }
 
             using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
@@ -83,7 +85,7 @@ public class DefaultAiProvider : IAiProvider
             if (!json.RootElement.TryGetProperty("choices", out var choices) || choices.GetArrayLength() == 0)
             {
                 _logger.LogError("AI API хариу хүлээгдэж байсан 'choices' талбаргүй ирлээ.");
-                return GetFallbackReply(messages);
+                return "AI provider-ийн хариу танигдахгүй байна. Загварын endpoint болон серверийн тохиргоог шалгана уу.";
             }
 
             var reply = choices[0]
@@ -91,9 +93,19 @@ public class DefaultAiProvider : IAiProvider
                 .GetProperty("content")
                 .GetString();
 
-            return string.IsNullOrWhiteSpace(reply) ? GetFallbackReply(messages) : reply.Trim();
+            if (string.IsNullOrWhiteSpace(reply))
+            {
+                _logger.LogError("AI API returned an empty reply.");
+                return "AI provider хоосон хариу буцаалаа. Дахин оролдоно уу.";
+            }
+
+            return reply.Trim();
         }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (OperationCanceledException)
         {
             _logger.LogWarning("AI API хүсэлт 45 секундийн дотор хариу өгсөнгүй (timeout).");
             return "Уучлаарай, AI сервер одоо удаашралтай байна. Түр хүлээгээд дахин оролдоно уу.";
@@ -101,13 +113,34 @@ public class DefaultAiProvider : IAiProvider
         catch (HttpRequestException ex)
         {
             _logger.LogError(ex, "AI provider-тэй сүлжээний холболт амжилтгүй боллоо.");
-            return GetFallbackReply(messages);
+            return "AI үйлчилгээний серверт холбогдож чадсангүй. Сүлжээ болон AI provider-ийн хаягийг шалгаад дахин оролдоно уу.";
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "AI provider дуудлага амжилтгүй боллоо.");
-            return GetFallbackReply(messages);
+            return "AI үйлчилгээ одоогоор хариу боловсруулах боломжгүй байна. Серверийн log-ийг шалгаад дахин оролдоно уу.";
         }
+    }
+
+    private static string GetProviderErrorReply(System.Net.HttpStatusCode statusCode, string model)
+    {
+        return statusCode switch
+        {
+            System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden =>
+                "AI үйлчилгээний API түлхүүр хүчингүй эсвэл энэ загварт хандах эрхгүй байна. NVIDIA_API_KEY болон загварын эрхийг шалгана уу.",
+            System.Net.HttpStatusCode.TooManyRequests =>
+                "AI үйлчилгээний хүсэлтийн хязгаар эсвэл кредит дууссан байна. Provider-ийн usage/billing тохиргоог шалгана уу.",
+            System.Net.HttpStatusCode.Gone =>
+                $"NVIDIA API энэ model-ийг ашиглах боломжгүй гэж буцаалаа: {model}. AI тохиргооны model болон API access-ийг шалгана уу.",
+            System.Net.HttpStatusCode.NotFound =>
+                $"NVIDIA API тохируулсан model эсвэл endpoint-ийг олсонгүй: {model}. AI тохиргоог шалгана уу.",
+            System.Net.HttpStatusCode.BadRequest =>
+                "AI үйлчилгээ хүсэлтийг хүлээн авсангүй. Загварын нэр болон provider-ийн тохиргоог шалгана уу.",
+            _ when (int)statusCode >= 500 =>
+                "AI provider дээр түр саатал гарлаа. Хэсэг хүлээгээд дахин оролдоно уу.",
+            _ =>
+                $"AI үйлчилгээ хүсэлтийг боловсруулж чадсангүй (HTTP {(int)statusCode}). Серверийн log-ийг шалгана уу."
+        };
     }
 
     private static string? FirstNonEmpty(params string?[] values)
@@ -115,36 +148,4 @@ public class DefaultAiProvider : IAiProvider
         return values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
     }
 
-    /// <summary>
-    /// AI provider ажиллахгүй тохиолдолд хэрэглэгчид ядаж чиглүүлэх энгийн хариулт.
-    /// Жинхэнэ AI хариулт биш гэдгийг тодорхой илэрхийлнэ.
-    /// </summary>
-    private static string GetFallbackReply(List<(string Role, string Content)> messages)
-    {
-        var lastUserMessage = messages.LastOrDefault(m => m.Role == "user").Content ?? string.Empty;
-
-        if (string.IsNullOrWhiteSpace(lastUserMessage))
-            return "Сайн байна уу! Танд туслахад бэлэн байна, гэхдээ AI үйлчилгээ түр боломжгүй байна.";
-
-        var lower = lastUserMessage.ToLowerInvariant();
-
-        string note = "\n\n_(Тэмдэглэл: AI үйлчилгээ түр боломжгүй тул автомат хариулт өгч байна.)_";
-
-        if (lower.Contains("амралт") || lower.Contains("leave") || lower.Contains("чөлөө"))
-            return "Амралтын хүсэлт гаргахын тулд 'Амралт' хэсэгт орж шинэ хүсэлт үүсгэнэ үү. Үлдсэн амралтын хоногоо профайл хэсгээс шалгаж болно." + note;
-
-        if (lower.Contains("ирц") || lower.Contains("attendance") || lower.Contains("check"))
-            return "Ирцийн мэдээллээ 'Ирц' хэсгээс шалгаж болно. Ирэх, явах товчоор бүртгэл хийгдэнэ." + note;
-
-        if (lower.Contains("цалин") || lower.Contains("salary"))
-            return "Цалингийн мэдээллийн талаар дэлгэрэнгүй мэдэхийн тулд HR хэлтэстэй шууд холбогдоорой." + note;
-
-        if (lower.Contains("хууль") || lower.Contains("эрх зүй") || lower.Contains("журам") || lower.Contains("бодлого"))
-            return "Хөдөлмөрийн эрх зүй болон компанийн бодлогын тодорхой асуултад одоогоор хариулах боломжгүй байна. HR хэлтэс эсвэл компанийн дотоод журмын баримтаас шалгаарай." + note;
-
-        if (lower.Contains("илүү цаг") || lower.Contains("overtime") || lower.Contains("тооцоо"))
-            return "Илүү цаг, цалингийн тооцооллын дэлгэрэнгүйг одоогоор гаргаж чадахгүй байна. HR хэлтэстэй холбогдож нарийвчилсан тооцооллыг авна уу." + note;
-
-        return $"Таны асуултыг хүлээн авлаа: \"{lastUserMessage}\". Одоогоор AI үйлчилгээ боломжгүй байна — HR-тэй холбогдож тодруулга авахыг зөвлөж байна." + note;
-    }
 }

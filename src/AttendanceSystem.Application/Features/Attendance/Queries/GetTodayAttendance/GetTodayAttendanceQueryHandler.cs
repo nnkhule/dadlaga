@@ -30,6 +30,6 @@ public class GetTodayAttendanceQueryHandler : IRequestHandler<GetTodayAttendance
         return Result<AttendanceRecordDto?>.Success(new AttendanceRecordDto(
             record.Id, record.EmployeeId, record.Date, record.CheckInTime, record.CheckOutTime,
             record.Status, record.OvertimeHours, record.LateMinutes, record.ShortHours, record.VerificationMethod,
-            record.IsSuspicious, record.IsAutoGeo));
+            record.IsSuspicious, record.IsAutoGeo, record.BreakDuration));
     }
 }

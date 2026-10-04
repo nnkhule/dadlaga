@@ -1,7 +1,8 @@
 @page "/admin/ai-chat"
 @layout AdminLayout
-@using System.Net.Http.Json
-@inject HttpClient Http
+@using AttendanceSystem.Application.DTOs.AI
+@inject ApiClient Api
+@inject ILogger<AiChat> Logger
 @inject IJSRuntime JS
 @attribute [Authorize(Roles = AppRoles.SuperAdmin + "," + AppRoles.HrManager + "," + AppRoles.DepartmentHead)]
 
@@ -130,43 +131,30 @@
         {
             var historyPayload = messages
                 .Where(m => m.Role == "user" || m.Role == "assistant")
-                .Select(m => new { role = m.Role, content = m.Content })
+                .Select(m => new ChatMessageDto { Role = m.Role, Content = m.Content })
                 .ToList();
 
-            var requestBody = new
+            var result = await Api.PostAdminChatAsync(new ChatRequestDto
             {
-                message = userMessage,
-                history = historyPayload.Take(historyPayload.Count - 1) // өмнөх түүх (сонгож илгээх)
-            };
-
-            var response = await Http.PostAsJsonAsync("api/ai/admin/chat", requestBody);
-
-            if (response.IsSuccessStatusCode)
-            {
-                var result = await response.Content.ReadFromJsonAsync<ChatResponseModel>();
-                messages.Add(new ChatMessageItem
-                {
-                    Role = "assistant",
-                    Content = result?.Reply ?? "Уучлаарай, хариулт авч чадсангүй.",
-                    Timestamp = DateTime.Now
-                });
-            }
-            else
-            {
-                messages.Add(new ChatMessageItem
-                {
-                    Role = "assistant",
-                    Content = "Алдаа гарлаа. Дахин оролдоно уу.",
-                    Timestamp = DateTime.Now
-                });
-            }
-        }
-        catch (Exception)
-        {
+                Message = userMessage,
+                History = historyPayload.Take(historyPayload.Count - 1).ToList()
+            });
             messages.Add(new ChatMessageItem
             {
                 Role = "assistant",
-                Content = "Сервертэй холбогдоход алдаа гарлаа.",
+                Content = result?.Reply ?? "AI үйлчилгээнээс хариу ирсэнгүй. Дахин оролдоно уу.",
+                Timestamp = DateTime.Now
+            });
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Admin AI chat request failed.");
+            messages.Add(new ChatMessageItem
+            {
+                Role = "assistant",
+                Content = ex is UnauthorizedAccessException
+                    ? "Нэвтрэх эрхийн хугацаа дууссан байна. Дахин нэвтэрч оролдоно уу."
+                    : "AI чат хүсэлт амжилтгүй боллоо. Сүлжээ болон AI үйлчилгээний тохиргоог шалгаад дахин оролдоно уу.",
                 Timestamp = DateTime.Now
             });
         }
@@ -203,9 +191,4 @@
         public DateTime Timestamp { get; set; }
     }
 
-    private class ChatResponseModel
-    {
-        public string Reply { get; set; } = string.Empty;
-        public DateTime Timestamp { get; set; }
-    }
 }

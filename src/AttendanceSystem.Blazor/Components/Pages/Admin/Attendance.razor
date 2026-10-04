@@ -3,6 +3,7 @@
 @attribute [Authorize(Roles = "SuperAdmin,HRManager")]
 @inject ApiClient Api
 @inject IJSRuntime JS
+@inject AttendanceSystem.Application.Common.IClock Clock
 
 <PageHeader Title="Ирцийн бүртгэл" Subtitle="Бодит цагийн ирц — SQL Server-ээс шууд" Icon="◈">
     
@@ -85,6 +86,7 @@
                     <option value="NightShift">Шөнийн ээлж</option>
                     <option value="WeekendWork">Амралтын өдөр</option>
                     <option value="PendingManualReview">Хяналт хүлээгдэж буй</option>
+                    <option value="suspicious">Сэжигтэй бүртгэл</option>
                 </select>
             </div>
 
@@ -127,6 +129,7 @@
                             Огноо <span class="att-sort-arrow">@SortArrow("date")</span>
                         </th>
                         <th>Ирэх / Явах</th>
+                        <th>Хяналт</th>
                         <th @onclick='() => SetSort("late")' class="att-th-sortable @SortClass("late")">
                             Хоцролт <span class="att-sort-arrow">@SortArrow("late")</span>
                         </th>
@@ -147,7 +150,7 @@
                     @if (displayed.Count == 0)
                     {
                         <tr>
-                            <td colspan="7" class="att-empty">
+                            <td colspan="9" class="att-empty">
                                 <div class="att-empty-inner">
                                     <div class="att-empty-icon">📋</div>
                                     <div class="att-empty-text">
@@ -178,6 +181,16 @@
                                         <span class="att-time-sep">→</span>
                                         <span class="att-time att-time--out">@(r.CheckOutTime?.ToString("HH:mm") ?? "--")</span>
                                     </div>
+                                </td>
+                                <td>
+                                    @if (r.IsSuspicious)
+                                    {
+                                        <span class="att-late-chip" title="Эрт, хэт орой эсвэл байршлын зөрүүтэй бүртгэл">⚠ Хянах</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="att-ok-dash">—</span>
+                                    }
                                 </td>
                                 <td>
                                     @if (r.LateMinutes > 0)
@@ -250,6 +263,12 @@
             <button class="att-drawer-close" @onclick="CloseDetail">✕</button>
         </div>
         <div class="att-drawer-body">
+            @if (detailRecord.IsSuspicious)
+            {
+                <div class="alert alert-warning" role="status">
+                    ⚠ Энэ бүртгэлийг хянах шаардлагатай: цаг хуваариас хэт зөрсөн эсвэл байршлын зөрүү илэрсэн.
+                </div>
+            }
             <div class="att-detail-grid">
                 <div class="att-detail-item">
                     <span class="att-detail-label">Ирсэн цаг</span>
@@ -443,7 +462,7 @@
 
 @code {
     // ── State ──────────────────────────────────────────────────────────────
-    private DateOnly date = DateOnly.FromDateTime(DateTime.Today);
+    private DateOnly date;
     private string? departmentId;
     private string searchQuery = string.Empty;
     private string statusFilter = string.Empty;
@@ -479,6 +498,7 @@
     // ── Lifecycle ──────────────────────────────────────────────────────────
     protected override async Task OnInitializedAsync()
     {
+        date = Clock.TodayLocal;
         var deptResult = await Api.GetAsync<PagedResponse<DepartmentDto>>("api/departments?pageNumber=1&pageSize=1000");
         departments = deptResult?.Items ?? [];
         await LoadAsync();
@@ -530,7 +550,8 @@
         displayed = records
             .Where(r =>
                 (string.IsNullOrEmpty(q) || (r.EmployeeName ?? "").ToLowerInvariant().Contains(q)) &&
-                (string.IsNullOrEmpty(statusFilter) || StatusKey(r) == statusFilter.ToLowerInvariant()))
+                (string.IsNullOrEmpty(statusFilter) ||
+                 (statusFilter == "suspicious" ? r.IsSuspicious : StatusKey(r) == statusFilter.ToLowerInvariant())))
             .ToList();
 
         displayed = sortField switch

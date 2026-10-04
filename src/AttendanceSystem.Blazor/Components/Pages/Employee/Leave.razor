@@ -141,7 +141,7 @@
                     <!-- Reason -->
                     <div class="form-group">
                         <label>Шалтгаан</label>
-                        <InputTextArea class="form-control" @bind-Value="request.Reason" @bind-Value:event="oninput" rows="4" />
+                        <InputTextArea class="form-control" @bind-Value="request.Reason" rows="4" />
                         <ValidationMessage For="@(() => request.Reason)" />
                         <small class="muted">@request.Reason?.Length  / 500 тэмдэгт</small>
                     </div>
@@ -441,27 +441,30 @@
             var historyResult = await Api.GetAsync<PagedResponse<LeaveDto>>("api/leave/history");
             history = historyResult?.Items?.OrderByDescending(x => x.StartDate).ThenByDescending(x => x.CreatedAt).ToList() ?? [];
         }
-        catch
+        catch (Exception ex)
         {
             history = [];
+            error = $"Чөлөөний түүх ачаалж чадсангүй: {ex.Message}";
         }
 
         try
         {
             balance = await Api.GetAsync<LeaveBalanceSummary>("api/leave/statistics");
         }
-        catch
+        catch (Exception ex)
         {
             balance = null;
+            error ??= $"Чөлөөний үлдэгдэл ачаалж чадсангүй: {ex.Message}";
         }
 
         try
         {
             calendar = await Api.GetAsync<LeaveCalendarResponse>("api/leave/calendar");
         }
-        catch
+        catch (Exception ex)
         {
             calendar = null;
+            error ??= $"Чөлөөний календарь ачаалж чадсангүй: {ex.Message}";
         }
 
         loadingHistory = false;
@@ -556,13 +559,6 @@
             submitSuccess = true;
             StateHasChanged();
             await LoadAsync();
-
-            _ = Task.Run(async () =>
-            {
-                await Task.Delay(2000);
-                submitSuccess = false;
-                StateHasChanged();
-            });
 
             request = new LeaveForm
             {
@@ -715,4 +711,3 @@
         public string Reason { get; set; } = string.Empty;
     }
 }
-

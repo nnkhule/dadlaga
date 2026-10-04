@@ -7,7 +7,7 @@ namespace AttendanceSystem.Infrastructure.Services
     {
         public DateTime UtcNow => DateTime.UtcNow;
 
-        public DateTime LocalNow => UtcNow.AddHours(8);
+        public DateTime LocalNow => AttendanceTimeZone.ToLocalTime(UtcNow);
 
         public DateOnly TodayLocal => DateOnly.FromDateTime(LocalNow);
     }

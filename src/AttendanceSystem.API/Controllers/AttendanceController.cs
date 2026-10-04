@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using AttendanceSystem.Application.Common;
 using AttendanceSystem.Application.Features.Attendance.Commands.CheckIn;
 using AttendanceSystem.Application.Features.Attendance.Commands.CheckOut;
 using AttendanceSystem.Application.Features.Attendance.Queries.GetAttendanceStatistics;
@@ -22,12 +23,18 @@ public class AttendanceController : ControllerBase
     private readonly IMediator _mediator;
     private readonly ApplicationDbContext _db;
     private readonly ILogger<AttendanceController> _logger;
+    private readonly IClock _clock;
 
-    public AttendanceController(IMediator mediator, ApplicationDbContext db, ILogger<AttendanceController> logger)
+    public AttendanceController(
+        IMediator mediator,
+        ApplicationDbContext db,
+        ILogger<AttendanceController> logger,
+        IClock clock)
     {
         _mediator = mediator;
         _db = db;
         _logger = logger;
+        _clock = clock;
     }
 
     [HttpPost("checkin")]
@@ -37,7 +44,7 @@ public class AttendanceController : ControllerBase
         if (employeeId is null)
             return BadRequest(new ApiErrorResponse("Employee profile not linked to user."));
 
-        var today = DateOnly.FromDateTime(DateTime.Now);
+        var today = _clock.TodayLocal;
         var approvedLeave = await _db.LeaveRequests
             .AsNoTracking()
             .Where(l => l.EmployeeId == employeeId.Value &&
@@ -45,7 +52,7 @@ public class AttendanceController : ControllerBase
                         l.StartDate <= today && l.EndDate >= today)
             .Select(l => new { l.LeaveMode, l.StartTime, l.EndTime })
             .ToListAsync(cancellationToken);
-        var now = TimeOnly.FromDateTime(DateTime.Now);
+        var now = TimeOnly.FromDateTime(_clock.LocalNow);
         if (approvedLeave.Any(l => l.LeaveMode == "Daily" ||
             (l.StartTime.HasValue && l.EndTime.HasValue && now >= l.StartTime.Value && now < l.EndTime.Value)))
         {
@@ -108,7 +115,8 @@ public class AttendanceController : ControllerBase
         var statusStr = AttendanceStatusClassifier.ToDisplayName(a.Status);
 
         var workHours = a.CheckOutTime.HasValue
-            ? Math.Round((decimal)(a.CheckOutTime.Value - a.CheckInTime).TotalHours, 2)
+            ? Math.Max(0, Math.Round((decimal)(a.CheckOutTime.Value - a.CheckInTime).TotalHours
+                - (decimal)(a.BreakDuration?.TotalHours ?? 0), 2))
             : 0;
 
         var todayResponse = new TodayAttendanceApiDto(
@@ -139,7 +147,7 @@ public class AttendanceController : ControllerBase
         if (employeeId is null)
             return BadRequest(new ApiErrorResponse("Employee profile not linked to user."));
 
-        var today = DateOnly.FromDateTime(DateTime.Now);
+        var today = _clock.TodayLocal;
         var start = from ?? new DateOnly(today.Year, today.Month, 1);
         var end = to ?? today;
 
@@ -174,7 +182,7 @@ public class AttendanceController : ControllerBase
 
         pageNumber = Math.Max(1, pageNumber);
         pageSize = Math.Clamp(pageSize, 1, 100);
-        var today = DateOnly.FromDateTime(DateTime.Now);
+        var today = _clock.TodayLocal;
         var start = from ?? today.AddDays(-30);
         var end = to ?? today;
 
@@ -198,9 +206,11 @@ public class AttendanceController : ControllerBase
                 a.Date,
                 a.CheckInTime,
                 a.CheckOutTime,
+                a.BreakDuration,
                 a.OvertimeHours,
                 a.ShortHours,
                 a.LateMinutes,
+                a.IsSuspicious,
                 VerificationMethod = a.VerificationMethod,
                 a.Status
             })
@@ -210,7 +220,8 @@ public class AttendanceController : ControllerBase
         {
             var statusStr = AttendanceStatusClassifier.ToDisplayName(a.Status);
             var workHours = a.CheckOutTime.HasValue
-                ? Math.Round((decimal)(a.CheckOutTime.Value - a.CheckInTime).TotalHours, 2)
+                ? Math.Max(0, Math.Round((decimal)(a.CheckOutTime.Value - a.CheckInTime).TotalHours
+                    - (decimal)(a.BreakDuration?.TotalHours ?? 0), 2))
                 : 0;
 
             return new AttendanceHistoryApiDto(
@@ -219,7 +230,8 @@ public class AttendanceController : ControllerBase
                 workHours, a.OvertimeHours, a.OvertimeHours, a.ShortHours, a.LateMinutes,
                 a.VerificationMethod.ToString(),
                 statusStr,
-                statusStr);
+                statusStr,
+                a.IsSuspicious);
         }).ToList();
 
         return Ok(new PagedResponseDto<AttendanceHistoryApiDto>(items, pageNumber, pageSize, total));
@@ -236,7 +248,7 @@ public class AttendanceController : ControllerBase
     {
         pageNumber = Math.Max(1, pageNumber);
         pageSize = Math.Clamp(pageSize, 1, 200);
-        var today = DateOnly.FromDateTime(DateTime.Now);
+        var today = _clock.TodayLocal;
         var start = from ?? today;
         var end = to ?? today;
 
@@ -264,9 +276,11 @@ public class AttendanceController : ControllerBase
                 a.Date,
                 a.CheckInTime,
                 a.CheckOutTime,
+                a.BreakDuration,
                 a.OvertimeHours,
                 a.ShortHours,
                 a.LateMinutes,
+                a.IsSuspicious,
                 VerificationMethod = a.VerificationMethod,
                 a.Status
             })
@@ -276,7 +290,8 @@ public class AttendanceController : ControllerBase
         {
             var statusStr = AttendanceStatusClassifier.ToDisplayName(a.Status);
             var workHours = a.CheckOutTime.HasValue
-                ? Math.Round((decimal)(a.CheckOutTime.Value - a.CheckInTime).TotalHours, 2)
+                ? Math.Max(0, Math.Round((decimal)(a.CheckOutTime.Value - a.CheckInTime).TotalHours
+                    - (decimal)(a.BreakDuration?.TotalHours ?? 0), 2))
                 : 0;
 
             return new AttendanceHistoryApiDto(
@@ -285,7 +300,8 @@ public class AttendanceController : ControllerBase
                 workHours, a.OvertimeHours, a.ShortHours, a.OvertimeHours, a.LateMinutes,
                 a.VerificationMethod.ToString(),
                 statusStr,
-                statusStr);
+                statusStr,
+                a.IsSuspicious);
         }).ToList();
 
         return Ok(new PagedResponseDto<AttendanceHistoryApiDto>(items, pageNumber, pageSize, total));
@@ -374,7 +390,7 @@ public sealed record AttendanceHistoryApiDto(
     Guid Id, Guid? EmployeeId, string? EmployeeName, DateOnly Date,
     DateTime? CheckInTime, DateTime? CheckOutTime,
     decimal WorkHours, decimal Overtime, decimal OvertimeHours, decimal ShortHours, decimal LateMinutes,
-    string? VerificationMethod, string? AttendanceStatus, string? Status);
+    string? VerificationMethod, string? AttendanceStatus, string? Status, bool IsSuspicious = false);
 
 public sealed record LocationValidationRequestApiDto(double Latitude, double Longitude);
 public sealed record LocationValidationApiDto(

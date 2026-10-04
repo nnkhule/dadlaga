@@ -6,9 +6,10 @@
 @inject ApiClient Api
 @inject IJSRuntime JS
 @inject NavigationManager Nav
+@inject AttendanceSystem.Application.Common.IClock Clock
 
 <PageHeader Title="Хянах самбар"
-            Subtitle="@($"{DateTime.Today:yyyy оны MM сарын dd} • {GetWeekLabel()}")"
+            Subtitle="@($"{Clock.TodayLocal:yyyy оны MM сарын dd} • {GetWeekLabel()}")"
             Icon="▦" />
 
 <div class="page-stack">
@@ -185,7 +186,7 @@
                 <h2>Өнөөдрийн ирцийн хуваарилалт</h2>
 
                 <span class="muted">
-                    @DateTime.Today.ToString("MM/dd")
+                    @Clock.TodayLocal.ToString("MM/dd")
                 </span>
             </div>
 
@@ -900,7 +901,7 @@
 
     private bool _disposed;
 
-    private DateTime _lastUpdated = DateTime.Now;
+    private DateTime _lastUpdated;
 
     private PeriodicTimer? _timer;
 
@@ -1012,7 +1013,7 @@
 
         try
         {
-            var today = DateTime.Today.ToString("yyyy-MM-dd");
+            var today = Clock.TodayLocal.ToString("yyyy-MM-dd");
 
             var summaryTask =
                 Api.GetDashboardSummaryAsync();
@@ -1066,7 +1067,7 @@
                 departmentsResult?.Items ?? [];
 
 
-            _lastUpdated = DateTime.Now;
+            _lastUpdated = Clock.LocalNow;
 
             EnsureValidPage();
 
@@ -1489,7 +1490,7 @@
 
         await JS.InvokeVoidAsync(
             "downloadCsv",
-            $"irts_{DateTime.Today:yyyy-MM-dd}.csv",
+            $"irts_{Clock.TodayLocal:yyyy-MM-dd}.csv",
             csv
         );
     }
@@ -1505,11 +1506,9 @@
     }
 
 
-    private static string GetWeekLabel()
+    private string GetWeekLabel()
     {
-        var date =
-            DateTime.Today;
-
+        var date = Clock.TodayLocal;
         var dayOfYear =
             date.DayOfYear;
 
@@ -1818,11 +1817,10 @@
         };
 
 
-    private static string RelativeTime(
+    private string RelativeTime(
         DateTime value)
     {
-        var diff =
-            DateTime.Now - value;
+        var diff = Clock.LocalNow - value;
 
         if (diff.TotalDays >= 1)
             return $"{(int)diff.TotalDays} өдрийн өмнө";

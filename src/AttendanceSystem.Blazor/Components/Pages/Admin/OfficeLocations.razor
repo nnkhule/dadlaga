@@ -1,0 +1,232 @@
+@page "/admin/office-locations"
+@layout AdminLayout
+@attribute [Authorize(Roles = AppRoles.SuperAdmin + "," + AppRoles.HrManager)]
+@inject ApiClient Api
+
+<PageHeader Title="Оффисын байршил" Subtitle="GPS баталгаажуулалтын байршил болон зөвшөөрөгдөх хүрээг тохируулна" Icon="⌖">
+    <Actions>
+        <button class="btn btn-primary" @onclick="StartNew">+ Оффис нэмэх</button>
+    </Actions>
+</PageHeader>
+
+<div class="page-stack">
+    @if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <div class="alert alert-danger" role="alert">@_error</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(_success))
+    {
+        <div class="alert alert-success" role="status">@_success</div>
+    }
+
+    @if (_isLoading)
+    {
+        <div class="card"><div class="loading-state"><div class="spinner"></div><span>Байршлуудыг ачааллаж байна...</span></div></div>
+    }
+    else
+    {
+        <div class="row g-4">
+            <div class="col-12 col-xl-5">
+                <section class="card">
+                    <div class="section-title"><h2>Бүртгэлтэй оффисууд</h2></div>
+                    @if (_offices.Count == 0)
+                    {
+                        <div class="empty-state">
+                            <div class="empty-state-icon">⌖</div>
+                            <strong>Оффисын байршил бүртгээгүй байна</strong>
+                            <p>GPS check-in ашиглахын тулд оффисын координатыг нэмнэ үү.</p>
+                            <button class="btn btn-primary" @onclick="StartNew">+ Оффис нэмэх</button>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr><th>Нэр</th><th>Хүрээ</th><th>Төлөв</th><th></th></tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var office in _offices)
+                                    {
+                                        <tr>
+                                            <td>
+                                                <strong>@office.Name</strong>
+                                                <div class="muted small">@office.Latitude.ToString("F6"), @office.Longitude.ToString("F6")</div>
+                                            </td>
+                                            <td>@office.RadiusMeters м</td>
+                                            <td><span class="badge @(office.IsActive ? "bg-success" : "bg-secondary")">@(office.IsActive ? "Идэвхтэй" : "Идэвхгүй")</span></td>
+                                            <td><button class="btn btn-ghost btn-sm" @onclick="() => Edit(office)">Засах</button></td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </section>
+            </div>
+
+            <div class="col-12 col-xl-7">
+                <section class="card">
+                    <div class="section-title"><h2>@(_isNew ? "Шинэ оффис" : "Байршил засах")</h2></div>
+                    <EditForm Model="_form" OnValidSubmit="SaveAsync">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary class="text-danger" />
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <label class="form-label" for="office-name">Оффисын нэр</label>
+                                <InputText id="office-name" class="form-control" @bind-Value="_form.Name" maxlength="200" />
+                                <ValidationMessage For="@(() => _form.Name)" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="office-lat">Өргөрөг (Latitude)</label>
+                                <InputNumber id="office-lat" class="form-control" @bind-Value="_form.Latitude" step="0.000001" />
+                                <ValidationMessage For="@(() => _form.Latitude)" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="office-lng">Уртраг (Longitude)</label>
+                                <InputNumber id="office-lng" class="form-control" @bind-Value="_form.Longitude" step="0.000001" />
+                                <ValidationMessage For="@(() => _form.Longitude)" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="office-radius">GPS зөвшөөрөх хүрээ (метр)</label>
+                                <InputNumber id="office-radius" class="form-control" @bind-Value="_form.RadiusMeters" />
+                                <ValidationMessage For="@(() => _form.RadiusMeters)" />
+                            </div>
+                            <div class="col-md-6 d-flex align-items-end">
+                                <div class="form-check mb-2">
+                                    <InputCheckbox id="office-active" class="form-check-input" @bind-Value="_form.IsActive" />
+                                    <label class="form-check-label" for="office-active">Идэвхтэй оффис</label>
+                                </div>
+                            </div>
+                            <div class="col-12 d-flex flex-wrap gap-2">
+                                <button class="btn btn-primary" type="submit" disabled="@_isSaving">
+                                    @(_isSaving ? "Хадгалж байна..." : "Хадгалах")
+                                </button>
+                                @if (!_isNew)
+                                {
+                                    <button class="btn btn-ghost" type="button" @onclick="StartNew">Шинээр нэмэх</button>
+                                }
+                                <a class="btn btn-ghost" href="@MapUrl" target="_blank" rel="noopener noreferrer">Газрын зурагт харах ↗</a>
+                            </div>
+                        </div>
+                    </EditForm>
+                    <p class="muted small mt-3 mb-0">Координатыг газрын зурагнаас авч оруулна. Хүрээ нь төв цэгээс метрээр хэмжигдэнэ.</p>
+                </section>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private IReadOnlyList<OfficeLocationSettingsDto> _offices = [];
+    private OfficeLocationForm _form = new();
+    private Guid? _editingId;
+    private bool _isLoading = true;
+    private bool _isSaving;
+    private bool _isNew = true;
+    private string? _error;
+    private string? _success;
+
+    private string MapUrl =>
+        $"https://www.google.com/maps/search/?api=1&query={_form.Latitude.ToString(System.Globalization.CultureInfo.InvariantCulture)},{_form.Longitude.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            _offices = await Api.GetAsync<IReadOnlyList<OfficeLocationSettingsDto>>("api/settings/office-locations") ?? [];
+            _error = null;
+        }
+        catch (HttpRequestException ex)
+        {
+            _error = $"Оффисын мэдээлэл татаж чадсангүй: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void StartNew()
+    {
+        _editingId = null;
+        _isNew = true;
+        _form = new OfficeLocationForm();
+        _error = null;
+        _success = null;
+    }
+
+    private void Edit(OfficeLocationSettingsDto office)
+    {
+        _editingId = office.Id;
+        _isNew = false;
+        _form = new OfficeLocationForm
+        {
+            Name = office.Name,
+            Latitude = office.Latitude,
+            Longitude = office.Longitude,
+            RadiusMeters = office.RadiusMeters,
+            IsActive = office.IsActive
+        };
+        _error = null;
+        _success = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        _isSaving = true;
+        _error = null;
+        _success = null;
+        try
+        {
+            var request = new SaveOfficeLocationDto(
+                _form.Name.Trim(), _form.Latitude, _form.Longitude, _form.RadiusMeters, _form.IsActive);
+            using var response = _isNew
+                ? await Api.PostAsync("api/settings/office-locations", request)
+                : await Api.PutAsync($"api/settings/office-locations/{_editingId}", request);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var detail = await response.Content.ReadAsStringAsync();
+                _error = string.IsNullOrWhiteSpace(detail)
+                    ? $"Хадгалж чадсангүй (HTTP {(int)response.StatusCode})."
+                    : $"Хадгалж чадсангүй: {detail}";
+                return;
+            }
+
+            _success = _isNew ? "Оффис амжилттай нэмэгдлээ." : "Оффисын байршил шинэчлэгдлээ.";
+            await LoadAsync();
+            if (_isNew)
+                StartNew();
+        }
+        catch (HttpRequestException ex)
+        {
+            _error = $"Хадгалж чадсангүй: {ex.Message}";
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private sealed class OfficeLocationForm
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Оффисын нэр оруулна уу.")]
+        [System.ComponentModel.DataAnnotations.StringLength(200)]
+        public string Name { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Range(-90, 90, ErrorMessage = "Өргөрөг -90–90 хооронд байна.")]
+        public double Latitude { get; set; } = 47.912216;
+
+        [System.ComponentModel.DataAnnotations.Range(-180, 180, ErrorMessage = "Уртраг -180–180 хооронд байна.")]
+        public double Longitude { get; set; } = 106.931346;
+
+        [System.ComponentModel.DataAnnotations.Range(1, 50000, ErrorMessage = "Хүрээ 1–50000 метр байна.")]
+        public int RadiusMeters { get; set; } = 100;
+
+        public bool IsActive { get; set; } = true;
+    }
+}

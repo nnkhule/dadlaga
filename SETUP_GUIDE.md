@@ -110,8 +110,8 @@ docker compose up -d
 Edit constants in `AttendanceSystem.Blazor/Components/Pages/AttendanceCheckin.razor`:
 
 ```csharp
-private const double OFFICE_LATITUDE = 47.9123;
-private const double OFFICE_LONGITUDE = 106.9318;
+private const double OFFICE_LATITUDE = 47.5444;
+private const double OFFICE_LONGITUDE = 106.5542;
 private const double GEOFENCE_RADIUS_KM = 0.5; // 500 meters
 ```
 

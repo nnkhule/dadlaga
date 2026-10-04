@@ -70,26 +70,21 @@ public class CheckInCommandHandler : IRequestHandler<CheckInCommand, Result<Atte
         {
             status = AttendanceStatus.PendingManualReview;
         }
-        else if (request.Latitude is null || request.Longitude is null)
-        {
-            return Result<AttendanceRecordDto>.Failure("GPS coordinates required.", "GPS_REQUIRED");
-        }
-        else if (!_geofenceService.IsWithinRadius(
-                     request.Latitude.Value, request.Longitude.Value,
-                     office.Latitude, office.Longitude, office.RadiusMeters))
-        {
-            var distance = _geofenceService.CalculateDistanceMeters(
-                request.Latitude.Value, request.Longitude.Value, office.Latitude, office.Longitude);
-            if (distance > _options.Value.SuspiciousDistanceMeters)
-                isSuspicious = true;
-            return Result<AttendanceRecordDto>.Failure("Та ажлын байрнаас хол байна", "OUT_OF_RANGE");
-        }
         else
         {
             var evaluation = await _rulesService.EvaluateCheckIn(checkInTime, schedule);
             status = evaluation.Status;
             lateMinutes = evaluation.LateMinutes;
-            if (evaluation.IsVeryEarly)
+            var suspiciousLateMinutes = Math.Max(0, _options.Value.SuspiciousCheckinThresholdHours) * 60m;
+            if (evaluation.IsVeryEarly || (suspiciousLateMinutes > 0 && lateMinutes >= suspiciousLateMinutes))
+                isSuspicious = true;
+        }
+
+        if (request.Latitude is not null && request.Longitude is not null)
+        {
+            var distance = _geofenceService.CalculateDistanceMeters(
+                request.Latitude.Value, request.Longitude.Value, office.Latitude, office.Longitude);
+            if (distance > _options.Value.SuspiciousDistanceMeters)
                 isSuspicious = true;
         }
 
@@ -125,5 +120,6 @@ public class CheckInCommandHandler : IRequestHandler<CheckInCommand, Result<Atte
 
     private static AttendanceRecordDto MapToDto(AttendanceRecord r) => new(
         r.Id, r.EmployeeId, r.Date, r.CheckInTime, r.CheckOutTime,
-        r.Status, r.OvertimeHours, r.LateMinutes, r.ShortHours, r.VerificationMethod, r.IsSuspicious, r.IsAutoGeo);
+        r.Status, r.OvertimeHours, r.LateMinutes, r.ShortHours, r.VerificationMethod, r.IsSuspicious, r.IsAutoGeo,
+        r.BreakDuration);
 }

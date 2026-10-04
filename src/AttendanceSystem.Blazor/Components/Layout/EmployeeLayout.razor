@@ -45,7 +45,13 @@
 </div>
 
     </aside>
-    <main class="content-wrap">@Body</main>
+    <main class="content-wrap">
+        <header class="employee-topbar" aria-label="Мэдэгдэл">
+            <span>AttendIQ</span>
+            <NotificationBell />
+        </header>
+        @Body
+    </main>
     <nav class="mobile-bottom-nav">
         @NavItem("/attendance", "⌖", "Нүүр")
         @NavItem("/leave", "☑", "Чөлөө")
@@ -177,5 +183,13 @@
 
 .mt-3 {
     margin-top: 12px;
+}
+
+.employee-topbar {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    min-height: 44px;
+    margin: -8px 0 16px;
 }
 </style>

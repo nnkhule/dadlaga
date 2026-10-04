@@ -15,7 +15,7 @@ appsettings.Development.json
 *.json
 *.dll
 *.exe
-*pdb
+*.pdb
 *.xml
 *.ttf
 *.so

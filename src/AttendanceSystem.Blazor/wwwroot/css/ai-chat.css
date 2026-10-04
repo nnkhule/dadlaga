@@ -515,7 +515,7 @@
   .content-wrap { padding: 16px; }
   .page-header { align-items: flex-start; flex-direction: column; }
   .employee-grid { grid-template-columns: 1fr; }
-  .mobile-bottom-nav { display: grid; grid-template-columns: repeat(4,1fr); position: fixed; left: 0; right: 0; bottom: 0; height: 64px; background: var(--clr-surface); border-top: 1px solid var(--clr-border); z-index: 70; }
+  .mobile-bottom-nav { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); position: fixed; left: 0; right: 0; bottom: 0; height: 64px; background: var(--clr-surface); border-top: 1px solid var(--clr-border); z-index: 70; }
   .mobile-bottom-nav a { display: grid; place-items: center; gap: 2px; font-size: 11px; color: var(--clr-text-muted); border-top: 2px solid transparent; padding: 7px 4px; }
   .mobile-bottom-nav a.active { color: var(--clr-primary); border-top-color: var(--clr-primary); }
 }

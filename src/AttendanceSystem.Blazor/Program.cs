@@ -1,5 +1,6 @@
 using AttendanceSystem.Blazor.Components;
 using AttendanceSystem.Blazor.Services;
+using AttendanceSystem.Application.Common;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Components.Authorization;
 
@@ -37,6 +38,7 @@ builder.Services.AddScoped(sp => new HttpClient
 
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<ApiClient>();
+builder.Services.AddSingleton<IClock, BlazorClock>();
 
 var app = builder.Build();
 

@@ -18,7 +18,7 @@
     }
     else
     {
-        <div class="card" style="display:flex;align-items:center;gap:18px">
+        <div class="card profile-summary">
             @if (!string.IsNullOrWhiteSpace(profile.ProfilePhotoUrl))
             {
                 <img class="avatar"
@@ -34,7 +34,7 @@
                 </div>
             }
 
-            <div style="flex:1">
+            <div class="profile-summary-details">
                 <h2 style="margin:0">@profile.FullName</h2>
                 <div class="muted">@Display(profile.Position)</div>
                 <span class="badge badge-leave">
@@ -238,6 +238,46 @@
 
 .mt-3 {
     margin-top: 16px;
+}
+
+.profile-summary {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+}
+
+.profile-summary-details {
+    min-width: 0;
+    flex: 1;
+    overflow-wrap: anywhere;
+}
+
+.info-row {
+    gap: 12px;
+}
+
+.info-row strong {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    text-align: right;
+}
+
+@@media (max-width: 480px) {
+    .profile-summary {
+        flex-wrap: wrap;
+    }
+
+    .profile-summary-details {
+        flex: 1 1 calc(100% - 100px);
+    }
+
+    .profile-summary > button {
+        width: 100%;
+    }
+
+    .info-row {
+        align-items: flex-start;
+    }
 }
 </style>
 

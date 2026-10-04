@@ -11,7 +11,7 @@ public class WorkSchedule : BaseEntity
     public string Name { get; private set; } = string.Empty;
     public TimeOnly ShiftStart { get; private set; }
     public TimeOnly ShiftEnd { get; private set; }
-    public int GraceMinutes { get; private set; } = 10;
+    public int GraceMinutes { get; private set; }
     public WorkDays WorkDays { get; private set; } = WorkDays.Weekdays;
     public int BreakDurationMinutes { get; private set; } = 60;
     public decimal StandardHoursPerDay { get; private set; } = 8;
@@ -21,13 +21,13 @@ public class WorkSchedule : BaseEntity
 
     private WorkSchedule() { }
 
-    public static WorkSchedule CreateStandard(string name = "Standard 09-13,14-18")
+    public static WorkSchedule CreateStandard(string name = "Standard 08:00-17:00")
         => new()
         {
             Name = name,
-            ShiftStart = new TimeOnly(9, 0),
-            ShiftEnd = new TimeOnly(18, 0),
-            GraceMinutes = 10,
+            ShiftStart = new TimeOnly(8, 0),
+            ShiftEnd = new TimeOnly(17, 0),
+            GraceMinutes = 0,
             WorkDays = WorkDays.Weekdays,
             BreakDurationMinutes = 60,
             StandardHoursPerDay = 8m

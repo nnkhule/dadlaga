@@ -54,7 +54,6 @@ I've completely modernized the Attendance System with **beautiful UI/UX design**
 - ✅ Geofence map section (placeholder for interactive map)
 - ✅ Quick action buttons
 - ✅ Responsive grid layout
-- ✅ Sample data with 10 employees
 
 ---
 
@@ -338,8 +337,8 @@ Path: /admin/geofence → Real-time location tracking
 Edit in `AttendanceCheckin.razor` and `GeofenceMonitoring.razor`:
 
 ```csharp
-private const double OFFICE_LATITUDE = 47.9123;      // Change latitude
-private const double OFFICE_LONGITUDE = 106.9318;    // Change longitude
+private const double OFFICE_LATITUDE = 47.5444;      // Change latitude
+private const double OFFICE_LONGITUDE = 106.5552;    // Change longitude
 private const double GEOFENCE_RADIUS_KM = 0.5;       // Change radius (km)
 ```
 

@@ -252,13 +252,13 @@ Edit these constants in the Razor components to customize:
 
 ```csharp
 // Check-in interface
-private const double OFFICE_LATITUDE = 47.9123;
-private const double OFFICE_LONGITUDE = 106.9318;
+private const double OFFICE_LATITUDE = 47.5544;
+private const double OFFICE_LONGITUDE = 106.5542;
 private const double GEOFENCE_RADIUS_KM = 0.5; // 500 meters
 
 // Geofence monitoring
-private const double OFFICE_LAT = 47.9123;
-private const double OFFICE_LON = 106.9318;
+private const double OFFICE_LAT = 47.5542;
+private const double OFFICE_LON = 106.5544;
 private const double GEOFENCE_RADIUS = 0.5;
 ```
 

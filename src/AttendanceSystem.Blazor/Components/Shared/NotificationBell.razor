@@ -1,14 +1,17 @@
 @inject AttendanceSystem.Blazor.Services.ApiClient Api
 
 <div class="notification">
-    <button class="icon-btn" @onclick="ToggleMenu" title="Мэдэгдэл">🔔</button>
+    <button class="icon-btn" @onclick="ToggleMenu" title="Мэдэгдэл" aria-label="Мэдэгдэл"
+            aria-expanded="@_open" aria-haspopup="true">
+        🔔
+    </button>
     @if (UnreadCount > 0)
     {
-        <span class="notification-count">@UnreadCount</span>
+        <span class="notification-count" aria-label="@($"{UnreadCount} уншаагүй мэдэгдэл")">@UnreadCount</span>
     }
     @if (_open)
     {
-        <div class="card notification-menu">
+        <div class="card notification-menu" role="dialog" aria-label="Мэдэгдэл">
             @if (isLoading)
             {
                 <div class="notification-item">Loading...</div>
@@ -76,9 +79,9 @@
             var unread = await Api.GetUnreadNotificationCountAsync();
             UnreadCount = unread?.Count ?? 0;
         }
-        catch
+        catch (Exception ex)
         {
-            // Fail silently for count load so header still renders.
+            loadError = $"Мэдэгдлийн тоо ачаалж чадсангүй: {ex.Message}";
         }
     }
 
@@ -105,7 +108,13 @@
     {
         try
         {
-            await Api.MarkNotificationReadAsync(id);
+            var response = await Api.MarkNotificationReadAsync(id);
+            if (!response.IsSuccessStatusCode)
+            {
+                loadError = $"Мэдэгдлийг уншсан болгоход алдаа гарлаа ({(int)response.StatusCode}).";
+                return;
+            }
+
             await LoadAsync();
         }
         catch (Exception ex)
@@ -116,12 +125,24 @@
 
     private async Task MarkAllReadAsync()
     {
-        foreach (var notification in notifications.Where(n => !n.IsRead))
+        try
         {
-            await Api.MarkNotificationReadAsync(notification.Id);
-        }
+            loadError = null;
+            foreach (var notification in notifications.Where(n => !n.IsRead))
+            {
+                var response = await Api.MarkNotificationReadAsync(notification.Id);
+                if (!response.IsSuccessStatusCode)
+                {
+                    loadError = $"Мэдэгдлийг уншсан болгоход алдаа гарлаа ({(int)response.StatusCode}).";
+                    return;
+                }
+            }
 
-        await LoadAsync();
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            loadError = ex.Message;
+        }
     }
 }
-

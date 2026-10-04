@@ -118,7 +118,6 @@ app.MapControllers();
 
 await ApplicationDbSeeder.SeedAsync(app.Services);
 await EmployeeAccountSeeder.SeedEmployeeAccountsAsync(app.Services);
-await FakeDataSeeder.SeedAsync(app.Services);
 await LeavePolicySeeder.SeedAsync(app.Services);
 
 app.Run();

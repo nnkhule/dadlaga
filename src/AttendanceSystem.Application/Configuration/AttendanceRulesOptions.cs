@@ -7,7 +7,7 @@ public class AttendanceRulesOptions
 {
     public const string SectionName = "AttendanceRules";
 
-    public int DefaultGraceMinutes { get; set; } = 10;
+    public int DefaultGraceMinutes { get; set; } = 0;
     public bool RequireGpsForCheckIn { get; set; } = true;
     public bool RequireGpsForCheckOut { get; set; } = true;
     public bool AllowRemoteCheckIn { get; set; } = false;

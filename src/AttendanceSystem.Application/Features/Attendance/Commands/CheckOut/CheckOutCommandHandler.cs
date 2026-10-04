@@ -48,7 +48,10 @@ public class CheckOutCommandHandler : IRequestHandler<CheckOutCommand, Result<At
     public async Task<Result<AttendanceRecordDto>> Handle(CheckOutCommand request, CancellationToken ct)
     {
         var employee = await _employeeRepository.GetByIdAsync(request.EmployeeId, ct);
-        if (employee?.WorkSchedule is null || employee.OfficeLocation is null)
+        if (employee is null || !employee.IsActive)
+            return Result<AttendanceRecordDto>.Failure("Employee not found.", "EMPLOYEE_NOT_FOUND");
+
+        if (employee.WorkSchedule is null || employee.OfficeLocation is null)
             return Result<AttendanceRecordDto>.Failure("Employee not configured.", "CONFIG_MISSING");
 
         var todayLocal = _clock.TodayLocal;
@@ -97,11 +100,11 @@ public class CheckOutCommandHandler : IRequestHandler<CheckOutCommand, Result<At
         var checkOutTime = _clock.LocalNow;
         var workDuration = checkOutTime - record.CheckInTime;
         var breakDuration = _rulesService.CalculateBreakDuration(workDuration, employee.WorkSchedule);
-        var isWeekend = record.Date.DayOfWeek == DayOfWeek.Saturday ||
-                       record.Date.DayOfWeek == DayOfWeek.Sunday;
-        var isHoliday = await _holidayRepository.IsHolidayAsync(todayLocal, ct);
+        var isWeekend = !employee.WorkSchedule.IsWorkDay(record.Date.DayOfWeek);
+        var isHoliday = await _holidayRepository.IsHolidayAsync(record.Date, ct);
         var overtime = _rulesService.CalculateOvertimeHours(
-            workDuration, breakDuration, employee.WorkSchedule, isWeekend, isHoliday);
+            workDuration, breakDuration, employee.WorkSchedule, isWeekend, isHoliday,
+            record.CheckInTime, checkOutTime);
         var shortHours = _rulesService.CalculateShortHours(workDuration, breakDuration, employee.WorkSchedule);
         var status = _rulesService.EvaluateCheckOut(
             record.CheckInTime, checkOutTime, employee.WorkSchedule, record.Status);
@@ -116,6 +119,6 @@ public class CheckOutCommandHandler : IRequestHandler<CheckOutCommand, Result<At
         return Result<AttendanceRecordDto>.Success(new AttendanceRecordDto(
             record.Id, record.EmployeeId, record.Date, record.CheckInTime, record.CheckOutTime,
             record.Status, record.OvertimeHours, record.LateMinutes, record.ShortHours,
-            record.VerificationMethod, record.IsSuspicious, record.IsAutoGeo));
+            record.VerificationMethod, record.IsSuspicious, record.IsAutoGeo, record.BreakDuration));
     }
 }

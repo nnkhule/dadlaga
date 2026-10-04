@@ -164,17 +164,23 @@
         try
         {
             error = null;
-            var resultTask = Api.GetAsync<PagedResponse<LeaveDto>>($"api/leave/requests?status={activeStatus}&pageSize=100");
-            var calendarTask = Api.GetAsync<IReadOnlyList<TeamLeaveCalendarItem>>("api/leave/team-calendar");
-            await Task.WhenAll(resultTask, calendarTask);
-            var result = await resultTask;
+            var result = await Api.GetAsync<PagedResponse<LeaveDto>>($"api/leave/requests?status={activeStatus}&pageSize=100");
             requests = result?.Items ?? [];
-            teamCalendar = await calendarTask ?? [];
         }
         catch (Exception ex)
         {
             error = ex.Message;
             requests = [];
+        }
+
+        try
+        {
+            teamCalendar = await Api.GetAsync<IReadOnlyList<TeamLeaveCalendarItem>>("api/leave/team-calendar") ?? [];
+        }
+        catch (Exception ex)
+        {
+            teamCalendar = [];
+            error ??= $"Багийн чөлөөний календарь ачаалж чадсангүй: {ex.Message}";
         }
         finally
         {

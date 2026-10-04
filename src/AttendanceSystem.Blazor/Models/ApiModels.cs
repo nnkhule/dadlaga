@@ -74,7 +74,8 @@ public sealed record AttendanceDto(
     decimal LateMinutes,
     string? VerificationMethod,
     string? AttendanceStatus,
-    string? Status);
+    string? Status,
+    bool IsSuspicious = false);
 
 public sealed record AttendanceStatisticsDto(
     int PresentDays,
@@ -133,6 +134,7 @@ public sealed record CompanySettingsDto(string? CompanyName, string? TimeZone, s
 public sealed record AttendanceRulesDto(int GraceMinutes, bool RequireGpsForCheckIn, bool RequireGpsForCheckOut, bool AllowRemoteCheckIn, bool OvertimeEnabled);
 public sealed record WorkScheduleSettingsDto(string? Name, TimeOnly? ShiftStart, TimeOnly? ShiftEnd, int BreakDurationMinutes, decimal StandardHoursPerDay);
 public sealed record OfficeLocationSettingsDto(Guid Id, string Name, double Latitude, double Longitude, int RadiusMeters, bool IsActive);
+public sealed record SaveOfficeLocationDto(string Name, double Latitude, double Longitude, int RadiusMeters, bool IsActive);
 public sealed record GpsSettingsDto(bool Enabled, double OfficeLatitude, double OfficeLongitude, double AllowedRadiusMeters, bool BlockOutsideRadius);
 
 public sealed record LoginRequestDto(string Email, string Password);

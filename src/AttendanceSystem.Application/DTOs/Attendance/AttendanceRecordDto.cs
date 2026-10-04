@@ -17,4 +17,5 @@ public record AttendanceRecordDto(
     decimal LateMinutes,
     VerificationMethod VerificationMethod,
     bool IsSuspicious,
-    bool IsAutoGeo);
+    bool IsAutoGeo,
+    TimeSpan? BreakDuration = null);

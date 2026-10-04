@@ -34,6 +34,7 @@
                 <span class="nav-section-label" role="heading" aria-level="2">Удирдлага</span>
                 @NavItem("/admin/employees",  "☷", "Ажилтнууд")
                 @NavItem("/admin/departments", "▥", "Хэлтэс")
+                @NavItem("/admin/office-locations", "⌖", "Оффисын байршил")
                 @NavItem("/admin/reports",    "▤", "Тайлан")
                 @NavItem("/admin/reports/employee", "☉", "Хувийн тайлан")
                 @NavItem("/admin/ai-chat",    "✦", "AI Туслах")
@@ -72,6 +73,7 @@
             </div>
 
             <div class="topbar-actions">
+                <NotificationBell />
                 <button class="ai-toggle-btn @(_chatOpen ? "active" : "")" @onclick="ToggleChat"
                         aria-label="@(_chatOpen ? "AI туслахыг хаах" : "AI туслахыг нээх")"
                         aria-pressed="@_chatOpen"
@@ -1288,6 +1290,9 @@
         get
         {
             var seg = Nav.Uri.Split('/').LastOrDefault(s => !string.IsNullOrWhiteSpace(s)) ?? "dashboard";
+            if (seg.Equals("office-locations", StringComparison.OrdinalIgnoreCase))
+                return "Оффисын байршил";
+
             return seg[0..1].ToUpperInvariant() + seg[1..];
         }
     }

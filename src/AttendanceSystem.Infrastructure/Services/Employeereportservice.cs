@@ -102,7 +102,9 @@ public sealed class EmployeeReportService(ApplicationDbContext db) : IEmployeeRe
 
             if (record.CheckOutTime.HasValue)
             {
-                worked = (record.CheckOutTime.Value - record.CheckInTime).TotalHours;
+                worked = Math.Max(
+                    0,
+                    (record.CheckOutTime.Value - record.CheckInTime - (record.BreakDuration ?? TimeSpan.Zero)).TotalHours);
                 var standardHours = (double)(employee.WorkSchedule?.StandardHoursPerDay ?? 8m);
                 var diff = worked.Value - standardHours;
                 if (diff > 0) overtime = (double)record.OvertimeHours;
